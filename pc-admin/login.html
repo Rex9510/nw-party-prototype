@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录 · 南湾红帆 PC管理端</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html,body{min-height:100%}
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+      color:#1A1A1A;
+      background:linear-gradient(165deg,#F5F3F0 0%,#EDE9E4 45%,#F5F3F0 100%);
+      display:flex;align-items:center;justify-content:center;padding:24px;
+      -webkit-font-smoothing:antialiased;
+    }
+    .card{
+      width:min(420px,100%);background:#fff;border-radius:16px;padding:36px 32px;
+      box-shadow:0 12px 40px rgba(0,0,0,0.08);border:1px solid #E8E5E0;
+    }
+    h1{font-family:'Noto Serif SC',serif;font-size:22px;font-weight:700;text-align:center;margin-bottom:6px}
+    .sub{font-size:13px;color:#9CA3AF;text-align:center;margin-bottom:18px;line-height:1.55}
+    .tabs{display:flex;gap:0;margin-bottom:18px;border-radius:10px;overflow:hidden;border:1px solid #E8E5E0}
+    .tabs button{flex:1;padding:10px 8px;border:none;background:#F5F3F0;font-size:13px;font-weight:600;color:#6B7280;cursor:pointer}
+    .tabs button.on{background:#D44040;color:#fff}
+    label{font-size:13px;font-weight:600;display:block;margin-bottom:6px}
+    input{
+      width:100%;padding:8px 12px;border-radius:8px;border:1px solid #E8E5E0;font-size:13px;
+      background:#F5F3F0;outline:none;margin-bottom:12px;
+    }
+    .row{display:flex;gap:8px;align-items:flex-start}
+    .row input{margin-bottom:12px}
+    .row .grow{flex:1}
+    .codeBtn{flex-shrink:0;padding:8px 12px;border-radius:8px;border:1px solid #D44040;background:#fff;color:#D44040;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+    .codeBtn:disabled{opacity:0.45;cursor:not-allowed}
+    .hint{font-size:11px;color:#9CA3AF;line-height:1.55;margin-bottom:14px}
+    .sms{font-size:11px;color:#6B7280;line-height:1.55;margin-bottom:20px;padding:10px 12px;background:#F8FAFC;border-radius:8px;border:1px solid #E5E7EB}
+    .sms strong{color:#374151}
+    button[type="submit"]{
+      width:100%;padding:11px 0;border:none;border-radius:8px;background:#D44040;color:#fff;
+      font-size:13px;font-weight:600;cursor:pointer;
+    }
+    button[type="submit"]:hover{background:#B83232}
+    .err{font-size:12px;color:#B83232;margin-top:8px;min-height:18px}
+    .hidden{display:none!important}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>南湾红帆</h1>
+    <p class="sub">PC 管理端登录 · 账号为党员档案中的<strong style="color:#6B7280">手机号码</strong>；人员仅在「党员管理」中新增或导入后开通</p>
+    <div class="tabs" role="tablist">
+      <button type="button" class="on" id="tabPwd" aria-selected="true">密码登录</button>
+      <button type="button" id="tabSms" aria-selected="false">验证码登录</button>
+    </div>
+    <form id="loginForm" autocomplete="on">
+      <label for="acc">手机号码（登录账号）</label>
+      <input id="acc" name="username" type="tel" inputmode="numeric" maxlength="11" placeholder="请输入11位手机号" value="13800138000" autocomplete="username">
+
+      <div id="blockPwd">
+        <label for="pwd">密码</label>
+        <input id="pwd" name="password" type="password" placeholder="初始密码以短信形式下发" autocomplete="current-password">
+        <p class="hint">正式环境：开户后系统向该手机发送随机初始密码，登录后请在系统内「修改密码」自行更换。演示环境：填写手机号后点击登录即可进入（不校验真实密码）。</p>
+        <p class="sms" id="smsDemo">短信示例：<strong id="smsText">（加载中）</strong></p>
+      </div>
+
+      <div id="blockSms" class="hidden">
+        <label for="code">短信验证码</label>
+        <div class="row">
+          <input id="code" class="grow" type="text" inputmode="numeric" maxlength="6" placeholder="6位验证码" autocomplete="one-time-code">
+          <button type="button" class="codeBtn" id="btnCode">获取验证码</button>
+        </div>
+        <p class="hint">正式环境：验证码仅下发至已导入白名单的手机号；与小程序「手机号+验证码」二选一方案一致。演示环境：任意 6 位数字即可登录。</p>
+      </div>
+
+      <button type="submit">登录</button>
+      <p id="err" class="err" aria-live="polite"></p>
+    </form>
+  </div>
+  <script>
+    (function () {
+      function pcLoginUrl() {
+        try {
+          return new URL('login.html', window.location.href).href;
+        } catch (e) {
+          return location.origin + '/pc-admin/login.html';
+        }
+      }
+      function smsText(phone, pwd) {
+        var branding = '南湾红帆';
+        return '你的' + branding + '账号已注册，账号：' + phone + '，密码：' + pwd + '，请登录PC后自行修改，PC登录链接' + pcLoginUrl();
+      }
+      var smsEl = document.getElementById('smsText');
+      if (smsEl) smsEl.textContent = smsText('13800138000', '********');
+
+      var mode = 'pwd';
+      var tabPwd = document.getElementById('tabPwd');
+      var tabSms = document.getElementById('tabSms');
+      var blockPwd = document.getElementById('blockPwd');
+      var blockSms = document.getElementById('blockSms');
+      var btnCode = document.getElementById('btnCode');
+      var codeInput = document.getElementById('code');
+
+      function setMode(m) {
+        mode = m;
+        if (m === 'pwd') {
+          tabPwd.classList.add('on');
+          tabSms.classList.remove('on');
+          tabPwd.setAttribute('aria-selected', 'true');
+          tabSms.setAttribute('aria-selected', 'false');
+          blockPwd.classList.remove('hidden');
+          blockSms.classList.add('hidden');
+        } else {
+          tabSms.classList.add('on');
+          tabPwd.classList.remove('on');
+          tabSms.setAttribute('aria-selected', 'true');
+          tabPwd.setAttribute('aria-selected', 'false');
+          blockSms.classList.remove('hidden');
+          blockPwd.classList.add('hidden');
+        }
+      }
+      tabPwd.addEventListener('click', function () { setMode('pwd'); });
+      tabSms.addEventListener('click', function () { setMode('sms'); });
+
+      var cd = 0;
+      btnCode.addEventListener('click', function () {
+        var acc = document.getElementById('acc').value.trim().replace(/\D/g, '');
+        if (!acc || acc.length !== 11) {
+          document.getElementById('err').textContent = '请先输入11位手机号再获取验证码';
+          return;
+        }
+        if (cd > 0) return;
+        cd = 60;
+        btnCode.disabled = true;
+        var t = setInterval(function () {
+          cd--;
+          btnCode.textContent = cd > 0 ? cd + 's' : '获取验证码';
+          if (cd <= 0) {
+            clearInterval(t);
+            btnCode.disabled = false;
+          }
+        }, 1000);
+        btnCode.textContent = '60s';
+        document.getElementById('err').textContent = '';
+        codeInput.value = '123456';
+        codeInput.placeholder = '演示已填入 123456';
+      });
+
+      function hasDemoSession() {
+        try {
+          if (sessionStorage.getItem('nw_admin_demo_session')) return true;
+        } catch (e) {}
+        try {
+          if (localStorage.getItem('nw_admin_demo_session')) return true;
+        } catch (e) {}
+        return false;
+      }
+      function setDemoSession() {
+        try {
+          sessionStorage.setItem('nw_admin_demo_session', '1');
+          return true;
+        } catch (e) {}
+        try {
+          localStorage.setItem('nw_admin_demo_session', '1');
+          return true;
+        } catch (e) {}
+        return false;
+      }
+      if (hasDemoSession()) {
+        location.replace('index.html');
+      }
+      document.getElementById('loginForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var acc = document.getElementById('acc').value.trim().replace(/\D/g, '');
+        var err = document.getElementById('err');
+        err.textContent = '';
+        if (!acc || acc.length !== 11) {
+          err.textContent = '请输入11位手机号码';
+          return;
+        }
+        if (mode === 'sms') {
+          var c = (codeInput.value || '').replace(/\D/g, '');
+          if (c.length !== 6) {
+            err.textContent = '请输入6位短信验证码';
+            return;
+          }
+        }
+        if (!setDemoSession()) {
+          err.textContent = '浏览器禁止了本地存储，请关闭无痕/严格隐私模式，或为本站允许存储后再试。';
+          return;
+        }
+        location.href = 'index.html';
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,3133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>南湾红帆 · 智慧党建平台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body,#root{height:100%;width:100%}
+body{display:flex;align-items:center;justify-content:center;background:#E8E6E1;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+// ============================================
+// iOS Frame Component (iPhone 15 Pro specs)
+// Dynamic Island: 124x36, top:12, centered
+// Content starts at top:54, bottom space for home indicator
+// ============================================
+const IosFrameStyles = {
+  wrapper: { width: 393, height: 852, position: 'relative', margin: '0 auto', background: '#000', borderRadius: 55, padding: 4, boxShadow: '0 24px 80px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.08) inset' },
+  bezel: { width: '100%', height: '100%', borderRadius: 51, overflow: 'hidden', position: 'relative', background: '#1C1C1E' },
+  screen: { width: '100%', height: '100%', borderRadius: 47, overflow: 'visible', position: 'relative', background: '#FAF8F5' },
+  island: { position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', width: 124, height: 36, background: '#000', borderRadius: 20, zIndex: 100 },
+  statusBar: { position: 'absolute', top: 0, left: 0, right: 0, height: 54, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', zIndex: 99, color: '#fff', fontSize: 14, fontWeight: 600 },
+  homeIndicator: { position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)', width: 134, height: 5, background: '#fff', borderRadius: 3, opacity: 0.5, zIndex: 100 }
+};
+
+function IosFrame({ time = '9:41', battery = 85, children, dark = false }) {
+  const sigColor = dark ? '#fff' : '#1a1a1a';
+  return (
+    <div style={IosFrameStyles.wrapper}>
+      <div style={IosFrameStyles.bezel}>
+        <div style={IosFrameStyles.screen}>
+          {children}
+          <div style={IosFrameStyles.island} />
+          <div style={IosFrameStyles.statusBar}>
+            <span style={{ color: sigColor, fontSize: 15, fontWeight: 700, fontFamily: '-apple-system, sans-serif' }}>{time}</span>
+            <svg width="64" height="14" viewBox="0 0 64 14" fill="none">
+              <rect x="0" y="3" width="3" height="8" rx="0.5" fill={sigColor}/>
+              <rect x="4" y="2" width="3" height="9" rx="0.5" fill={sigColor}/>
+              <rect x="8" y="1" width="3" height="10" rx="0.5" fill={sigColor}/>
+              <rect x="12" y="0" width="3" height="11" rx="0.5" fill={sigColor} opacity="0.3"/>
+              <text x="20" y="11" fontSize="9" fill={sigColor} fontFamily="-apple-system" fontWeight="500">5G</text>
+              <rect x="38" y="1" width="22" height="12" rx="3" stroke={sigColor} strokeWidth="1.2" fill="none"/>
+              <rect x="40" y="3" width={14 * (battery / 100)} height="8" rx="1.5" fill={battery > 20 ? sigColor : '#D44040'}/>
+              <path d="M61.5 5.5V8.5" stroke={sigColor} strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+          </div>
+          <div style={IosFrameStyles.homeIndicator} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// Design Tokens
+// ============================================
+const T = {
+  bg: '#FAF8F5', surface: '#FFFFFF', primary: '#D44040', primaryDark: '#B83232',
+  primaryLight: '#FFF0EE', textPrimary: '#1A1A1A', textSecondary: '#6B7280',
+  textMuted: '#9CA3AF', border: '#F0EDEA', success: '#059669', warning: '#D97706',
+  cardPadding: 14, sectionGap: 12, navHeight: 44, tabBarHeight: 50,
+  cardRadius: 14, gridGap: 12, btnPadV: 12, btnPadH: 20
+};
+
+/** i龙岗 小程序短链：仅在微信内置浏览器中点击可唤起；普通浏览器无法直接打开小程序 */
+const WX_MINIPROGRAM_ILG = '#小程序://i龙岗/wMeWysej0d7okgp';
+const AUDIT_RECORDS_STORAGE_KEY = 'nw_archive_audit_records_v1';
+function openILongGangMiniprogram() {
+  var ua = (navigator.userAgent || '').toLowerCase();
+  if (/micromessenger/.test(ua)) {
+    window.location.href = WX_MINIPROGRAM_ILG;
+    return;
+  }
+  window.alert('「#小程序://」链接只在微信里能唤起小程序。\n\n当前为系统浏览器预览：请用手机微信打开本页面后再点，或把下面整行复制到微信任意聊天里发送后点击：\n\n' + WX_MINIPROGRAM_ILG);
+}
+/** 与 PC 管理端「小程序外链配置」共用 localStorage，正式环境改为接口下发 */
+const NW_LEARNING_RUNTIME_STORAGE_KEY = 'nw_learning_runtime_config_v1';
+const NW_LEARNING_RUNTIME_BC = 'nw-learning-runtime';
+
+function defaultLiveSession(idx) {
+  var n = idx + 1;
+  return {
+    id: 'ls_' + n,
+    tagLine: 'AI夜讲堂',
+    posterTitle: '全球人工智能产业',
+    posterName: '胡杰森',
+    cardTitle: '海报：2026 第' + n + '期开讲',
+    themeLine: '主题：发展趋势及AI赋能千行百业案例解析',
+    lecturerLine: '讲师：胡杰森（人工智能专家）',
+    dateLine: '日期：4月16日（周四）19:00-21:00',
+    entryUrl: 'https://live.avalive.cn/pc/#/livePlay/8080808490d0baa1019cfb6576ce53f1',
+    password: '322122',
+    posterImage: '',
+    reg: 0,
+    attend: '—',
+    replay: '—',
+    status: '未开始',
+    promoStartAt: '',
+    promoEndAt: '',
+    sortOrder: idx
+  };
+}
+
+function normalizeLiveSessionsOrder(sessions) {
+  if (!Array.isArray(sessions) || sessions.length === 0) return [];
+  var arr = sessions.map(function (s, i) {
+    var o = Object.assign({}, s, { _orig: i });
+    return o;
+  });
+  arr.sort(function (a, b) {
+    var ao = Number(a.sortOrder);
+    var bo = Number(b.sortOrder);
+    var av = Number.isFinite(ao) ? ao : a._orig;
+    var bv = Number.isFinite(bo) ? bo : b._orig;
+    if (av !== bv) return av - bv;
+    return a._orig - b._orig;
+  });
+  return arr.map(function (s, i) {
+    var out = Object.assign({}, s);
+    delete out._orig;
+    out.sortOrder = i;
+    return out;
+  });
+}
+
+function nwLearningRuntimeDefaults() {
+  var s0 = defaultLiveSession(0);
+  var s1 = defaultLiveSession(1);
+  s1.tagLine = '红色讲堂';
+  s1.posterTitle = '基层治理现代化';
+  s1.posterName = '李明';
+  s1.cardTitle = '海报：2026 第2期开讲';
+  s1.themeLine = '主题：党建引领社区治理实践';
+  s1.lecturerLine = '讲师：李明（党校教师）';
+  s1.dateLine = '日期：5月10日（周六）14:00-16:00';
+  s1.password = '888888';
+  return {
+    platformLinks: {
+      '共产党员网': 'https://www.12371.cn/',
+      '学习强国': 'https://www.xuexi.cn/',
+      '深i学': 'https://www.szlll.net.cn/',
+      '深圳智慧党建': 'https://mp.weixin.qq.com/s/ZC1ovvIR68a7ZwyIWb9vGg',
+    },
+    liveSessions: [s0, s1],
+    shenXiaoFuMiniLink: '#小程序://深小服',
+  };
+}
+
+function normalizeLearningRuntimeObj(o) {
+  var base = nwLearningRuntimeDefaults();
+  var platformLinks = Object.assign({}, base.platformLinks, o.platformLinks || {});
+  var liveSessions = [];
+  if (Array.isArray(o.liveSessions) && o.liveSessions.length > 0) {
+    liveSessions = o.liveSessions.map(function (s, i) {
+      return Object.assign({}, defaultLiveSession(i), s, { id: (s && s.id) ? String(s.id) : 'ls_' + (i + 1) });
+    });
+  } else if (o.liveEntryUrl) {
+    liveSessions = [Object.assign({}, defaultLiveSession(0), {
+      entryUrl: String(o.liveEntryUrl),
+      password: o.livePassword != null ? String(o.livePassword) : ''
+    })];
+  } else {
+    liveSessions = JSON.parse(JSON.stringify(base.liveSessions));
+  }
+  liveSessions = normalizeLiveSessionsOrder(liveSessions);
+  return {
+    platformLinks: platformLinks,
+    liveSessions: liveSessions,
+    shenXiaoFuMiniLink: o.shenXiaoFuMiniLink != null ? String(o.shenXiaoFuMiniLink) : base.shenXiaoFuMiniLink,
+  };
+}
+
+function readLearningRuntime() {
+  var base = nwLearningRuntimeDefaults();
+  try {
+    var raw = localStorage.getItem(NW_LEARNING_RUNTIME_STORAGE_KEY);
+    if (!raw) return JSON.parse(JSON.stringify(base));
+    return normalizeLearningRuntimeObj(JSON.parse(raw));
+  } catch (e) {
+    return JSON.parse(JSON.stringify(base));
+  }
+}
+
+function openShenXiaoFuMiniProgram() {
+  var link = (readLearningRuntime().shenXiaoFuMiniLink || '').trim() || '#小程序://深小服';
+  var ua = (navigator.userAgent || '').toLowerCase();
+  if (/micromessenger/.test(ua)) {
+    window.location.href = link;
+    return;
+  }
+  window.alert('「深小服」小程序链接需在微信内打开。\n\n当前为系统浏览器预览：请用手机微信打开本页面后再点，或把下面整行复制到微信任意聊天里发送后点击：\n\n' + link);
+}
+
+/** 学习资源页：一级平台在系统浏览器中直接打开官网/H5；若为 #小程序:// 则仅在微信内跳转；公众号 mp 域名在微信内打开 */
+function openExternalOrMiniProgramLink(url, titleForAlert) {
+  if (!url || typeof url !== 'string' || !url.trim()) {
+    window.alert((titleForAlert || '该入口') + '尚未配置链接，请向实施同事索要正式地址后写入原型配置。');
+    return;
+  }
+  url = url.trim();
+  if (url.indexOf('#小程序://') === 0) {
+    var ua = (navigator.userAgent || '').toLowerCase();
+    if (/micromessenger/.test(ua)) {
+      window.location.href = url;
+      return;
+    }
+    window.alert('该入口为微信小程序短链，请在微信内打开本页面后再试；或复制下面整行到微信聊天中打开：\n\n' + url);
+    return;
+  }
+  /** 微信公众号：profile_ext / 任意图文链接等，仅微信内核可正常进号；外链需复制到微信 */
+  if (/^https?:\/\/mp\.weixin\.qq\.com\//i.test(url)) {
+    var uaMp = (navigator.userAgent || '').toLowerCase();
+    var withHash = /#wechat_redirect/i.test(url) ? url : (url.replace(/#.*$/, '') + '#wechat_redirect');
+    if (/micromessenger/.test(uaMp)) {
+      window.location.href = withHash;
+      return;
+    }
+    window.alert(
+      '「' + (titleForAlert || '该公众号') + '」为微信平台链接，在系统浏览器中无法直接打开公众号主页。\n\n' +
+        '请使用【手机微信】打开本页面后再点；或复制下面整段链接，发到微信任意聊天里再点开：\n\n' +
+        withHash
+    );
+    return;
+  }
+  try {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  } catch (e) {
+    window.location.href = url;
+  }
+}
+
+// 学习资源外链 / 多场直播 / 深小服：默认值见 nwLearningRuntimeDefaults()；由 PC「学习 → 学习外链配置 / 直播管理」写入 localStorage 覆盖
+
+// ============================================
+// SVG Icons (line-art, no emoji)
+// ============================================
+const Icons = {
+  Back: () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>,
+  ChevronRight: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 6l6 6-6 6"/></svg>,
+  ChevronDown: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 9l6 6 6-6"/></svg>,
+  Home: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 10.5L12 3l9 7.5V21a1 1 0 01-1 1H4a1 1 0 01-1-1V10.5z"/><path d="M9 22V12h6v10"/></svg>,
+  Book: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M4 4h12a2 2 0 012 2v14l-3-1.5L12 20l-3-1.5L6 20V6a2 2 0 012-2z"/><path d="M4 4v14"/></svg>,
+  Service: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>,
+  User: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0112 0v1"/></svg>,
+  Users: () => <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="9" cy="7" r="3"/><path d="M3 21v-1a5 5 0 015-5h2a5 5 0 015 5v1"/><circle cx="17" cy="7" r="2.5"/><path d="M21 21v-1a4 4 0 00-3-3.87"/></svg>,
+  Chat: () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 01-3.36 6.94L12 21l-1.28-1.06A9 9 0 1121 12z"/><path d="M8 10h.01M12 10h.01M16 10h.01"/></svg>,
+  Doc: () => <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h3"/></svg>,
+  Location: () => <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>,
+  Play: () => <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16" fill="currentColor" stroke="none"/></svg>,
+  Chart: () => <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>,
+  Video: () => <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="15" height="16" rx="2"/><path d="M17 8l5-3v14l-5-3"/></svg>,
+  Briefcase: () => <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/><path d="M2 14h20"/></svg>,
+  Store: () => <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M3 9l2-5h14l2 5"/><path d="M2 9h20v11a1 1 0 01-1 1H3a1 1 0 01-1-1V9z"/><path d="M7 14h10"/></svg>,
+  Alert: () => <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>,
+  Audit: () => <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>,
+  Check: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 7"/></svg>,
+  X: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>,
+  Clock: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>,
+  MapPin: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2"/></svg>,
+  Send: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>,
+  Calendar: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>,
+  QR: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="3" height="3"/><rect x="18" y="18" width="3" height="3"/><rect x="14" y="18" width="3" height="3"/></svg>,
+  Settings: () => <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>,
+  Search: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>,
+  Heart: () => <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>,
+  Phone: () => <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.905.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.905.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>,
+  Shield: () => <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
+  Award: () => <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="12" cy="8" r="6"/><path d="M8.5 13.5l-2 8 5.5-3 5.5 3-2-8"/></svg>,
+  Download: () => <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+  Truck: () => <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>,
+  Info: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>,
+  Edit: () => <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+  TrendUp: () => <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><polyline points="23,6 13.5,15.5 8.5,10.5 1,18"/><polyline points="17,6 23,6 23,12"/></svg>,
+  Camera: () => <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>,
+  Eye: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>,
+  EyeOff: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 10-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+};
+
+// ============================================
+// Navigation System
+// ============================================
+function useNavigation(initial = 'login') {
+  const [history, setHistory] = React.useState([initial]);
+  const [tabBarActive, setTabBarActive] = React.useState(null);
+  const [userRole, setUserRole] = React.useState('member'); // 'member' | 'admin'
+  const screen = history[history.length - 1];
+  const navigateTo = React.useCallback((s, tab) => {
+    setHistory(prev => [...prev, s]);
+    if (tab !== undefined) setTabBarActive(tab);
+  }, []);
+  const goBack = React.useCallback(() => {
+    setHistory(prev => prev.length > 1 ? prev.slice(0, -1) : prev);
+  }, []);
+  const switchTab = React.useCallback((tab, s) => {
+    setTabBarActive(tab);
+    setHistory([s]);
+  }, []);
+  return { screen, navigateTo, goBack, tabBarActive, switchTab, history, userRole, setUserRole };
+}
+
+// ============================================
+// Reusable Components
+// ============================================
+const Card = ({ style: extraStyle, children, onClick }) => (
+  <div onClick={onClick} style={{
+    background: T.surface, borderRadius: T.cardRadius, padding: `${T.cardPadding}px`,
+    boxShadow: '0 1px 3px rgba(0,0,0,0.04)', border: `1px solid ${T.border}`,
+    ...(onClick ? { cursor: 'pointer' } : {}), ...extraStyle
+  }}>{children}</div>
+);
+
+const NavBar = ({ title, onBack, right, dark, bg }) => (
+  <div style={{
+    position: 'sticky', top: 0, zIndex: 50, height: T.navHeight,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: bg || (dark ? 'linear-gradient(135deg, #D44040, #B83232)' : T.surface),
+    borderBottom: dark ? 'none' : `1px solid ${T.border}`,
+    padding: '0 8px'
+  }}>
+    <div style={{ position: 'absolute', left: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+      {onBack && <div onClick={onBack} style={{ cursor: 'pointer', padding: 6, borderRadius: 8, display: 'flex', color: dark ? '#fff' : T.textPrimary }}>
+        <Icons.Back />
+      </div>}
+    </div>
+    <span style={{
+      fontFamily: "'Noto Serif SC', serif", fontSize: 16, fontWeight: 600,
+      color: dark ? '#fff' : T.textPrimary
+    }}>{title}</span>
+    {right && <div style={{ position: 'absolute', right: 8 }}>{right}</div>}
+  </div>
+);
+
+const TabBar = ({ active, onSwitch, items }) => (
+  <div style={{
+    flexShrink: 0, height: T.tabBarHeight,
+    background: T.surface, borderTop: `1px solid ${T.border}`,
+    display: 'flex', alignItems: 'center', justifyContent: 'space-around',
+    zIndex: 50
+  }}>
+    {items.map(item => {
+      const isActive = active === item.key;
+      return (
+        <div key={item.key} onClick={() => onSwitch(item.key, item.screen)} style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+          cursor: 'pointer', color: isActive ? T.primary : T.textMuted, padding: '4px 12px'
+        }}>
+          {React.createElement(item.icon)}
+          <span style={{ fontSize: 10, fontWeight: isActive ? 600 : 400 }}>{item.label}</span>
+        </div>
+      );
+    })}
+  </div>
+);
+
+const tabItems = [
+  { key: 'home', label: '首页', icon: Icons.Home, screen: 'home' },
+  { key: 'learn', label: '学习', icon: Icons.Book, screen: 'learning' },
+  { key: 'service', label: '服务', icon: Icons.Service, screen: 'lifeServices' },
+  { key: 'profile', label: '我的', icon: Icons.User, screen: 'profile' }
+];
+
+// ============================================
+// Screen 1: Login
+// ============================================
+const LoginScreen = ({ onLogin, role, setRole }) => {
+  const [showRole, setShowRole] = React.useState(false);
+  const [loginMethod, setLoginMethod] = React.useState('wechat'); // wechat | sms
+  const [smsPhone, setSmsPhone] = React.useState('13812345678');
+  const [smsCode, setSmsCode] = React.useState('');
+  const [smsHint, setSmsHint] = React.useState('');
+  const [smsCd, setSmsCd] = React.useState(0);
+  React.useEffect(() => {
+    if (smsCd <= 0) return undefined;
+    const t = window.setInterval(() => setSmsCd((c) => (c <= 1 ? 0 : c - 1)), 1000);
+    return () => window.clearInterval(t);
+  }, [smsCd]);
+  const loginStyles = {
+    container: { height: '100%', background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32 },
+    logo: { width: 96, height: 96, borderRadius: 24, background: 'linear-gradient(135deg, #D44040, #B83232)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+    appName: { fontFamily: "'Noto Serif SC', serif", fontSize: 20, fontWeight: 700, color: T.textPrimary, marginBottom: 6 },
+    subtitle: { fontSize: 13, color: T.textMuted, marginBottom: 40 },
+    loginBtn: { width: '100%', padding: '14px 20px', background: 'linear-gradient(135deg, #D44040, #E85D5D)', color: '#fff', border: 'none', borderRadius: 12, fontSize: 16, fontWeight: 600, fontFamily: "'Noto Serif SC', serif", cursor: 'pointer', marginBottom: 16 },
+    agree: { fontSize: 11, color: T.textMuted, textAlign: 'center', lineHeight: 1.6, marginBottom: 24 },
+    notice: { background: '#FFF7ED', borderRadius: 10, padding: 12, border: '1px solid #FED7AA', width: '100%' },
+    noticeTitle: { fontSize: 12, fontWeight: 600, color: '#C2410C', marginBottom: 4 },
+    noticeText: { fontSize: 11, color: '#9A3412', lineHeight: 1.5 },
+    roleBtn: { position: 'absolute', bottom: 20, right: 20, padding: '6px 12px', background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, fontSize: 11, color: T.textMuted, cursor: 'pointer' },
+    roleOverlay: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60 },
+    roleModal: { background: T.surface, borderRadius: 16, padding: 24, width: '80%', maxWidth: 260 },
+    roleOption: (active) => ({ padding: '12px 16px', borderRadius: 10, border: `2px solid ${active ? T.primary : T.border}`, background: active ? T.primaryLight : T.surface, cursor: 'pointer', marginBottom: 10, textAlign: 'center' }),
+    roleLabel: (active) => ({ fontSize: 14, fontWeight: 600, color: active ? T.primary : T.textPrimary }),
+    roleDesc: { fontSize: 11, color: T.textMuted, marginTop: 2 },
+    tabRow: { display: 'flex', width: '100%', maxWidth: 320, marginBottom: 16, borderRadius: 10, overflow: 'hidden', border: `1px solid ${T.border}` },
+    tabBtn: (on) => ({
+      flex: 1, padding: '10px 8px', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+      background: on ? T.primary : T.bg, color: on ? '#fff' : T.textSecondary,
+    }),
+    input: { width: '100%', maxWidth: 320, padding: '12px 14px', borderRadius: 10, border: `1px solid ${T.border}`, fontSize: 15, marginBottom: 10, outline: 'none', boxSizing: 'border-box' },
+    smsRow: { display: 'flex', width: '100%', maxWidth: 320, gap: 8, marginBottom: 10 },
+    smsBtn: { flexShrink: 0, padding: '0 14px', borderRadius: 10, border: `1px solid ${T.primary}`, background: '#fff', color: T.primary, fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' },
+  };
+  const doSmsLogin = () => {
+    const p = smsPhone.replace(/\D/g, '');
+    if (p.length !== 11) { setSmsHint('请输入11位手机号'); return; }
+    const c = smsCode.replace(/\D/g, '');
+    if (c.length !== 6) { setSmsHint('请输入6位验证码'); return; }
+    setSmsHint('');
+    onLogin(role);
+  };
+  return (
+    <div style={{ ...loginStyles.container, position: 'relative' }}>
+      <div style={loginStyles.logo}>
+        <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+          <path d="M26 6 L14 22 L14 46 L22 46 L22 32 L30 32 L30 46 L38 46 L38 22 Z" fill="white" opacity="0.95"/>
+          <circle cx="26" cy="18" r="6" fill="white" opacity="0.9"/>
+          <rect x="22" y="20" width="8" height="12" rx="1" fill="white" opacity="0.85"/>
+        </svg>
+      </div>
+      <div style={loginStyles.appName}>南湾红帆</div>
+      <div style={loginStyles.subtitle}>龙岗南湾街道 · 智慧党建平台 · 与 PC 档案手机号同源</div>
+      <div style={loginStyles.tabRow}>
+        <button type="button" style={loginStyles.tabBtn(loginMethod === 'wechat')} onClick={() => { setLoginMethod('wechat'); setSmsHint(''); }}>微信登录</button>
+        <button type="button" style={loginStyles.tabBtn(loginMethod === 'sms')} onClick={() => { setLoginMethod('sms'); setSmsHint(''); }}>验证码登录</button>
+      </div>
+      {loginMethod === 'wechat' ? (
+        <button style={loginStyles.loginBtn} onClick={() => onLogin(role)}>微信授权手机号登录</button>
+      ) : (
+        <>
+          <input style={loginStyles.input} type="tel" inputMode="numeric" maxLength={11} placeholder="11位手机号" value={smsPhone} onChange={(e) => setSmsPhone(e.target.value)} />
+          <div style={loginStyles.smsRow}>
+            <input style={{ ...loginStyles.input, flex: 1, marginBottom: 0, maxWidth: 'none' }} type="text" inputMode="numeric" maxLength={6} placeholder="6位验证码" value={smsCode} onChange={(e) => setSmsCode(e.target.value)} />
+            <button
+              type="button"
+              style={{ ...loginStyles.smsBtn, opacity: smsCd > 0 ? 0.5 : 1, cursor: smsCd > 0 ? 'default' : 'pointer' }}
+              disabled={smsCd > 0}
+              onClick={() => {
+                const p = smsPhone.replace(/\D/g, '');
+                if (p.length !== 11) { setSmsHint('请先填写正确手机号'); return; }
+                setSmsCd(60);
+                setSmsCode('123456');
+                setSmsHint('演示：已自动填入验证码 123456');
+              }}
+            >{smsCd > 0 ? `${smsCd}s` : '获取验证码'}</button>
+          </div>
+          {smsHint ? <div style={{ fontSize: 11, color: '#059669', marginBottom: 10, maxWidth: 320 }}>{smsHint}</div> : null}
+          <button style={loginStyles.loginBtn} onClick={doSmsLogin}>手机号登录</button>
+        </>
+      )}
+      <div style={loginStyles.agree}>
+        {loginMethod === 'wechat'
+          ? <>微信将授权获取您的<strong>手机号码</strong>，作为小程序端<strong>唯一登录标识</strong>（须与 PC「党员管理」档案中手机号一致）。登录即表示同意《用户服务协议》和《隐私政策》</>
+          : <>验证码将发送至已导入白名单的手机号；与 PC 管理端「验证码登录」一致。登录即表示同意《用户服务协议》和《隐私政策》</>}
+      </div>
+      <div style={loginStyles.notice}>
+        <div style={loginStyles.noticeTitle}>提示</div>
+        <div style={loginStyles.noticeText}>本平台仅限辖区党员使用。修改绑定手机号须由具备 PC「党员管理」权限的工作人员在后台档案中办理，小程序内不提供改号入口。</div>
+      </div>
+      <button style={loginStyles.roleBtn} onClick={() => setShowRole(true)}>
+        当前：{role === 'member' ? '党员' : '管理员'}
+      </button>
+
+      {showRole && (
+        <div style={loginStyles.roleOverlay} onClick={() => setShowRole(false)}>
+          <div style={loginStyles.roleModal} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8, textAlign: 'center', fontFamily: "'Noto Serif SC', serif" }}>选择登录身份</div>
+            <p style={{ fontSize: 11, color: T.textMuted, lineHeight: 1.5, marginBottom: 14, textAlign: 'center' }}>仅原型演示切换。正式环境由「党员管理」档案 +「权限管理」系统身份统一下发，与 PC 一致。</p>
+            <div style={loginStyles.roleOption(role === 'member')} onClick={() => { setRole('member'); setShowRole(false); }}>
+              <div style={loginStyles.roleLabel(role === 'member')}>党员端</div>
+              <div style={loginStyles.roleDesc}>出示党员码 · 查看学习记录</div>
+            </div>
+            <div style={loginStyles.roleOption(role === 'admin')} onClick={() => { setRole('admin'); setShowRole(false); }}>
+              <div style={loginStyles.roleLabel(role === 'admin')}>管理员端</div>
+              <div style={loginStyles.roleDesc}>扫码核验 · 活动管理</div>
+            </div>
+            <button onClick={() => setShowRole(false)} style={{ width: '100%', padding: '10px 0', background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, cursor: 'pointer', color: T.textMuted, marginTop: 4 }}>取消</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================
+// Screen 2: Home
+// ============================================
+const HomeScreen = ({ nav }) => {
+  const [showSub, setShowSub] = React.useState(false);
+  const [showYearPicker, setShowYearPicker] = React.useState(false);
+  const [year, setYear] = React.useState('2026');
+  const years = ['2026', '2025', '2024', '2023'];
+
+  const homeStyles = {
+    container: { height: '100%', background: T.bg, display: 'flex', flexDirection: 'column' },
+    content: { flex: 1, overflowY: 'auto', padding: '8px 14px 16px' },
+    yearCard: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', marginBottom: T.sectionGap, cursor: 'pointer' },
+    yearText: { fontFamily: "'Noto Serif SC', serif", fontSize: 15, fontWeight: 600, color: T.textPrimary },
+    yearBadge: { fontSize: 11, color: T.primary, background: T.primaryLight, padding: '3px 8px', borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: 4 },
+    yearList: { marginTop: -6, marginBottom: 10, borderRadius: 12, border: `1px solid ${T.border}`, background: T.surface, overflow: 'hidden' },
+    yearItem: (active) => ({ padding: '10px 14px', fontSize: 13, color: active ? T.primary : T.textPrimary, background: active ? '#FFF5F5' : T.surface, fontWeight: active ? 600 : 500, cursor: 'pointer', borderBottom: `1px solid ${T.border}` }),
+    moduleCard: { background: T.surface, borderRadius: 14, padding: 14, border: `1px solid ${T.border}`, marginBottom: 10, cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' },
+    moduleHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+    moduleIcon: { width: 38, height: 38, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    moduleTitle: { fontSize: 15, fontWeight: 700, fontFamily: "'Noto Serif SC', serif", color: T.textPrimary },
+    moduleSub: { fontSize: 12, color: T.textSecondary, lineHeight: 1.6 },
+    aiIcon: { background: '#EFF6FF', color: '#1D4ED8' },
+    qaCard: { background: 'linear-gradient(135deg, #D44040, #E87040)', borderColor: 'transparent' },
+    qaIcon: { background: 'rgba(255,255,255,0.2)', color: '#fff' },
+    qaTitle: { fontSize: 15, fontWeight: 700, fontFamily: "'Noto Serif SC', serif", color: '#fff' },
+    qaSub: { fontSize: 12, color: 'rgba(255,255,255,0.88)', lineHeight: 1.55 },
+    auditIcon: { background: '#FFF0EE', color: T.primary },
+    overlay: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60 },
+    modal: { background: T.surface, borderRadius: 16, padding: 20, width: '80%', maxWidth: 280 }
+  };
+
+  return (
+    <div style={homeStyles.container}>
+      <NavBar title="南湾红帆" right={
+        <div onClick={() => setShowSub(true)} style={{ cursor: 'pointer', padding: 6, borderRadius: 8, display: 'flex', color: T.textPrimary }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+        </div>
+      } />
+      <div style={homeStyles.content}>
+        <Card style={homeStyles.yearCard} onClick={() => setShowYearPicker(v => !v)}>
+          <span style={homeStyles.yearText}>{year}年</span>
+          <span style={homeStyles.yearBadge}>可选年份 <Icons.ChevronDown /></span>
+        </Card>
+        {showYearPicker && (
+          <div style={homeStyles.yearList}>
+            {years.map((y, idx) => (
+              <div
+                key={y}
+                style={{ ...homeStyles.yearItem(y === year), borderBottom: idx === years.length - 1 ? 'none' : `1px solid ${T.border}` }}
+                onClick={() => { setYear(y); setShowYearPicker(false); }}
+              >
+                {y}年
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={homeStyles.moduleCard} onClick={() => nav.navigateTo('aiProfile')}>
+          <div style={homeStyles.moduleHead}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ ...homeStyles.moduleIcon, ...homeStyles.aiIcon }}><Icons.Chart /></div>
+              <div style={homeStyles.moduleTitle}>AI画像</div>
+            </div>
+            <Icons.ChevronRight />
+          </div>
+          <div style={homeStyles.moduleSub}>总结个人情况，查看成长轨迹、风险提示与能力评估。</div>
+        </div>
+
+        <div style={{ ...homeStyles.moduleCard, ...homeStyles.qaCard }} onClick={openShenXiaoFuMiniProgram}>
+          <div style={homeStyles.moduleHead}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ ...homeStyles.moduleIcon, ...homeStyles.qaIcon }}><Icons.Chat /></div>
+              <div style={homeStyles.qaTitle}>党务智能问答</div>
+            </div>
+            <span style={{ color: '#fff' }}><Icons.ChevronRight /></span>
+          </div>
+          <div style={homeStyles.qaSub}>点击跳转深小服小程序，快速咨询党务政策与办事问题。</div>
+        </div>
+
+        <div style={homeStyles.moduleCard} onClick={() => nav.navigateTo('archiveAudit')}>
+          <div style={homeStyles.moduleHead}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ ...homeStyles.moduleIcon, ...homeStyles.auditIcon }}><Icons.Audit /></div>
+              <div style={homeStyles.moduleTitle}>智能资料审核</div>
+            </div>
+            <Icons.ChevronRight />
+          </div>
+          <div style={homeStyles.moduleSub}>支持现拍、本地照片、本地文件组合上传，自动检核并输出问题清单。</div>
+        </div>
+      </div>
+
+      <TabBar active="home" onSwitch={nav.switchTab} items={tabItems} />
+
+      {showSub && (
+        <div style={homeStyles.overlay} onClick={() => setShowSub(false)}>
+          <div style={homeStyles.modal} onClick={e => e.stopPropagation()}>
+            <div style={{ fontFamily: "'Noto Serif SC', serif", fontSize: 16, fontWeight: 600, marginBottom: 12 }}>订阅通知</div>
+            <div style={{ fontSize: 13, color: T.textSecondary, marginBottom: 16, lineHeight: 1.6 }}>是否开启重要通知推送？包括活动提醒、学习更新等。</div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setShowSub(false)} style={{ flex: 1, padding: '10px 0', background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 14, color: T.textPrimary, cursor: 'pointer' }}>暂不开启</button>
+              <button onClick={() => setShowSub(false)} style={{ flex: 1, padding: '10px 0', background: T.primary, border: 'none', borderRadius: 10, fontSize: 14, color: '#fff', cursor: 'pointer' }}>开启</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================
+// Screen 3: Profile
+// ============================================
+const ProfileScreen = ({ nav, role }) => {
+  const [showQR, setShowQR] = React.useState(false);
+  const [showActModal, setShowActModal] = React.useState(false);
+  const [selectedActIdx, setSelectedActIdx] = React.useState(0);
+  const [phoneRevealed, setPhoneRevealed] = React.useState(false);
+
+  // Define all styles at the top level to prevent React rendering issues
+  const profStyles = {
+    container: { height: '100%', background: T.bg, display: 'flex', flexDirection: 'column' },
+    header: { background: 'linear-gradient(135deg, #D44040, #B83232)', padding: '20px 16px 48px', display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 },
+    avatar: { width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: '#fff', fontFamily: "'Noto Serif SC', serif", fontWeight: 700, flexShrink: 0 },
+    name: { fontSize: 17, fontWeight: 700, color: '#fff', fontFamily: "'Noto Serif SC', serif" },
+    branch: { fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 3 },
+    // QR card
+    qrCard: { margin: '-32px 14px 0', background: T.surface, borderRadius: 16, padding: '24px 20px', textAlign: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.06)', border: `1px solid ${T.border}` },
+    qrCardTitle: { fontSize: 13, color: T.textSecondary, marginBottom: 16 },
+    qrDisplay: { width: 140, height: 140, background: '#fff', borderRadius: 12, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #eee', padding: 8 },
+    qrCardHint: { fontSize: 12, color: T.textMuted, marginTop: 16 },
+    // Profile info
+    infoSection: { padding: '14px 14px 0' },
+    infoTitle: { fontSize: 14, fontWeight: 700, fontFamily: "'Noto Serif SC', serif", color: T.textPrimary, marginBottom: 10 },
+    infoCard: { background: T.surface, borderRadius: 14, border: `1px solid ${T.border}`, overflow: 'hidden' },
+    row: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px' },
+    rowSensitive: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' },
+    label: { fontSize: 13, color: T.textSecondary },
+    value: { fontSize: 13, color: T.textPrimary, fontWeight: 500 },
+    valueWithIcon: { display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, justifyContent: 'flex-end' },
+    divider: { height: 1, background: T.border, marginLeft: 48 },
+    // Activity history button
+    btnWrap: { padding: '14px 14px 20px' },
+    btn: { width: '100%', padding: '14px 20px', background: T.primary, color: '#fff', border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 },
+    // QR modal
+    overlay: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60 },
+    qrModal: { background: T.surface, borderRadius: 20, padding: 28, width: '85%', maxWidth: 300, textAlign: 'center' },
+    qrTitle: { fontSize: 16, fontWeight: 700, fontFamily: "'Noto Serif SC', serif", marginBottom: 4 },
+    qrSub: { fontSize: 12, color: T.textMuted, marginBottom: 16 },
+    qrModalDisplay: { width: 200, height: 200, background: '#f5f5f5', borderRadius: 12, margin: '0 auto 16px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    qrInfo: { fontSize: 13, color: T.textSecondary, lineHeight: 1.8, textAlign: 'left' }
+  };
+
+  const adminStyles = {
+    container: { height: '100%', background: T.bg, display: 'flex', flexDirection: 'column' },
+    header: { background: 'linear-gradient(135deg, #D44040, #B83232)', padding: '20px 16px 24px', display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 },
+    avatar: { width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: '#fff', fontFamily: "'Noto Serif SC', serif", fontWeight: 700, flexShrink: 0 },
+    name: { fontSize: 17, fontWeight: 700, color: '#fff', fontFamily: "'Noto Serif SC', serif" },
+    branch: { fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 3 },
+    // Activity selector card
+    activitySection: { padding: '14px 14px 0' },
+    activityCard: { background: T.surface, borderRadius: 14, padding: '14px 16px', border: `1px solid ${T.border}`, boxShadow: '0 2px 8px rgba(0,0,0,0.04)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+    activityLabel: { fontSize: 11, color: T.textMuted, marginBottom: 4 },
+    activityName: { fontSize: 14, fontWeight: 600, color: T.textPrimary },
+    activityMeta: { fontSize: 11, color: T.textMuted, marginTop: 2 },
+    activityBadge: { display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: '#ECFDF5', color: T.success, marginLeft: 8 },
+    activityChevron: { color: T.textMuted, flexShrink: 0 },
+    // Stats bar
+    statsBar: { display: 'flex', gap: 10, padding: '10px 14px 0' },
+    statCard: { flex: 1, background: T.surface, borderRadius: 12, padding: '12px 10px', textAlign: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: `1px solid ${T.border}` },
+    statNum: { fontSize: 22, fontWeight: 700, color: T.primary, fontFamily: "'Noto Serif SC', serif" },
+    statLabel: { fontSize: 10, color: T.textMuted, marginTop: 2 },
+    // Scan button
+    scanSection: { padding: '14px 14px 0' },
+    scanBtn: { display: 'flex', alignItems: 'center', gap: 14, background: 'linear-gradient(135deg, #D44040, #E87040)', borderRadius: 14, padding: '16px 18px', cursor: 'pointer', boxShadow: '0 4px 12px rgba(212,64,64,0.3)' },
+    scanBtnIcon: { width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+    scanBtnText: { fontSize: 15, fontWeight: 700, color: '#fff', fontFamily: "'Noto Serif SC', serif" },
+    scanBtnSub: { fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 3 },
+    // Section title
+    sectionTitle: { padding: '16px 14px 10px', fontSize: 14, fontWeight: 700, fontFamily: "'Noto Serif SC', serif", color: T.textPrimary },
+    quickGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: T.gridGap, padding: '0 14px 16px' },
+    quickItem: { background: T.surface, borderRadius: 12, padding: '14px 12px', display: 'flex', alignItems: 'center', gap: 10, border: `1px solid ${T.border}`, cursor: 'pointer' },
+    quickIcon: { width: 36, height: 36, borderRadius: 10, background: T.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.primary, flexShrink: 0 },
+    quickLabel: { fontSize: 12, color: T.textPrimary, fontWeight: 500 },
+    // Activity modal
+    overlay: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-end', zIndex: 60 },
+    actModal: { background: T.surface, borderRadius: '20px 20px 0 0', padding: '20px 16px 32px', width: '100%' },
+    actModalTitle: { fontSize: 15, fontWeight: 700, fontFamily: "'Noto Serif SC', serif", marginBottom: 16, textAlign: 'center' },
+    actItem: (active) => ({ padding: '12px 14px', borderRadius: 10, marginBottom: 8, border: `2px solid ${active ? T.primary : T.border}`, background: active ? T.primaryLight : T.surface, cursor: 'pointer' }),
+    actItemName: { fontSize: 13, fontWeight: 600, color: T.textPrimary },
+    actItemMeta: { fontSize: 11, color: T.textMuted, marginTop: 2 },
+    actItemBadge: (live) => ({ display: 'inline-block', padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 600, background: live ? '#ECFDF5' : '#F3F4F6', color: live ? T.success : T.textMuted, marginLeft: 6 })
+  };
+
+  const maskMobile = (raw) => {
+    const s = String(raw || '').replace(/\D/g, '');
+    if (s.length < 7) return raw || '—';
+    if (s.length === 11) return s.slice(0, 3) + '****' + s.slice(-4);
+    return s.slice(0, 3) + '****' + s.slice(-2);
+  };
+
+  const profileData = [
+    { label: '姓名', value: '张伟' },
+    { label: '系统身份', value: '书记' },
+    { label: '性别', value: '男' },
+    { label: '入党时间', value: '2019年3月' },
+    { label: '教育程度', value: '本科' },
+    { label: '手机号码', value: '13812345678', sensitive: 'phone' },
+    { label: '党籍状态', value: '正式党员' },
+    { label: '评定等级', value: '优秀' },
+    { label: '联系人', value: '李芳（党务专员）' },
+  ];
+
+  // ---- Member view ----
+  if (role === 'member') {
+    return (
+      <div style={profStyles.container}>
+        <NavBar title="个人信息" onBack={nav.goBack} dark />
+        <div style={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
+          <div style={profStyles.header}>
+            <div style={profStyles.avatar}>张</div>
+            <div>
+              <div style={profStyles.name}>张伟</div>
+              <div style={profStyles.branch}>南湾街道 南湾社区第一党支部</div>
+            </div>
+          </div>
+
+          {/* 党员码卡片 - 白底上浮 */}
+          <div style={profStyles.qrCard} onClick={() => setShowQR(true)}>
+            <div style={profStyles.qrCardTitle}>我的党员码</div>
+            <div style={profStyles.qrDisplay}>
+              <svg width="120" height="120" viewBox="0 0 120 120">
+                <rect x="8" y="8" width="34" height="34" rx="4" fill="#1a1a1a"/>
+                <rect x="12" y="12" width="26" height="26" rx="2" fill="white"/>
+                <rect x="16" y="16" width="18" height="18" rx="1" fill="#1a1a1a"/>
+                <rect x="78" y="8" width="34" height="34" rx="4" fill="#1a1a1a"/>
+                <rect x="82" y="12" width="26" height="26" rx="2" fill="white"/>
+                <rect x="86" y="16" width="18" height="18" rx="1" fill="#1a1a1a"/>
+                <rect x="8" y="78" width="34" height="34" rx="4" fill="#1a1a1a"/>
+                <rect x="12" y="82" width="26" height="26" rx="2" fill="white"/>
+                <rect x="16" y="86" width="18" height="18" rx="1" fill="#1a1a1a"/>
+                <rect x="48" y="8" width="8" height="8" fill="#1a1a1a"/>
+                <rect x="48" y="24" width="8" height="8" fill="#1a1a1a"/>
+                <rect x="48" y="48" width="8" height="8" fill="#1a1a1a"/>
+                <rect x="64" y="48" width="8" height="8" fill="#1a1a1a"/>
+                <rect x="48" y="64" width="8" height="8" fill="#1a1a1a"/>
+                <rect x="8" y="48" width="8" height="8" fill="#1a1a1a"/>
+                <rect x="24" y="48" width="8" height="8" fill="#1a1a1a"/>
+                <rect x="40" y="48" width="8" height="8" fill="#1a1a1a"/>
+                <rect x="8" y="64" width="8" height="8" fill="#1a1a1a"/>
+                <rect x="40" y="64" width="8" height="8" fill="#1a1a1a"/>
+                <rect x="8" y="80" width="8" height="8" fill="#1a1a1a"/>
+                <rect x="24" y="80" width="8" height="8" fill="#1a1a1a"/>
+                <rect x="48" y="80" width="8" height="8" fill="#1a1a1a"/>
+                <rect x="64" y="80" width="8" height="8" fill="#1a1a1a"/>
+                <rect x="48" y="96" width="8" height="8" fill="#1a1a1a"/>
+                <rect x="80" y="48" width="8" height="8" fill="#1a1a1a"/>
+                <rect x="96" y="48" width="8" height="8" fill="#1a1a1a"/>
+                <rect x="80" y="64" width="8" height="8" fill="#1a1a1a"/>
+                <rect x="96" y="64" width="8" height="8" fill="#1a1a1a"/>
+                <rect x="80" y="80" width="8" height="8" fill="#1a1a1a"/>
+                <rect x="96" y="80" width="8" height="8" fill="#1a1a1a"/>
+                <rect x="80" y="96" width="8" height="8" fill="#1a1a1a"/>
+                <rect x="96" y="96" width="8" height="8" fill="#1a1a1a"/>
+                <rect x="64" y="96" width="8" height="8" fill="#1a1a1a"/>
+              </svg>
+            </div>
+            <div style={profStyles.qrCardHint}>点击放大 · 出示给工作人员扫码</div>
+          </div>
+
+          {/* 党员信息 */}
+          <div style={profStyles.infoSection}>
+            <div style={profStyles.infoTitle}>党员信息</div>
+            <div style={profStyles.infoCard}>
+              {profileData.map((d, i) => {
+                const isPhone = d.sensitive === 'phone';
+                const display = isPhone ? (phoneRevealed ? d.value : maskMobile(d.value)) : d.value;
+                return (
+                  <React.Fragment key={i}>
+                    <div
+                      style={isPhone ? profStyles.rowSensitive : profStyles.row}
+                      onClick={isPhone ? () => setPhoneRevealed((v) => !v) : undefined}
+                      role={isPhone ? 'button' : undefined}
+                      aria-label={isPhone ? (phoneRevealed ? '隐藏手机号码' : '显示完整手机号码') : undefined}
+                    >
+                      <span style={profStyles.label}>{d.label}</span>
+                      <span style={{ ...profStyles.value, ...(isPhone ? profStyles.valueWithIcon : {}) }}>
+                        <span style={{ letterSpacing: isPhone && phoneRevealed ? 0.5 : 0 }}>{display}</span>
+                        {isPhone && (
+                          <span style={{ color: T.textMuted, display: 'flex', flexShrink: 0 }} aria-hidden>
+                            {phoneRevealed ? <Icons.EyeOff /> : <Icons.Eye />}
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    {i < profileData.length - 1 && <div style={profStyles.divider} />}
+                  </React.Fragment>
+                );
+              })}
+            </div>
+            <p style={{ fontSize: 11, color: T.textMuted, lineHeight: 1.55, marginTop: 10, padding: '0 4px' }}>
+              微信登录仅识别本页手机号码；与 PC 账号同源。如需变更手机号，请联系具备「党员管理」权限的工作人员在 PC 后台修改档案。
+            </p>
+          </div>
+
+          {/* 活动记录按钮 */}
+          <div style={profStyles.btnWrap}>
+            <button style={profStyles.btn} onClick={() => nav.navigateTo('activityHistory')}>
+              <Icons.Calendar />
+              查看活动参加情况
+            </button>
+          </div>
+        </div>
+        <TabBar active="profile" onSwitch={nav.switchTab} items={tabItems} />
+
+        {/* 党员码弹窗 */}
+        {showQR && (
+          <div style={profStyles.overlay} onClick={() => setShowQR(false)}>
+            <div style={profStyles.qrModal} onClick={e => e.stopPropagation()}>
+              <div style={profStyles.qrTitle}>党员码</div>
+              <div style={profStyles.qrSub}>请向工作人员出示此码</div>
+              <div style={profStyles.qrModalDisplay}>
+                <svg width="180" height="180" viewBox="0 0 180 180">
+                  <rect width="180" height="180" fill="white" rx="8"/>
+                  <rect x="10" y="10" width="50" height="50" rx="4" fill="#1a1a1a"/>
+                  <rect x="16" y="16" width="38" height="38" rx="2" fill="white"/>
+                  <rect x="22" y="22" width="26" height="26" rx="2" fill="#1a1a1a"/>
+                  <rect x="120" y="10" width="50" height="50" rx="4" fill="#1a1a1a"/>
+                  <rect x="126" y="16" width="38" height="38" rx="2" fill="white"/>
+                  <rect x="132" y="22" width="26" height="26" rx="2" fill="#1a1a1a"/>
+                  <rect x="10" y="120" width="50" height="50" rx="4" fill="#1a1a1a"/>
+                  <rect x="16" y="126" width="38" height="38" rx="2" fill="white"/>
+                  <rect x="22" y="132" width="26" height="26" rx="2" fill="#1a1a1a"/>
+                  <rect x="70" y="10" width="10" height="10" fill="#1a1a1a"/>
+                  <rect x="90" y="10" width="10" height="10" fill="#1a1a1a"/>
+                  <rect x="70" y="30" width="10" height="10" fill="#1a1a1a"/>
+                  <rect x="70" y="50" width="10" height="10" fill="#1a1a1a"/>
+                  <rect x="90" y="50" width="10" height="10" fill="#1a1a1a"/>
+                  <rect x="10" y="70" width="10" height="10" fill="#1a1a1a"/>
+                  <rect x="30" y="70" width="10" height="10" fill="#1a1a1a"/>
+                  <rect x="50" y="70" width="10" height="10" fill="#1a1a1a"/>
+                  <rect x="10" y="90" width="10" height="10" fill="#1a1a1a"/>
+                  <rect x="50" y="90" width="10" height="10" fill="#1a1a1a"/>
+                  <rect x="10" y="110" width="10" height="10" fill="#1a1a1a"/>
+                  <rect x="30" y="110" width="10" height="10" fill="#1a1a1a"/>
+                  <rect x="70" y="70" width="10" height="10" fill="#1a1a1a"/>
+                  <rect x="90" y="70" width="10" height="10" fill="#1a1a1a"/>
+                  <rect x="70" y="90" width="10" height="10" fill="#1a1a1a"/>
+                  <rect x="110" y="70" width="10" height="10" fill="#1a1a1a"/>
+                  <rect x="70" y="110" width="10" height="10" fill="#1a1a1a"/>
+                  <rect x="110" y="90" width="10" height="10" fill="#1a1a1a"/>
+                  <rect x="70" y="130" width="10" height="10" fill="#1a1a1a"/>
+                  <rect x="90" y="130" width="10" height="10" fill="#1a1a1a"/>
+                  <rect x="70" y="150" width="10" height="10" fill="#1a1a1a"/>
+                  <rect x="110" y="130" width="10" height="10" fill="#1a1a1a"/>
+                  <rect x="130" y="130" width="10" height="10" fill="#1a1a1a"/>
+                  <rect x="150" y="130" width="10" height="10" fill="#1a1a1a"/>
+                  <rect x="130" y="150" width="10" height="10" fill="#1a1a1a"/>
+                  <rect x="150" y="150" width="10" height="10" fill="#1a1a1a"/>
+                  <rect x="130" y="70" width="10" height="10" fill="#1a1a1a"/>
+                  <rect x="150" y="70" width="10" height="10" fill="#1a1a1a"/>
+                  <rect x="130" y="90" width="10" height="10" fill="#1a1a1a"/>
+                  <rect x="150" y="110" width="10" height="10" fill="#1a1a1a"/>
+                </svg>
+              </div>
+              <div style={profStyles.qrInfo}>
+                <div>姓名：张伟</div>
+                <div>编号：DY001</div>
+                <div>支部：南湾街道 南湾社区第一党支部</div>
+              </div>
+              <button onClick={() => setShowQR(false)} style={{ marginTop: 16, width: '100%', padding: '10px 0', background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 14, color: T.textPrimary, cursor: 'pointer' }}>关闭</button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ---- Admin view ----
+
+  const adminActivities = [
+    { name: '学习贯彻党的二十大精神', date: '3月15日 14:00', loc: '南湾街道党群服务中心', live: true },
+    { name: '学雷锋志愿服务日', date: '3月8日 9:00', loc: '南湾社区公园', live: true },
+    { name: '年度组织生活会', date: '6月15日 15:00', loc: '线上会议', live: false },
+  ];
+  const curAct = adminActivities[selectedActIdx];
+
+  return (
+    <div style={adminStyles.container}>
+      <NavBar title="管理中心" onBack={nav.goBack} dark />
+      <div style={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
+        <div style={adminStyles.header}>
+          <div style={adminStyles.avatar}>李</div>
+          <div>
+            <div style={adminStyles.name}>李建国</div>
+            <div style={adminStyles.branch}>南湾街道 · 管理员</div>
+          </div>
+        </div>
+
+        {/* 当前活动选择 */}
+        <div style={adminStyles.activitySection}>
+          <div style={adminStyles.activityCard} onClick={() => setShowActModal(true)}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={adminStyles.activityLabel}>当前签到活动</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <span style={adminStyles.activityName}>{curAct.name}</span>
+                  <span style={adminStyles.activityBadge}>{curAct.live ? '进行中' : '未开始'}</span>
+                </div>
+                <div style={adminStyles.activityMeta}>{curAct.date} · {curAct.loc}</div>
+              </div>
+              <span style={{ fontSize: 12, color: T.primary, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+                更改 <Icons.ChevronRight />
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* 签到统计 */}
+        <div style={adminStyles.statsBar}>
+          <div style={adminStyles.statCard}>
+            <div style={adminStyles.statNum}>56</div>
+            <div style={adminStyles.statLabel}>已扫码</div>
+          </div>
+          <div style={adminStyles.statCard}>
+            <div style={adminStyles.statNum}>60</div>
+            <div style={adminStyles.statLabel}>应到</div>
+          </div>
+          <div style={adminStyles.statCard}>
+            <div style={{ ...adminStyles.statNum, color: T.warning }}>2</div>
+            <div style={adminStyles.statLabel}>异常</div>
+          </div>
+        </div>
+
+        {/* 扫码核验按钮 */}
+        <div style={adminStyles.scanSection}>
+          <div style={adminStyles.scanBtn} onClick={() => nav.navigateTo('scanVerify')}>
+            <div style={adminStyles.scanBtnIcon}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round">
+                <path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/>
+                <line x1="7" y1="12" x2="17" y2="12"/>
+              </svg>
+            </div>
+            <div>
+              <div style={adminStyles.scanBtnText}>扫码核验</div>
+              <div style={adminStyles.scanBtnSub}>扫党员码 · 身份核验 + 签到</div>
+            </div>
+          </div>
+        </div>
+
+        {/* 管理工具 */}
+        <div style={adminStyles.sectionTitle}>管理工具</div>
+        <div style={adminStyles.quickGrid}>
+          {[
+            { icon: Icons.Calendar, label: '活动签到管理', screen: 'adminCheckinMgmt' },
+            { icon: Icons.Chart, label: '签到统计', screen: 'adminStats' },
+            { icon: Icons.Users, label: '党员列表', screen: 'adminMemberList' },
+            { icon: Icons.Alert, label: '异常记录', screen: 'adminExceptions' },
+          ].map((q, i) => (
+            <div key={i} style={adminStyles.quickItem} onClick={() => nav.navigateTo(q.screen)}>
+              <div style={adminStyles.quickIcon}>{React.createElement(q.icon)}</div>
+              <div style={adminStyles.quickLabel}>{q.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* 活动选择弹窗 */}
+        {showActModal && (
+          <div style={adminStyles.overlay} onClick={() => setShowActModal(false)}>
+            <div style={adminStyles.actModal} onClick={e => e.stopPropagation()}>
+              <div style={adminStyles.actModalTitle}>选择签到活动</div>
+              {adminActivities.map((a, i) => (
+                <div key={i} style={adminStyles.actItem(selectedActIdx === i)} onClick={() => { setSelectedActIdx(i); setShowActModal(false); }}>
+                  <div style={adminStyles.actItemName}>
+                    {a.name}
+                    <span style={adminStyles.actItemBadge(a.live)}>{a.live ? '进行中' : '未开始'}</span>
+                  </div>
+                  <div style={adminStyles.actItemMeta}>{a.date} · {a.loc}</div>
+                </div>
+              ))}
+              <button onClick={() => setShowActModal(false)} style={{ width: '100%', padding: '10px 0', background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, cursor: 'pointer', color: T.textMuted, marginTop: 4 }}>取消</button>
+            </div>
+          </div>
+        )}
+      </div>
+      <TabBar active="profile" onSwitch={nav.switchTab} items={tabItems} />
+    </div>
+  );
+};
+
+// ============================================
+// Screen 4: Activity History
+// ============================================
+const ActivityHistoryScreen = ({ nav }) => {
+  const [expandedYears, setExpandedYears] = React.useState({ '2025': true, '2024': false, '2023': false });
+
+  const activities = {
+    '2025': [
+      { theme: '学习贯彻党的二十大精神', date: '2025-03-15', loc: '南湾街道党群服务中心', hasPhoto: true },
+      { theme: '学雷锋志愿服务日', date: '2025-03-08', loc: '南湾社区公园', hasPhoto: true },
+      { theme: '年度组织生活会', date: '2025-06-15', loc: '线上会议', hasPhoto: false },
+      { theme: '建党104周年庆祝活动', date: '2025-07-01', loc: '南湾街道广场', hasPhoto: false }
+    ],
+    '2024': [
+      { theme: '红色教育基地参观', date: '2024-11-08', loc: '深圳革命烈士陵园', hasPhoto: true },
+      { theme: '党员培训课', date: '2024-09-15', loc: '街道会议室', hasPhoto: false },
+      { theme: '七一主题党日活动', date: '2024-07-01', loc: '南湾广场', hasPhoto: true }
+    ],
+    '2023': [
+      { theme: '党史学习专题讲座', date: '2023-12-20', loc: '党群服务中心', hasPhoto: false },
+      { theme: '年度民主评议', date: '2023-06-15', loc: '南湾街道 南湾社区第一党支部', hasPhoto: false }
+    ]
+  };
+
+  const toggleYear = y => setExpandedYears(prev => ({ ...prev, [y]: !prev[y] }));
+
+  const actStyles = {
+    container: { height: '100%', background: T.bg },
+    content: { padding: '8px 14px', overflowY: 'auto', height: 'calc(100% - 54px)' },
+    yearHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', cursor: 'pointer' },
+    yearTitle: { fontFamily: "'Noto Serif SC', serif", fontSize: 15, fontWeight: 600, color: T.textPrimary },
+    item: { background: T.surface, borderRadius: 12, padding: 12, marginBottom: 10, border: `1px solid ${T.border}` },
+    itemTitle: { fontSize: 13, fontWeight: 600, color: T.textPrimary, marginBottom: 6 },
+    metaRow: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: T.textSecondary, marginBottom: 3 },
+    photoBadge: { display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, color: T.primary, background: T.primaryLight, padding: '2px 6px', borderRadius: 4, marginTop: 6 }
+  };
+
+  return (
+    <div style={actStyles.container}>
+      <NavBar title="历年活动记录" onBack={nav.goBack} />
+      <div style={actStyles.content}>
+        {Object.entries(activities).map(([year, acts], yi) => (
+          <div key={year} style={{ marginBottom: T.sectionGap, paddingBottom: yi === Object.entries(activities).length - 1 ? 20 : 0 }}>
+            <div style={actStyles.yearHeader} onClick={() => toggleYear(year)}>
+              <span style={actStyles.yearTitle}>{year}年</span>
+              <span style={{ fontSize: 12, color: T.textMuted, transform: expandedYears[year] ? 'rotate(180deg)' : '' }}>
+                <Icons.ChevronRight />
+              </span>
+            </div>
+            {expandedYears[year] && acts.map((a, i) => (
+              <div key={i} style={actStyles.item}>
+                <div style={actStyles.itemTitle}>{a.theme}</div>
+                <div style={actStyles.metaRow}>
+                  <Icons.Calendar />
+                  <span>{a.date}</span>
+                </div>
+                <div style={actStyles.metaRow}>
+                  <Icons.MapPin />
+                  <span>{a.loc}</span>
+                </div>
+                {a.hasPhoto && <div style={actStyles.photoBadge}><Icons.Camera /> 含活动照片</div>}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// Screen 5: Scan Verify (Admin)
+// ============================================
+const ScanVerifyScreen = ({ nav }) => {
+  const [scanState, setScanState] = React.useState('scanning'); // scanning | found | success
+
+  const scanStyles = {
+    container: { height: '100%', background: '#1a1a1a', display: 'flex', flexDirection: 'column' },
+    scanArea: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative' },
+    scanFrame: { width: 240, height: 240, position: 'relative' },
+    scanCorner: (pos) => ({
+      position: 'absolute', width: 24, height: 24,
+      ...(pos === 'tl' ? { top: 0, left: 0, borderTop: '3px solid #D44040', borderLeft: '3px solid #D44040', borderRadius: '4px 0 0 0' } : {}),
+      ...(pos === 'tr' ? { top: 0, right: 0, borderTop: '3px solid #D44040', borderRight: '3px solid #D44040', borderRadius: '0 4px 0 0' } : {}),
+      ...(pos === 'bl' ? { bottom: 0, left: 0, borderBottom: '3px solid #D44040', borderLeft: '3px solid #D44040', borderRadius: '0 0 0 4px' } : {}),
+      ...(pos === 'br' ? { bottom: 0, right: 0, borderBottom: '3px solid #D44040', borderRight: '3px solid #D44040', borderRadius: '0 0 4px 0' } : {}),
+    }),
+    scanLine: { position: 'absolute', left: 4, right: 4, height: 2, background: 'linear-gradient(90deg, transparent, #D44040, transparent)', top: '50%', animation: 'pulse 2s infinite' },
+    scanHint: { fontSize: 14, color: 'rgba(255,255,255,0.7)', textAlign: 'center', marginTop: 24, textWrap: 'pretty' },
+    // Member info card
+    overlay: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 60 },
+    memberCard: { background: T.surface, borderRadius: '20px 20px 0 0', padding: '24px 20px 32px', width: '100%' },
+    memberHeader: { display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 },
+    memberAvatar: { width: 48, height: 48, borderRadius: '50%', background: T.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: T.primary, fontWeight: 700, fontFamily: "'Noto Serif SC', serif" },
+    memberName: { fontSize: 18, fontWeight: 700, fontFamily: "'Noto Serif SC', serif" },
+    memberBranch: { fontSize: 12, color: T.textMuted, marginTop: 2 },
+    memberInfo: { display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 },
+    memberRow: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: T.textSecondary },
+    activitySelect: { padding: '10px 14px', borderRadius: 10, border: `1px solid ${T.border}`, fontSize: 13, width: '100%', marginBottom: 16, outline: 'none', background: T.bg },
+    activitySelectLabel: { fontSize: 12, color: T.textMuted, marginBottom: 6 },
+    statusTags: { display: 'flex', gap: 8, marginBottom: 16 },
+    statusTag: (active) => ({ flex: 1, padding: '8px 0', textAlign: 'center', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: active ? T.primaryLight : T.bg, color: active ? T.primary : T.textMuted, border: `1px solid ${active ? T.primary : T.border}` }),
+    confirmBtn: { width: '100%', padding: '14px 0', background: T.primary, color: '#fff', border: 'none', borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: 'pointer', marginTop: 8 },
+    cancelBtn: { width: '100%', padding: '14px 0', background: 'transparent', color: T.textMuted, border: `1px solid ${T.border}`, borderRadius: 12, fontSize: 14, cursor: 'pointer', marginTop: 10 },
+    // Result
+    resultContainer: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 32px' },
+    resultIcon: { width: 72, height: 72, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
+    resultTitle: { fontSize: 20, fontWeight: 700, fontFamily: "'Noto Serif SC', serif", marginBottom: 8 },
+    resultSub: { fontSize: 13, color: T.textMuted, textAlign: 'center', marginBottom: 24, lineHeight: 1.6 },
+    resultBtn: { padding: '12px 40px', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: 'pointer', color: '#fff' }
+  };
+
+  const [selectedActivity, setSelectedActivity] = React.useState(0);
+  const [checkinStatus, setCheckinStatus] = React.useState('准时');
+
+  const activities = [
+    '学习贯彻党的二十大精神 (进行中)',
+    '学雷锋志愿服务日 (进行中)',
+    '年度组织生活会 (未开始)'
+  ];
+
+  const handleScan = () => setScanState('found');
+  const handleConfirm = () => {
+    setScanState('confirming');
+    setTimeout(() => setScanState('success'), 1200);
+  };
+  const handleReset = () => { setScanState('scanning'); nav.goBack(); };
+
+  // Success result
+  if (scanState === 'success') {
+    return (
+      <div style={{ ...scanStyles.container, background: T.bg }}>
+        <NavBar title="核验结果" onBack={handleReset} />
+        <div style={scanStyles.resultContainer}>
+          <div style={{ ...scanStyles.resultIcon, background: '#ECFDF5' }}>
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke={T.success} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 7"/></svg>
+          </div>
+          <div style={{ ...scanStyles.resultTitle, color: T.success }}>身份核验通过</div>
+          <div style={scanStyles.resultSub}>
+            张伟 · 南湾街道 南湾社区第一党支部<br/>
+            已签到：{activities[selectedActivity].split(' (')[0]}<br/>
+            状态：{checkinStatus}
+          </div>
+          <button style={{ ...scanStyles.resultBtn, background: T.success }} onClick={handleReset}>继续扫码</button>
+        </div>
+      </div>
+    );
+  }
+
+  // Scanning + member info sheet
+  return (
+    <div style={scanStyles.container}>
+      <NavBar title="扫码核验" onBack={nav.goBack} dark bg="rgba(26,26,26,0.95)" />
+      {/* 当前活动提示 */}
+      <div style={{ background: 'rgba(212,64,64,0.15)', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Icons.Calendar />
+        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>当前活动：</span>
+        <span style={{ fontSize: 12, color: '#fff', fontWeight: 600 }}>{activities[selectedActivity].split(' (')[0]}</span>
+      </div>
+      <div style={scanStyles.scanArea}>
+        <div style={scanStyles.scanFrame}>
+          <div style={scanStyles.scanCorner('tl')} />
+          <div style={scanStyles.scanCorner('tr')} />
+          <div style={scanStyles.scanCorner('bl')} />
+          <div style={scanStyles.scanCorner('br')} />
+          <div style={scanStyles.scanLine} />
+        </div>
+        <div style={scanStyles.scanHint}>将扫码框对准党员码</div>
+        {scanState === 'scanning' && (
+          <div style={{ marginTop: 32 }}>
+            <button style={{ padding: '10px 24px', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, fontSize: 13, color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }} onClick={handleScan}>
+              模拟扫码识别
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* 党员信息 + 签到确认 */}
+      {scanState === 'found' && (
+        <div style={scanStyles.overlay} onClick={() => setScanState('scanning')}>
+          <div style={scanStyles.memberCard} onClick={e => e.stopPropagation()}>
+            <div style={scanStyles.memberHeader}>
+              <div style={scanStyles.memberAvatar}>张</div>
+              <div>
+                <div style={scanStyles.memberName}>张伟</div>
+                <div style={scanStyles.memberBranch}>南湾街道 南湾社区第一党支部 · DY001</div>
+              </div>
+            </div>
+
+            <div style={scanStyles.memberInfo}>
+              <div style={scanStyles.memberRow}><Icons.Calendar /> 入党时间：2019年3月</div>
+              <div style={scanStyles.memberRow}><Icons.Shield /> 身份核验：✅ 已认证</div>
+            </div>
+
+            <div style={scanStyles.activitySelectLabel}>选择活动</div>
+            <select style={scanStyles.activitySelect} value={selectedActivity} onChange={e => setSelectedActivity(Number(e.target.value))}>
+              {activities.map((a, i) => <option key={i} value={i}>{a}</option>)}
+            </select>
+
+            <div style={scanStyles.activitySelectLabel}>签到状态</div>
+            <div style={scanStyles.statusTags}>
+              {['准时', '迟到', '请假'].map(s => (
+                <div key={s} style={scanStyles.statusTag(checkinStatus === s)} onClick={() => setCheckinStatus(s)}>{s}</div>
+              ))}
+            </div>
+
+            <button style={scanStyles.confirmBtn} onClick={handleConfirm}>
+              {scanState === 'confirming' ? '核验中...' : '确认核验 + 签到'}
+            </button>
+            <button style={scanStyles.cancelBtn} onClick={() => setScanState('scanning')}>取消</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================
+const CheckinScreen = ({ nav }) => {
+  const [status, setStatus] = React.useState('success'); // success | failed | ended
+  const [showScanner, setShowScanner] = React.useState(false);
+
+  const statusMap = {
+    success: { label: '签到成功', color: T.success, bg: '#ECFDF5', icon: <Icons.Check /> },
+    failed: { label: '签到失败', color: T.primary, bg: '#FFF0EE', icon: <Icons.X /> },
+    ended: { label: '活动已结束', color: T.textMuted, bg: '#F3F4F6', icon: <Icons.Clock /> }
+  };
+
+  const ckStyles = {
+    container: { height: '100%', background: T.bg },
+    content: { padding: '8px 14px', overflowY: 'auto', height: 'calc(100% - 54px)' },
+    infoCard: { marginBottom: T.sectionGap },
+    actTitle: { fontSize: 15, fontWeight: 600, fontFamily: "'Noto Serif SC', serif", marginBottom: 6 },
+    meta: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: T.textSecondary, marginBottom: 3 },
+    statusBox: { borderRadius: T.cardRadius, padding: 24, textAlign: 'center', marginBottom: T.sectionGap },
+    statusIcon: { width: 48, height: 48, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' },
+    statusLabel: { fontSize: 18, fontWeight: 700, fontFamily: "'Noto Serif SC', serif", marginBottom: 4 },
+    statusTime: { fontSize: 12, opacity: 0.8 },
+    timeBox: { background: T.surface, borderRadius: 12, padding: 14, border: `1px solid ${T.border}`, marginBottom: T.sectionGap },
+    timeLabel: { fontSize: 12, color: T.textSecondary, marginBottom: 4 },
+    timeValue: { fontSize: 20, fontWeight: 700, color: T.textPrimary, fontFamily: "'Noto Serif SC', serif" },
+    demoBtns: { display: 'flex', gap: 8, padding: '0 14px 20px' },
+    demoBtn: (s) => ({ flex: 1, padding: '10px 0', border: `1.5px solid ${s === status ? T.primary : T.border}`, borderRadius: 10, background: s === status ? T.primaryLight : T.surface, fontSize: 12, fontWeight: 600, color: s === status ? T.primary : T.textSecondary, cursor: 'pointer' }),
+    qrSection: { textAlign: 'center', marginBottom: T.sectionGap, padding: 20, background: T.surface, borderRadius: T.cardRadius, border: `1px solid ${T.border}` },
+    qrCardTitle: { fontSize: 13, color: T.textSecondary, marginBottom: 16 },
+    qrDisplay: { width: 180, height: 180, background: '#fff', borderRadius: 12, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #eee', padding: 8 },
+    qrCardHint: { fontSize: 12, color: T.textMuted, marginTop: 16 },
+    scanBtn: { width: '100%', padding: '12px 20px', background: 'linear-gradient(135deg, #D44040, #E87040)', color: '#fff', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 },
+    scannerBtn: { width: '100%', padding: '12px 20px', background: T.primaryLight, color: T.primary, border: `1px solid ${T.primary}`, borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10 }
+  };
+
+  const st = statusMap[status];
+
+  return (
+    <div style={ckStyles.container}>
+      <NavBar title="现场扫码签到" onBack={nav.goBack} />
+      <div style={ckStyles.content}>
+        <Card style={ckStyles.infoCard}>
+          <div style={ckStyles.actTitle}>学习贯彻党的二十大精神</div>
+          <div style={ckStyles.meta}><Icons.Calendar /> 2025-03-15 14:00-16:00</div>
+          <div style={ckStyles.meta}><Icons.MapPin /> 南湾街道党群服务中心</div>
+        </Card>
+
+        <div style={ckStyles.qrSection}>
+          <div style={ckStyles.qrCardTitle}>活动签到码</div>
+          <div style={ckStyles.qrDisplay}>
+            <svg width="160" height="160" viewBox="0 0 160 160">
+              <rect x="10" y="10" width="40" height="40" rx="4" fill="#1a1a1a"/>
+              <rect x="14" y="14" width="32" height="32" rx="2" fill="white"/>
+              <rect x="18" y="18" width="24" height="24" rx="1" fill="#1a1a1a"/>
+              <rect x="110" y="10" width="40" height="40" rx="4" fill="#1a1a1a"/>
+              <rect x="114" y="14" width="32" height="32" rx="2" fill="white"/>
+              <rect x="118" y="18" width="24" height="24" rx="1" fill="#1a1a1a"/>
+              <rect x="10" y="110" width="40" height="40" rx="4" fill="#1a1a1a"/>
+              <rect x="14" y="114" width="32" height="32" rx="2" fill="white"/>
+              <rect x="18" y="118" width="24" height="24" rx="1" fill="#1a1a1a"/>
+              <rect x="60" y="10" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="60" y="22" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="60" y="38" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="70" y="38" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="60" y="50" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="10" y="60" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="22" y="60" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="38" y="60" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="10" y="70" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="38" y="70" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="10" y="80" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="22" y="80" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="60" y="60" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="70" y="60" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="60" y="70" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="80" y="60" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="60" y="80" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="80" y="70" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="60" y="90" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="70" y="90" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="60" y="102" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="80" y="90" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="100" y="90" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="116" y="90" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="100" y="102" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="116" y="102" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="100" y="70" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="116" y="70" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="100" y="80" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="116" y="80" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="100" y="112" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="116" y="112" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="102" y="112" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="110" y="112" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="90" y="112" width="6" height="6" fill="#1a1a1a"/>
+              <rect x="96" y="112" width="6" height="6" fill="#1a1a1a"/>
+            </svg>
+          </div>
+          <div style={ckStyles.qrCardHint}>请向工作人员出示此二维码进行现场签到</div>
+        </div>
+
+        <div style={{ ...ckStyles.statusBox, background: st.bg }}>
+          <div style={{ ...ckStyles.statusIcon, background: st.color, color: '#fff' }}>{st.icon}</div>
+          <div style={{ ...ckStyles.statusLabel, color: st.color }}>{st.label}</div>
+          {status !== 'ended' && <div style={{ ...ckStyles.statusTime, color: st.color }}>请在活动开始前完成现场签到</div>}
+        </div>
+
+        <div style={ckStyles.timeBox}>
+          <div style={ckStyles.timeLabel}>签到时间</div>
+          <div style={ckStyles.timeValue}>{status === 'success' ? '13:42' : status === 'failed' ? '--:--' : '14:05'}</div>
+        </div>
+
+        <div style={{ padding: '0 14px' }}>
+          <button style={ckStyles.scanBtn} onClick={() => alert('已生成临时二维码，将在现场展示')}>
+            <Icons.QR />
+            生成临时二维码，现场展示
+          </button>
+
+          <button style={ckStyles.scannerBtn} onClick={() => setShowScanner(true)}>
+            <Icons.Camera />
+            主动扫码签到
+          </button>
+        </div>
+      </div>
+
+      <div style={{ ...ckStyles.demoBtns, borderTop: `1px solid ${T.border}`, background: T.surface, padding: '12px 14px 20px' }}>
+        {['success', 'failed', 'ended'].map(s => (
+          <button key={s} style={ckStyles.demoBtn(s)} onClick={() => setStatus(s)}>
+            {statusMap[s].label}
+          </button>
+        ))}
+      </div>
+
+      {/* Scanner Modal */}
+      {showScanner && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setShowScanner(false)}>
+          <div style={{ background: T.surface, borderRadius: 16, padding: 28, width: 500 }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, fontFamily: "'Noto Serif SC', serif" }}>扫描现场签到码</h3>
+            <div style={{ background: '#000', height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16, position: 'relative', borderRadius: 8 }}>
+              <div style={{ width: 240, height: 240, border: '2px solid #00ff00', position: 'relative' }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, width: 30, height: 30, borderLeft: '3px solid #00ff00', borderTop: '3px solid #00ff00' }}></div>
+                <div style={{ position: 'absolute', top: 0, right: 0, width: 30, height: 30, borderRight: '3px solid #00ff00', borderTop: '3px solid #00ff00' }}></div>
+                <div style={{ position: 'absolute', bottom: 0, left: 0, width: 30, height: 30, borderLeft: '3px solid #00ff00', borderBottom: '3px solid #00ff00' }}></div>
+                <div style={{ position: 'absolute', bottom: 0, right: 0, width: 30, height: 30, borderRight: '3px solid #00ff00', borderBottom: '3px solid #00ff00' }}></div>
+                <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 2, height: '100%', background: 'rgba(0,255,0,0.5)', animation: 'pulse 1.5s infinite' }}></div>
+              </div>
+            </div>
+            <div style={{ textAlign: 'center', color: T.textMuted, fontSize: 13, marginBottom: 16 }}>
+              请扫描现场大屏幕上的活动签到二维码
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setShowScanner(false)} style={{ flex: 1, padding: '10px 0', background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 14, cursor: 'pointer', color: T.textPrimary }}>取消</button>
+              <button onClick={() => {
+                // 模拟扫描成功
+                setStatus('success');
+                setShowScanner(false);
+                alert('扫码签到成功！');
+              }} style={{ flex: 1, padding: '10px 0', background: T.primary, color: '#fff', border: 'none', borderRadius: 10, fontSize: 14, cursor: 'pointer' }}>模拟扫码</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+function isLivePromoVisibleNow(s) {
+  var a = (s.promoStartAt || '').trim();
+  var b = (s.promoEndAt || '').trim();
+  if (!a && !b) return true;
+  var now = Date.now();
+  if (a) {
+    var t = new Date(a).getTime();
+    if (!isNaN(t) && now < t) return false;
+  }
+  if (b) {
+    var t2 = new Date(b).getTime();
+    if (!isNaN(t2) && now > t2) return false;
+  }
+  return true;
+}
+
+function formatLivePromoLine(s) {
+  var a = (s.promoStartAt || '').trim();
+  var b = (s.promoEndAt || '').trim();
+  if (!a && !b) return '';
+  var fmt = function (iso) {
+    if (!iso) return '—';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    var p = function (n) { return String(n).padStart(2, '0'); };
+    return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  };
+  return '宣传期：' + fmt(a) + ' — ' + fmt(b);
+}
+
+/** 按场次稳定哈希选色：通透渐变 + 顶光，贴合主色红与米白底 */
+function hashLiveThemeKey(sess) {
+  var raw = String(sess && sess.id ? sess.id : '') + '\n' + String(sess && sess.cardTitle ? sess.cardTitle : '') + '\n' + String(sess && sess.themeLine ? sess.themeLine : '');
+  var h = 0;
+  for (var i = 0; i < raw.length; i++) {
+    h = ((h << 5) - h) + raw.charCodeAt(i);
+    h |= 0;
+  }
+  return Math.abs(h);
+}
+
+function glossOn(baseGrad) {
+  return 'linear-gradient(180deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.03) 28%, rgba(255,255,255,0) 52%), ' + baseGrad;
+}
+
+function getLiveCardTheme(sess) {
+  var palettes = [
+    { base: 'linear-gradient(138deg, #7F1D1D 0%, #D44040 46%, #9F1239 100%)', edge: 'rgba(255,255,255,0.28)', sh: 'rgba(180, 40, 55, 0.22)', btnBg: 'rgba(255, 252, 251, 0.98)', btnFg: '#7F1D1D' },
+    { base: 'linear-gradient(142deg, #1E3A5F 0%, #3B6EA8 48%, #243E63 100%)', edge: 'rgba(255,255,255,0.22)', sh: 'rgba(40, 72, 120, 0.2)', btnBg: 'rgba(248, 250, 252, 0.98)', btnFg: '#1E3A5F' },
+    { base: 'linear-gradient(145deg, #0F5C5E 0%, #14B8A6 52%, #0D4F4F 100%)', edge: 'rgba(255,255,255,0.24)', sh: 'rgba(15, 100, 105, 0.2)', btnBg: 'rgba(240, 253, 250, 0.98)', btnFg: '#0F4C4E' },
+    { base: 'linear-gradient(140deg, #4C1D95 0%, #7C3AED 45%, #4C1D6E 100%)', edge: 'rgba(255,255,255,0.26)', sh: 'rgba(76, 29, 149, 0.22)', btnBg: 'rgba(250, 245, 255, 0.98)', btnFg: '#4C1D6E' },
+    { base: 'linear-gradient(144deg, #9A3412 0%, #EA580C 50%, #9A3412 100%)', edge: 'rgba(255,255,255,0.26)', sh: 'rgba(180, 60, 20, 0.2)', btnBg: 'rgba(255, 247, 237, 0.98)', btnFg: '#7C2D12' },
+    { base: 'linear-gradient(146deg, #134E4A 0%, #0D9488 48%, #115E59 100%)', edge: 'rgba(255,255,255,0.24)', sh: 'rgba(13, 116, 110, 0.2)', btnBg: 'rgba(240, 253, 250, 0.98)', btnFg: '#134E4A' },
+    { base: 'linear-gradient(141deg, #312E81 0%, #6366F1 46%, #312E81 100%)', edge: 'rgba(255,255,255,0.26)', sh: 'rgba(49, 46, 129, 0.22)', btnBg: 'rgba(238, 242, 255, 0.98)', btnFg: '#312E81' },
+    { base: 'linear-gradient(143deg, #334155 0%, #64748B 50%, #1E293B 100%)', edge: 'rgba(255,255,255,0.2)', sh: 'rgba(30, 41, 59, 0.18)', btnBg: 'rgba(248, 250, 252, 0.98)', btnFg: '#1E293B' },
+  ];
+  var p = palettes[hashLiveThemeKey(sess) % palettes.length];
+  return {
+    card: {
+      background: glossOn(p.base),
+      border: '1px solid ' + p.edge,
+      boxShadow: '0 6px 22px ' + p.sh + ', 0 1px 0 rgba(255,255,255,0.06) inset',
+    },
+    btn: { background: p.btnBg, color: p.btnFg },
+  };
+}
+
+// ============================================
+// Screen 6: Learning Resources
+// ============================================
+const LearningScreen = ({ nav }) => {
+  const [posterModalSessionId, setPosterModalSessionId] = React.useState(null);
+  const [lrCfg, setLrCfg] = React.useState(() => readLearningRuntime());
+  const liveTrackRef = React.useRef(null);
+  const [liveSlideIdx, setLiveSlideIdx] = React.useState(0);
+  React.useEffect(function () {
+    var pull = function () { setLrCfg(readLearningRuntime()); };
+    window.addEventListener('storage', pull);
+    window.addEventListener('focus', pull);
+    var bc = null;
+    if (typeof BroadcastChannel !== 'undefined') {
+      bc = new BroadcastChannel(NW_LEARNING_RUNTIME_BC);
+      bc.onmessage = pull;
+    }
+    return function () {
+      window.removeEventListener('storage', pull);
+      window.removeEventListener('focus', pull);
+      if (bc) try { bc.close(); } catch (e) {}
+    };
+  }, []);
+  React.useEffect(function () {
+    if (!posterModalSessionId) return;
+    var ok = (lrCfg.liveSessions || []).some(function (s) { return s.id === posterModalSessionId; });
+    if (!ok) setPosterModalSessionId(null);
+  }, [lrCfg.liveSessions, posterModalSessionId]);
+  React.useEffect(function () {
+    setLiveSlideIdx(0);
+    if (liveTrackRef.current) liveTrackRef.current.scrollLeft = 0;
+  }, [lrCfg.liveSessions]);
+  const onlinePlatforms = ['共产党员网', '学习强国', '深i学', '深圳智慧党建'];
+  const learningRecord = {
+    done: 18,
+    total: 36,
+    totalHours: 42.5,
+    latest: '已完成《AI赋能基层治理》第4讲，建议继续学习「智能审核实务」'
+  };
+
+  const lrStyles = {
+    container: { height: '100%', background: T.bg, display: 'flex', flexDirection: 'column' },
+    content: { flex: 1, overflowY: 'auto', padding: '8px 14px 16px' },
+    sectionCard: { background: T.surface, borderRadius: 16, padding: 16, border: `1px solid ${T.border}`, marginBottom: 12, boxShadow: '0 2px 12px rgba(26,26,26,0.06), 0 1px 0 rgba(255,255,255,0.8) inset' },
+    secHead: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 12 },
+    secTitle: { fontSize: 16, fontWeight: 700, color: T.textPrimary, fontFamily: "'Noto Serif SC', serif", letterSpacing: '0.02em' },
+    secSub: { fontSize: 10, color: T.textMuted, lineHeight: 1.45, textAlign: 'right', maxWidth: '52%' },
+    lvTitle: { fontSize: 12, color: T.textSecondary, marginBottom: 8, fontWeight: 600 },
+    platformGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 12 },
+    platformChip: { padding: '12px 10px', borderRadius: 12, border: '1px solid rgba(240,237,234,0.95)', background: 'linear-gradient(180deg, #FDFCFA 0%, #F6F4F0 100%)', fontSize: 12, fontWeight: 600, color: T.textPrimary, cursor: 'pointer', textAlign: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' },
+    statsEntry: {
+      width: '100%', marginBottom: 14, padding: 0, border: 'none', borderRadius: 14, cursor: 'pointer', textAlign: 'left',
+      background: 'linear-gradient(135deg, #F8F6F3 0%, #FDFCFA 48%, #F3F1ED 100%)',
+      boxShadow: '0 2px 10px rgba(26,26,26,0.06), inset 0 1px 0 rgba(255,255,255,0.85)',
+      display: 'flex', alignItems: 'center', gap: 12, paddingLeft: 4, paddingRight: 12, paddingTop: 4, paddingBottom: 4,
+      WebkitTapHighlightColor: 'transparent',
+    },
+    statsEntryIcon: {
+      width: 48, height: 48, borderRadius: 14, flexShrink: 0,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'linear-gradient(145deg, #5C6570 0%, #3D4550 100%)',
+      color: '#F5F3EF', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.12), 0 4px 12px rgba(61,69,80,0.25)',
+    },
+    statsEntryBody: { flex: 1, minWidth: 0, padding: '10px 0' },
+    statsEntryTitle: { fontSize: 14, fontWeight: 700, color: T.textPrimary, letterSpacing: '0.01em' },
+    statsEntrySub: { fontSize: 11, color: T.textSecondary, marginTop: 3, lineHeight: 1.45 },
+    statsEntryChevron: { color: '#C4C0BA', flexShrink: 0, display: 'flex', alignItems: 'center' },
+    pastCourseBtn: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 12, border: `1px solid ${T.border}`, background: 'linear-gradient(180deg, #FFFFFF 0%, #FAFAF8 100%)', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' },
+    pastCourseMeta: { fontSize: 11, color: T.textMuted, marginTop: 2 },
+    /* 直播卡底色由 getLiveCardTheme(sess) 按场次自动适配 */
+    liveCard: { borderRadius: 14, padding: 12, color: '#fff' },
+    liveWrap: { display: 'flex', gap: 10 },
+    posterThumb: { width: 94, height: 126, borderRadius: 10, overflow: 'hidden', position: 'relative', color: '#fff', background: 'linear-gradient(165deg, #2C4156 0%, #243848 100%)', flexShrink: 0, border: '1px solid rgba(255,255,255,0.2)' },
+    thumbTag: { position: 'absolute', top: 6, left: 6, fontSize: 9, fontWeight: 600, color: 'rgba(255,255,255,0.95)', background: 'rgba(255,255,255,0.18)', borderRadius: 999, padding: '2px 6px' },
+    thumbTitle: { position: 'absolute', left: 8, right: 8, top: 28, fontSize: 14, fontWeight: 800, lineHeight: 1.2, color: '#fff' },
+    thumbName: { position: 'absolute', left: 8, bottom: 8, right: 8, fontSize: 12, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.14)', borderRadius: 6, padding: '4px 6px', textAlign: 'center' },
+    liveMetaTitle: { fontSize: 15, fontWeight: 700, lineHeight: 1.35, marginBottom: 8, fontFamily: "'Noto Serif SC', serif" },
+    liveMetaRow: { fontSize: 11, opacity: 0.92, lineHeight: 1.6 },
+    liveBtn: { marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 999, border: 'none', background: 'rgba(250,248,245,0.97)', color: '#2C4256', fontSize: 11, fontWeight: 700, cursor: 'pointer' },
+    liveTrack: { display: 'flex', gap: 12, overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', scrollSnapType: 'x mandatory', paddingBottom: 2, paddingRight: 4 },
+    liveSlide: { scrollSnapAlign: 'center', boxSizing: 'border-box' },
+    liveCountPill: { fontSize: 10, fontWeight: 700, color: T.primary, background: 'rgba(220,38,38,0.08)', borderRadius: 999, padding: '3px 10px', border: '1px solid rgba(220,38,38,0.22)' },
+    livePromoHint: { fontSize: 10, opacity: 0.88, lineHeight: 1.45, marginTop: 4 },
+    statGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 10 },
+    statItem: { background: '#FAFAF8', border: `1px solid ${T.border}`, borderRadius: 10, textAlign: 'center', padding: '8px 4px' },
+    statNum: { fontSize: 18, fontWeight: 700, color: T.primary, fontFamily: "'Noto Serif SC', serif" },
+    statLabel: { fontSize: 10, color: T.textMuted, marginTop: 2 },
+    recordText: { fontSize: 12, color: T.textSecondary, lineHeight: 1.65, background: '#FFF8F6', border: '1px solid #FFE4DF', borderRadius: 10, padding: '10px 12px' }
+  };
+
+  var visibleLiveSessions = normalizeLiveSessionsOrder(lrCfg.liveSessions || []).filter(isLivePromoVisibleNow);
+
+  return (
+    <div style={lrStyles.container}>
+      <NavBar title="学习资源" onBack={nav.goBack} />
+      <div style={lrStyles.content}>
+        <div style={lrStyles.sectionCard}>
+          <div style={lrStyles.secHead}>
+            <div style={lrStyles.secTitle}>在线课程</div>
+            <div style={lrStyles.secSub}>两级入口 · PC「直播管理 / 学习外链配置」可配</div>
+          </div>
+          <button type="button" onClick={() => nav.navigateTo('learningPlatformStats')} style={lrStyles.statsEntry} aria-label="查看外链学习行为明细">
+            <div style={lrStyles.statsEntryIcon}><Icons.Chart /></div>
+            <div style={lrStyles.statsEntryBody}>
+              <div style={lrStyles.statsEntryTitle}>外链学习行为明细</div>
+              <div style={lrStyles.statsEntrySub}>各平台打开次数与累计停留时长 · 与 PC 统计口径一致</div>
+            </div>
+            <div style={lrStyles.statsEntryChevron}><Icons.ChevronRight /></div>
+          </button>
+          <div style={lrStyles.lvTitle}>一级课程平台</div>
+          <div style={lrStyles.platformGrid}>
+            {onlinePlatforms.map((name) => (
+              <button
+                key={name}
+                type="button"
+                style={lrStyles.platformChip}
+                onClick={() => openExternalOrMiniProgramLink(lrCfg.platformLinks[name], name)}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+          <div style={lrStyles.lvTitle}>二级课程内容</div>
+          <button type="button" style={lrStyles.pastCourseBtn} onClick={() => nav.navigateTo('pastCourses')}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary }}>往期课程</div>
+              <div style={lrStyles.pastCourseMeta}>回看历史专题课程与配套课件</div>
+            </div>
+            <Icons.ChevronRight />
+          </button>
+        </div>
+
+        {/* 第二排：多场直播（横向滑动，右侧露出下一张边缘） */}
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ ...lrStyles.secHead, marginBottom: 8, paddingLeft: 2, paddingRight: 2 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: T.textSecondary }}>直播课程</span>
+              {visibleLiveSessions.length > 0 ? (
+                <span style={lrStyles.liveCountPill}>共 {visibleLiveSessions.length} 场</span>
+              ) : null}
+            </div>
+            <div style={{ ...lrStyles.secSub, fontSize: 10, textAlign: 'right', maxWidth: '55%', lineHeight: 1.35 }}>
+              {visibleLiveSessions.length > 1 ? '左右滑动切换场次' : '仅宣传期内展示；未配置宣传期则全部展示'}
+            </div>
+          </div>
+          {visibleLiveSessions.length === 0 ? (
+            <div style={{ ...lrStyles.sectionCard, textAlign: 'center', fontSize: 12, color: T.textMuted, padding: '16px 12px' }}>
+              当前暂无处于宣传期内的直播场次（可在 PC「直播管理」调整宣传起止时间）
+            </div>
+          ) : (
+            <>
+              <div
+                ref={liveTrackRef}
+                onScroll={function (e) {
+                  var el = e.currentTarget;
+                  var n = visibleLiveSessions.length;
+                  if (n <= 1) return;
+                  var maxScroll = el.scrollWidth - el.clientWidth;
+                  if (maxScroll <= 1) return;
+                  var r = el.scrollLeft / maxScroll;
+                  var idx = Math.round(r * (n - 1));
+                  idx = Math.max(0, Math.min(n - 1, idx));
+                  setLiveSlideIdx(function (prev) { return prev === idx ? prev : idx; });
+                }}
+                style={lrStyles.liveTrack}
+                aria-label="直播场次横向滑动"
+              >
+                {visibleLiveSessions.map((sess) => {
+                  var peek = visibleLiveSessions.length > 1;
+                  var slideW = peek ? 'calc(100% - 36px)' : '100%';
+                  var liveTheme = getLiveCardTheme(sess);
+                  return (
+                    <div key={sess.id} style={{ ...lrStyles.liveSlide, flex: '0 0 ' + slideW, maxWidth: slideW }}>
+                      <div style={{ ...lrStyles.liveCard, ...liveTheme.card }}>
+                        <div style={lrStyles.secHead}>
+                          <div style={{ ...lrStyles.secTitle, color: '#fff' }}>直播课程</div>
+                          <button
+                            type="button"
+                            style={{ ...lrStyles.secSub, color: 'rgba(255,255,255,0.9)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}
+                            onClick={() => setPosterModalSessionId(sess.id)}
+                          >
+                            缩略海报
+                          </button>
+                        </div>
+                        <div style={lrStyles.liveWrap}>
+                          <button
+                            type="button"
+                            aria-label="放大宣传图"
+                            style={{ ...lrStyles.posterThumb, cursor: 'pointer', WebkitTapHighlightColor: 'transparent', padding: 0 }}
+                            onClick={() => setPosterModalSessionId(sess.id)}
+                          >
+                            {sess.posterImage ? (
+                              <img alt={sess.cardTitle || '直播宣传图'} src={sess.posterImage} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                            ) : (
+                              <>
+                                <div style={lrStyles.thumbTag}>{sess.tagLine || '直播'}</div>
+                                <div style={lrStyles.thumbTitle}>{sess.posterTitle || '专题直播'}</div>
+                                <div style={lrStyles.thumbName}>{sess.posterName || ''}</div>
+                              </>
+                            )}
+                          </button>
+                          <div
+                            style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}
+                            onClick={() => openExternalOrMiniProgramLink(sess.entryUrl, sess.cardTitle || '直播课程')}
+                            role="presentation"
+                          >
+                            <div style={lrStyles.liveMetaTitle}>{sess.cardTitle || '直播'}</div>
+                            {formatLivePromoLine(sess) ? <div style={{ ...lrStyles.livePromoHint }}>{formatLivePromoLine(sess)}</div> : null}
+                            {sess.themeLine ? <div style={lrStyles.liveMetaRow}>{sess.themeLine}</div> : null}
+                            {sess.lecturerLine ? <div style={lrStyles.liveMetaRow}>{sess.lecturerLine}</div> : null}
+                            {sess.dateLine ? <div style={lrStyles.liveMetaRow}>{sess.dateLine}</div> : null}
+                            {sess.password ? (
+                              <div style={{ ...lrStyles.liveMetaRow, marginTop: 4, opacity: 1, fontWeight: 600 }}>
+                                访问密码：{sess.password}
+                              </div>
+                            ) : null}
+                            <button
+                              type="button"
+                              style={{ ...lrStyles.liveBtn, ...liveTheme.btn }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openExternalOrMiniProgramLink(sess.entryUrl, sess.cardTitle || '直播课程');
+                              }}
+                            >
+                              进入直播课程 <span aria-hidden>→</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {visibleLiveSessions.length > 1 ? (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 8 }} aria-hidden>
+                  {visibleLiveSessions.map((_, i) => (
+                    <span
+                      key={i}
+                      style={{
+                        width: liveSlideIdx === i ? 18 : 6,
+                        height: 6,
+                        borderRadius: 999,
+                        background: liveSlideIdx === i ? T.primary : 'rgba(0,0,0,0.12)',
+                        transition: 'width 0.2s ease, background 0.2s ease',
+                      }}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </>
+          )}
+        </div>
+
+        <div style={lrStyles.sectionCard}>
+          <div style={lrStyles.secHead}>
+            <div style={lrStyles.secTitle}>我的学习情况</div>
+            <div style={lrStyles.secSub}>学习记录</div>
+          </div>
+          <div style={lrStyles.statGrid}>
+            <div style={lrStyles.statItem}>
+              <div style={lrStyles.statNum}>{learningRecord.done}</div>
+              <div style={lrStyles.statLabel}>已完成</div>
+            </div>
+            <div style={lrStyles.statItem}>
+              <div style={lrStyles.statNum}>{learningRecord.total}</div>
+              <div style={lrStyles.statLabel}>总课程</div>
+            </div>
+            <div style={lrStyles.statItem}>
+              <div style={lrStyles.statNum}>{learningRecord.totalHours}h</div>
+              <div style={lrStyles.statLabel}>累计时长</div>
+            </div>
+          </div>
+          <div style={lrStyles.recordText}>记录：{learningRecord.latest}</div>
+        </div>
+      </div>
+
+      {posterModalSessionId && (() => {
+        var ps = (lrCfg.liveSessions || []).find(function (s) { return s.id === posterModalSessionId; });
+        if (!ps) return null;
+        return (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="宣传海报大图"
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 2000,
+              background: 'rgba(0,0,0,0.88)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 20,
+              cursor: 'pointer',
+              WebkitTapHighlightColor: 'transparent'
+            }}
+            onClick={() => setPosterModalSessionId(null)}
+          >
+            <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, marginBottom: 14, textAlign: 'center' }}>查阅海报 · 轻触任意处关闭</div>
+            {ps.posterImage ? (
+              <img
+                alt={ps.cardTitle || '直播宣传图'}
+                src={ps.posterImage}
+                style={{
+                  maxWidth: 'min(92vw, 360px)',
+                  maxHeight: '70vh',
+                  borderRadius: 14,
+                  objectFit: 'contain',
+                  border: '1px solid rgba(255,255,255,0.22)',
+                  boxShadow: '0 20px 48px rgba(0,0,0,0.35)',
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: 'min(78vw, 280px)',
+                  maxHeight: '62vh',
+                  aspectRatio: '94 / 126',
+                  borderRadius: 14,
+                  overflow: 'hidden',
+                  position: 'relative',
+                  color: '#fff',
+                  background: 'linear-gradient(165deg, #2C4156 0%, #243848 100%)',
+                  border: '1px solid rgba(255,255,255,0.22)',
+                  boxShadow: '0 20px 48px rgba(0,0,0,0.35)',
+                  flexShrink: 0
+                }}
+              >
+                <div style={{ position: 'absolute', top: 14, left: 14, fontSize: 12, background: 'rgba(255,255,255,0.22)', borderRadius: 999, padding: '4px 10px', fontWeight: 600, color: '#fff' }}>{ps.tagLine || '直播'}</div>
+                <div style={{ position: 'absolute', left: 16, right: 16, top: 52, fontSize: 22, fontWeight: 800, lineHeight: 1.25, color: '#fff', fontFamily: "'Noto Serif SC', serif" }}>{ps.posterTitle || ''}</div>
+                <div style={{ position: 'absolute', left: 16, right: 16, bottom: 18, fontSize: 17, fontWeight: 700, background: 'rgba(255,255,255,0.2)', borderRadius: 8, padding: '8px 10px', textAlign: 'center', color: '#fff' }}>{ps.posterName || ''}</div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      <TabBar active="learn" onSwitch={nav.switchTab} items={tabItems} />
+    </div>
+  );
+};
+
+// ============================================
+// Screen 6b: Past Courses（PC 后台上传；原型内展示已学/未学）
+// ============================================
+const PAST_COURSES_MOCK = [
+  { id: '1', title: '党的二十大精神解读（专题一）', type: '视频', duration: '45分钟', publishedAt: '2026-03-12', status: 'completed', progress: 100 },
+  { id: '2', title: '中国共产党纪律处分条例解读', type: '图文', duration: '约30分钟', publishedAt: '2026-03-05', status: 'completed', progress: 100 },
+  { id: '3', title: 'AI 赋能基层治理实务', type: '视频', duration: '52分钟', publishedAt: '2026-02-28', status: 'in_progress', progress: 62 },
+  { id: '4', title: '发展党员工作细则培训', type: '视频', duration: '38分钟', publishedAt: '2026-02-18', status: 'not_started', progress: 0 },
+  { id: '5', title: '组织生活会规范与案例', type: '图文', duration: '约25分钟', publishedAt: '2026-02-01', status: 'not_started', progress: 0 },
+  { id: '6', title: '党章党规党纪学习（必修）', type: '在线测试', duration: '20分钟', publishedAt: '2026-01-20', status: 'completed', progress: 100 }
+];
+
+const PastCoursesScreen = ({ nav }) => {
+  const [filter, setFilter] = React.useState('all');
+
+  const doneCount = PAST_COURSES_MOCK.filter(c => c.status === 'completed').length;
+  const undoneCount = PAST_COURSES_MOCK.length - doneCount;
+  const filtered = PAST_COURSES_MOCK.filter(c => {
+    if (filter === 'done') return c.status === 'completed';
+    if (filter === 'undone') return c.status !== 'completed';
+    return true;
+  });
+
+  const pcStyles = {
+    wrap: { height: '100%', background: T.bg, display: 'flex', flexDirection: 'column' },
+    summary: { padding: '10px 14px 12px', background: T.surface, borderBottom: `1px solid ${T.border}` },
+    summaryText: { fontSize: 12, color: T.textSecondary, lineHeight: 1.55, marginBottom: 10 },
+    summaryNums: { fontWeight: 700, color: T.primary },
+    chips: { display: 'flex', gap: 8 },
+    chip: (on) => ({
+      padding: '6px 12px', borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+      background: on ? T.primary : '#FAFAF8', color: on ? '#fff' : T.textSecondary,
+      border: on ? 'none' : `1px solid ${T.border}`
+    }),
+    list: { flex: 1, overflowY: 'auto', padding: '10px 14px 24px' },
+    row: {
+      width: '100%', textAlign: 'left', display: 'block', background: T.surface, border: `1px solid ${T.border}`,
+      borderRadius: 14, padding: '12px 12px 10px', marginBottom: 10, cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+      WebkitTapHighlightColor: 'transparent'
+    },
+    rowTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 8 },
+    rowTitle: { fontSize: 14, fontWeight: 600, color: T.textPrimary, lineHeight: 1.45, flex: 1, minWidth: 0 },
+    badge: (st) => {
+      if (st === 'completed') return { label: '已完成', bg: '#ECFDF5', color: T.success };
+      if (st === 'in_progress') return { label: '学习中', bg: T.primaryLight, color: T.primary };
+      return { label: '未学习', bg: '#F3F4F6', color: T.textMuted };
+    },
+    meta: { fontSize: 11, color: T.textMuted, display: 'flex', flexWrap: 'wrap', gap: 10 },
+    barWrap: { marginTop: 8, height: 4, borderRadius: 2, background: '#F0EDEA', overflow: 'hidden' },
+    barFill: (p) => ({ height: '100%', width: `${p}%`, background: p >= 100 ? T.success : T.primary, borderRadius: 2 })
+  };
+
+  return (
+    <div style={pcStyles.wrap}>
+      <NavBar title="往期课程" onBack={nav.goBack} />
+      <div style={pcStyles.summary}>
+        <div style={pcStyles.summaryText}>
+          课程由 PC 管理后台发布。当前示例共 <span style={pcStyles.summaryNums}>{PAST_COURSES_MOCK.length}</span> 门：
+          已学完 <span style={pcStyles.summaryNums}>{doneCount}</span> 门，
+          未学完 <span style={pcStyles.summaryNums}>{undoneCount}</span> 门（含进行中）。
+        </div>
+        <div style={pcStyles.chips}>
+          {[
+            { id: 'all', label: '全部' },
+            { id: 'done', label: '已学完' },
+            { id: 'undone', label: '未学完' }
+          ].map(t => (
+            <button key={t.id} type="button" style={pcStyles.chip(filter === t.id)} onClick={() => setFilter(t.id)}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={pcStyles.list}>
+        {filtered.map(c => {
+          const b = pcStyles.badge(c.status);
+          return (
+            <button key={c.id} type="button" style={pcStyles.row} onClick={() => nav.navigateTo('courseDetail')}>
+              <div style={pcStyles.rowTop}>
+                <div style={pcStyles.rowTitle}>{c.title}</div>
+                <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 999, background: b.bg, color: b.color }}>{b.label}</span>
+              </div>
+              <div style={pcStyles.meta}>
+                <span>{c.type}</span>
+                <span>{c.duration}</span>
+                <span>发布 {c.publishedAt}</span>
+              </div>
+              {c.status !== 'not_started' && (
+                <div style={pcStyles.barWrap}><div style={pcStyles.barFill(c.progress)} /></div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// Screen 7: Course Detail
+// ============================================
+const CourseDetailScreen = ({ nav }) => {
+  const chapters = [
+    { title: '第一章：大会历史意义', duration: '25:30', done: true },
+    { title: '第二章：核心思想概述', duration: '32:15', done: true },
+    { title: '第三章：理论创新成果', duration: '28:45', done: true },
+    { title: '第四章：实践应用指南', duration: '35:20', done: false },
+    { title: '第五章：基层治理实践', duration: '22:10', done: false },
+    { title: '第六章：总结与展望', duration: '18:50', done: false }
+  ];
+
+  const cdStyles = {
+    container: { height: '100%', background: T.bg },
+    videoArea: { background: '#1C1C1E', height: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', position: 'relative' },
+    playBtn: { width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+    progressRow: { width: '80%', display: 'flex', alignItems: 'center', gap: 8 },
+    progressBar: { flex: 1, height: 3, background: 'rgba(255,255,255,0.2)', borderRadius: 2, overflow: 'hidden' },
+    progressFill: { width: '45%', height: '100%', background: T.primary, borderRadius: 2 },
+    timeCode: { fontSize: 11, opacity: 0.7 },
+    content: { padding: '8px 14px 20px', overflowY: 'auto', height: 'calc(100% - 54px - 200px)' },
+    infoCard: { marginBottom: T.sectionGap },
+    title: { fontSize: 16, fontWeight: 700, fontFamily: "'Noto Serif SC', serif", marginBottom: 8 },
+    statsRow: { display: 'flex', gap: 12, marginTop: 8 },
+    statCol: { flex: 1, textAlign: 'center' },
+    statNum: { fontSize: 18, fontWeight: 700, color: T.primary, fontFamily: "'Noto Serif SC', serif" },
+    statLabel: { fontSize: 10, color: T.textMuted, marginTop: 2 },
+    chapterTitle: { fontSize: 13, fontWeight: 600, marginBottom: 10 },
+    chapterItem: (done) => ({ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: `1px solid ${T.border}`, cursor: 'pointer' }),
+    chLeft: { display: 'flex', alignItems: 'center', gap: 10 },
+    chDot: (done) => ({ width: 8, height: 8, borderRadius: '50%', background: done ? T.success : T.border }),
+    chTitle: (done) => ({ fontSize: 13, color: done ? T.textSecondary : T.textPrimary, fontWeight: done ? 400 : 500 }),
+    chDuration: { fontSize: 11, color: T.textMuted }
+  };
+
+  return (
+    <div style={cdStyles.container}>
+      <NavBar title="课程详情" onBack={nav.goBack} dark bg="rgba(28,28,30,0.95)" />
+      <div style={{ background: '#1C1C1E', height: 156, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+        <div style={cdStyles.playBtn}><Icons.Play /></div>
+        <div style={cdStyles.progressRow}>
+          <div style={cdStyles.progressBar}><div style={cdStyles.progressFill} /></div>
+          <span style={cdStyles.timeCode}>12:30 / 28:45</span>
+        </div>
+      </div>
+      <div style={{ padding: '8px 14px', overflowY: 'auto', height: 'calc(100% - 54px - 156px)' }}>
+        <Card style={cdStyles.infoCard}>
+          <div style={cdStyles.title}>党的二十大精神解读</div>
+          <div style={{ fontSize: 12, color: T.textSecondary }}>讲师：王教授 · 共6章</div>
+          <div style={cdStyles.statsRow}>
+            <div style={cdStyles.statCol}><div style={cdStyles.statNum}>6</div><div style={cdStyles.statLabel}>总章节</div></div>
+            <div style={cdStyles.statCol}><div style={cdStyles.statNum}>3</div><div style={cdStyles.statLabel}>已完成</div></div>
+            <div style={cdStyles.statCol}><div style={cdStyles.statNum}>2.5h</div><div style={cdStyles.statLabel}>总时长</div></div>
+          </div>
+        </Card>
+
+        <div style={cdStyles.chapterTitle}>章节列表</div>
+        {chapters.map((ch, i) => (
+          <div key={i} style={cdStyles.chapterItem(ch.done)}>
+            <div style={cdStyles.chLeft}>
+              <div style={cdStyles.chDot(ch.done)} />
+              <span style={cdStyles.chTitle(ch.done)}>{ch.title}</span>
+            </div>
+            <span style={cdStyles.chDuration}>{ch.duration}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// Screen 8: AI Profile
+// ============================================
+const AIProfileScreen = ({ nav }) => {
+  const dims = [
+    { label: '政治素养', score: 92 },
+    { label: '学习参与', score: 85 },
+    { label: '活动参与', score: 88 },
+    { label: '服务贡献', score: 82 },
+    { label: '纪律作风', score: 94 }
+  ];
+  const totalScore = 91;
+  const activityStats = [
+    { label: '参与活动', value: '12场' },
+    { label: '活动出勤率', value: '86%' },
+    { label: '签到合规率', value: '92%' },
+  ];
+  const liveStats = [
+    { label: '参与直播', value: '6场' },
+    { label: '录播观看', value: '38次' },
+    { label: '完成率', value: '84%' },
+  ];
+  const monthlyTrend = [
+    { month: '2025-11', activities: 3, live: 1, replay: 9 },
+    { month: '2025-12', activities: 4, live: 2, replay: 11 },
+    { month: '2026-01', activities: 5, live: 1, replay: 14 },
+    { month: '2026-02', activities: 6, live: 2, replay: 16 },
+    { month: '2026-03', activities: 5, live: 2, replay: 18 },
+    { month: '2026-04', activities: 7, live: 3, replay: 21 },
+  ];
+
+  const apStyles = {
+    container: { height: '100%', background: T.bg },
+    content: { padding: '8px 14px 20px', overflowY: 'auto', height: 'calc(100% - 54px)' },
+    scoreCard: { background: 'linear-gradient(135deg, #D44040, #E87040)', borderRadius: T.cardRadius, padding: 20, textAlign: 'center', marginBottom: T.sectionGap, color: '#fff' },
+    scoreLabel: { fontSize: 12, opacity: 0.8, marginBottom: 4 },
+    scoreNum: { fontSize: 48, fontWeight: 700, fontFamily: "'Noto Serif SC', serif", lineHeight: 1 },
+    badge: { display: 'inline-block', background: 'rgba(255,255,255,0.2)', padding: '3px 10px', borderRadius: 12, fontSize: 11, marginTop: 8 },
+    rank: { fontSize: 11, opacity: 0.8, marginTop: 6 },
+    radarContainer: { background: T.surface, borderRadius: T.cardRadius, padding: 16, marginBottom: T.sectionGap, border: `1px solid ${T.border}` },
+    dimRow: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 },
+    dimLabel: { fontSize: 12, color: T.textPrimary, width: 56 },
+    dimBarBg: { flex: 1, height: 6, background: '#F3F4F6', borderRadius: 3, overflow: 'hidden' },
+    dimBarFill: (s) => ({ height: '100%', background: s >= 80 ? T.success : s >= 60 ? T.warning : T.primary, borderRadius: 3, width: `${s}%` }),
+    dimScore: { fontSize: 12, fontWeight: 600, color: T.textPrimary, width: 28, textAlign: 'right' },
+    summaryCard: { marginBottom: T.sectionGap },
+    summaryTitle: { fontSize: 13, fontWeight: 600, marginBottom: 8 },
+    summaryText: { fontSize: 12, color: T.textSecondary, lineHeight: 1.7, textWrap: 'pretty' },
+    statCard: { background: T.surface, borderRadius: T.cardRadius, padding: 14, marginBottom: T.sectionGap, border: `1px solid ${T.border}` },
+    statTitle: { fontSize: 13, fontWeight: 600, marginBottom: 10, fontFamily: "'Noto Serif SC', serif" },
+    statGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 10 },
+    statItem: { background: T.bg, borderRadius: 8, padding: '8px 6px', border: `1px solid ${T.border}`, textAlign: 'center' },
+    statLabel: { fontSize: 10, color: T.textMuted, marginBottom: 4 },
+    statValue: { fontSize: 13, fontWeight: 700, color: T.textPrimary, fontFamily: "'Noto Serif SC', serif" },
+    statHint: { fontSize: 11, color: T.textMuted, lineHeight: 1.7 },
+    trendHint: { fontSize: 11, color: T.textMuted, lineHeight: 1.65, marginTop: 8 },
+    updateBtn: { width: '100%', padding: '12px 20px', background: T.primary, color: '#fff', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: 'pointer', marginBottom: 20 }
+  };
+
+  // Radar chart SVG
+  const n = dims.length;
+  const cx = 120, cy = 100, r = 70;
+  const angleStep = (2 * Math.PI) / n;
+  const startAngle = -Math.PI / 2;
+
+  const getPoint = (i, ratio) => {
+    const angle = startAngle + i * angleStep;
+    return { x: cx + r * ratio * Math.cos(angle), y: cy + r * ratio * Math.sin(angle) };
+  };
+
+  const gridPts = [1, 0.75, 0.5, 0.25].map(ratio => {
+    return Array.from({ length: n }, (_, i) => {
+      const p = getPoint(i, ratio);
+      return `${p.x},${p.y}`;
+    }).join(' ');
+  });
+
+  const radarPts = dims.map((d, i) => {
+    const p = getPoint(i, d.score / 100);
+    return `${p.x},${p.y}`;
+  }).join(' ');
+
+  const labelPts = dims.map((d, i) => {
+    const p = getPoint(i, 1.18);
+    return { ...p, label: d.label };
+  });
+
+  return (
+    <div style={apStyles.container}>
+      <NavBar title="AI智能画像" onBack={nav.goBack} />
+      <div style={apStyles.content}>
+        <p style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.55, marginBottom: 10 }}>
+          党员端展示参与与自评维度（演示）。支部治理、按人检索及近 6 个月趋势维护见 PC「AI 画像管理」。
+        </p>
+        <div style={apStyles.scoreCard}>
+          <div style={apStyles.scoreLabel}>综合评分</div>
+          <div style={apStyles.scoreNum}>{totalScore}</div>
+          <div style={apStyles.badge}>优秀</div>
+          <div style={apStyles.rank}>支部排名 12/45</div>
+        </div>
+
+        <div style={apStyles.radarContainer}>
+          <svg width="240" height="220" viewBox="0 0 240 200">
+            {gridPts.map((pts, i) => (
+              <polygon key={i} points={pts} fill="none" stroke="#E5E7EB" strokeWidth="0.8" />
+            ))}
+            {Array.from({ length: n }, (_, i) => {
+              const p = getPoint(i, 1);
+              return <line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="#E5E7EB" strokeWidth="0.8" />;
+            })}
+            <polygon points={radarPts} fill="rgba(212,64,64,0.15)" stroke={T.primary} strokeWidth="2" />
+            {dims.map((_, i) => {
+              const p = getPoint(i, 1);
+              return <circle key={i} cx={p.x} cy={p.y} r="3" fill={T.primary} />;
+            })}
+            {labelPts.map((p, i) => (
+              <text key={i} x={p.x} y={p.y} textAnchor="middle" dominantBaseline="middle" fontSize="10" fill={T.textSecondary} fontFamily="'Noto Serif SC', serif">{p.label}</text>
+            ))}
+          </svg>
+        </div>
+
+        {dims.map((d, i) => (
+          <div key={i} style={apStyles.dimRow}>
+            <span style={apStyles.dimLabel}>{d.label}</span>
+            <div style={apStyles.dimBarBg}><div style={apStyles.dimBarFill(d.score)} /></div>
+            <span style={apStyles.dimScore}>{d.score}</span>
+          </div>
+        ))}
+
+        <Card style={{ ...apStyles.summaryCard, marginTop: T.sectionGap }}>
+          <div style={apStyles.summaryTitle}>AI 总结</div>
+          <div style={apStyles.summaryText}>
+            该同志政治素养与纪律作风表现优秀，学习与活动参与稳定，服务贡献仍有提升空间。综合评分与 PC「党员管理」中评定等级「优秀」及 AI 画像管理口径对齐（演示数据）。
+          </div>
+        </Card>
+
+        <div style={apStyles.statCard}>
+          <div style={apStyles.statTitle}>近 6 个月趋势（演示）</div>
+          <p style={{ fontSize: 11, color: T.textMuted, marginBottom: 8 }}>活动 · 直播 · 录播按月对比</p>
+          {(() => {
+            const W = 320, H = 200, padL = 34, padR = 8, padT = 36, padB = 28;
+            const innerW = W - padL - padR, innerH = H - padT - padB;
+            const data = monthlyTrend;
+            const n = data.length;
+            const maxY = Math.max(8, ...data.flatMap((d) => [d.activities, d.live, d.replay])) * 1.08;
+            const xAt = (i) => padL + (i / (n - 1)) * innerW;
+            const yAt = (v) => padT + innerH - (v / maxY) * innerH;
+            const line = (key) => data.map((d, i) => `${i ? 'L' : 'M'}${xAt(i).toFixed(1)},${yAt(d[key]).toFixed(1)}`).join(' ');
+            const area = (key) => {
+              let d = `M${xAt(0)},${yAt(data[0][key])}`;
+              for (let i = 1; i < n; i++) d += ` L${xAt(i)},${yAt(data[i][key])}`;
+              const y0 = padT + innerH;
+              d += ` L${xAt(n - 1)},${y0} L${xAt(0)},${y0} Z`;
+              return d;
+            };
+            const monthLab = (m) => `${parseInt(m.split('-')[1], 10)}月`;
+            const series = [
+              { key: 'activities', c: T.primary, g: 'mobTrendA' },
+              { key: 'live', c: '#2563EB', g: 'mobTrendL' },
+              { key: 'replay', c: T.success, g: 'mobTrendR' },
+            ];
+            return (
+              <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block', maxWidth: 360 }}>
+                <defs>
+                  {series.map((s) => (
+                    <linearGradient key={s.g} id={s.g} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={s.c} stopOpacity="0.2" />
+                      <stop offset="100%" stopColor={s.c} stopOpacity="0" />
+                    </linearGradient>
+                  ))}
+                </defs>
+                {[0, 0.5, 1].map((t, i) => {
+                  const y = padT + innerH * (1 - t);
+                  return (
+                    <g key={i}>
+                      <line x1={padL} y1={y} x2={W - padR} y2={y} stroke="#EDE9E4" strokeWidth="1" />
+                      <text x={padL - 4} y={y + 3} textAnchor="end" fontSize={9} fill={T.textMuted}>{t === 0 ? 0 : Math.round(maxY * t)}</text>
+                    </g>
+                  );
+                })}
+                {series.map((s) => <path key={s.g} d={area(s.key)} fill={`url(#${s.g})`} />)}
+                {series.map((s) => <path key={s.key} d={line(s.key)} fill="none" stroke={s.c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />)}
+                {series.map((s) => data.map((d, i) => <circle key={`${s.key}-${i}`} cx={xAt(i)} cy={yAt(d[s.key])} r="3.5" fill="#fff" stroke={s.c} strokeWidth="1.8" />))}
+                {data.map((d, i) => <text key={i} x={xAt(i)} y={H - 8} textAnchor="middle" fontSize={9} fill={T.textSecondary}>{monthLab(d.month)}</text>)}
+                <g transform={`translate(${padL}, 10)`}>
+                  {series.map((s, i) => (
+                    <g key={s.key} transform={`translate(${i * 88}, 0)`}>
+                      <rect width="8" height="8" rx="1.5" fill={s.c} />
+                      <text x="11" y="7.5" fontSize={9} fill={T.textPrimary}>{s.key === 'activities' ? '活动' : s.key === 'live' ? '直播' : '录播'}</text>
+                    </g>
+                  ))}
+                </g>
+              </svg>
+            );
+          })()}
+          <div style={apStyles.trendHint}>累计直播观看约 540 分钟（演示）。</div>
+        </div>
+
+        <div style={apStyles.statCard}>
+          <div style={apStyles.statTitle}>活动参与数据（演示）</div>
+          <div style={apStyles.statGrid}>
+            {activityStats.map((it) => (
+              <div key={it.label} style={apStyles.statItem}>
+                <div style={apStyles.statLabel}>{it.label}</div>
+                <div style={apStyles.statValue}>{it.value}</div>
+              </div>
+            ))}
+          </div>
+          <div style={apStyles.statHint}>最近活动：主题党日专题学习（签到正常）</div>
+        </div>
+
+        <div style={apStyles.statCard}>
+          <div style={apStyles.statTitle}>直播与录播（演示）</div>
+          <div style={apStyles.statGrid}>
+            {liveStats.map((it) => (
+              <div key={it.label} style={apStyles.statItem}>
+                <div style={apStyles.statLabel}>{it.label}</div>
+                <div style={apStyles.statValue}>{it.value}</div>
+              </div>
+            ))}
+          </div>
+          <div style={apStyles.statHint}>最近直播：二十大精神宣讲直播（观看完成）</div>
+        </div>
+
+        <div style={apStyles.statCard}>
+          <div style={apStyles.statTitle}>直播学习总结（按场次 · 与 PC 画像口径一致）</div>
+          <p style={{ fontSize: 11, color: T.textMuted, lineHeight: 1.55, marginBottom: 10 }}>每场直播后生成 AI 小结，纳入周/月报与评优参考（演示）。</p>
+          {[
+            { title: '党的二十大精神宣讲直播', date: '2026-03-10', watch: '86 分钟', ok: true, sum: '全程观看，互动 1 次，签到通过。' },
+            { title: '党务工作数字化实务', date: '2026-02-18', watch: '62 分钟', ok: true, sum: '中途离场约 8 分钟，回放已补完。' },
+            { title: '党史学习教育专题', date: '2026-01-05', watch: '—', ok: false, sum: '已报名未签到，未计有效时长。' },
+          ].map((row, i) => (
+            <div key={i} style={{ padding: '10px 0', borderTop: i ? `1px solid ${T.border}` : 'none' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: T.textPrimary }}>{row.title}</div>
+              <div style={{ fontSize: 11, color: T.textMuted, marginTop: 2 }}>{row.date} · 有效观看 {row.watch} · {row.ok ? <span style={{ color: T.success }}>已签到</span> : <span style={{ color: T.warning }}>未签到</span>}</div>
+              <div style={{ fontSize: 12, color: T.textSecondary, marginTop: 6, lineHeight: 1.55 }}>{row.sum}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={apStyles.statCard}>
+          <div style={apStyles.statTitle}>画像推送（演示闭环）</div>
+          <p style={{ fontSize: 11, color: T.textMuted, lineHeight: 1.55, marginBottom: 8 }}>周报/月报定时生成后下发订阅消息；未读 48h 内最多补推 2 次（与 PC「画像推送策略」一致）。</p>
+          <div style={{ fontSize: 12, color: T.textSecondary, lineHeight: 1.65 }}>
+            · 上次月报：2026-04-01 已查看<br />
+            · 待补足提醒：未开启订阅（可点首页通知引导）
+          </div>
+        </div>
+
+        <button style={apStyles.updateBtn}>立即更新画像</button>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// Screen: 外链学习行为明细（与 PC 数据统计外链表对齐 · 自查）
+// ============================================
+const LearningPlatformStatsScreen = ({ nav }) => {
+  const rows = [
+    { name: '共产党员网', visits: 28, mins: '4h 12m', note: 'onShow/onHide', hue: '#8B5A3C' },
+    { name: '学习强国', visits: 42, mins: '6h 50m', note: 'onShow/onHide', hue: '#B83232' },
+    { name: '深圳智慧党建', visits: 15, mins: '2h 05m', note: 'onShow/onHide', hue: '#1D6F8C' },
+    { name: '自有录播课', visits: 11, mins: '3h 20m', note: '含 30s 心跳', hue: '#5C6570' },
+  ];
+  function parseHmToMin(s) {
+    var h = 0; var m = 0;
+    var hm = s.match(/(\d+)\s*h/);
+    var mm = s.match(/(\d+)\s*m/);
+    if (hm) h = parseInt(hm[1], 10);
+    if (mm) m = parseInt(mm[1], 10);
+    return h * 60 + m;
+  }
+  var totalVisits = rows.reduce(function (a, r) { return a + r.visits; }, 0);
+  var totalMin = rows.reduce(function (a, r) { return a + parseHmToMin(r.mins); }, 0);
+  var totalStayLabel = Math.floor(totalMin / 60) + 'h ' + String(totalMin % 60).padStart(2, '0') + 'm';
+  return (
+    <div style={{ height: '100%', background: T.bg, display: 'flex', flexDirection: 'column' }}>
+      <NavBar title="外链学习明细" onBack={nav.goBack} />
+      <div style={{ flex: 1, overflowY: 'auto', padding: '10px 14px 24px' }}>
+        <div style={{
+          borderRadius: 14, padding: '14px 16px', marginBottom: 14,
+          background: 'linear-gradient(125deg, #FDFCFA 0%, #F4F1EC 100%)',
+          border: `1px solid ${T.border}`, boxShadow: '0 2px 10px rgba(26,26,26,0.05)',
+        }}>
+          <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 8, lineHeight: 1.5 }}>统计口径与 PC「数据统计 → 外链平台学习行为」一致；以下为本人汇总（演示）。</div>
+          <div style={{ display: 'flex', gap: 16, alignItems: 'baseline' }}>
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: T.textPrimary, fontFamily: "'Noto Serif SC', serif" }}>{totalVisits}</div>
+              <div style={{ fontSize: 10, color: T.textMuted, marginTop: 2 }}>总打开次数</div>
+            </div>
+            <div style={{ width: 1, alignSelf: 'stretch', background: T.border, margin: '4px 0' }} />
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: T.textPrimary, fontFamily: "'Noto Serif SC', serif" }}>{totalStayLabel}</div>
+              <div style={{ fontSize: 10, color: T.textMuted, marginTop: 2 }}>累计停留（各行合计）</div>
+            </div>
+          </div>
+        </div>
+        <div style={{
+          background: T.surface, borderRadius: 16, overflow: 'hidden',
+          border: `1px solid ${T.border}`, boxShadow: '0 2px 12px rgba(26,26,26,0.06)',
+        }}>
+          {rows.map((r, i) => (
+            <div
+              key={r.name}
+              style={{
+                padding: '14px 16px', borderBottom: i < rows.length - 1 ? `1px solid ${T.border}` : 'none',
+                display: 'flex', alignItems: 'flex-start', gap: 12,
+              }}
+            >
+              <div style={{
+                width: 8, height: 8, borderRadius: '50%', marginTop: 6, flexShrink: 0,
+                background: r.hue, boxShadow: '0 0 0 3px rgba(0,0,0,0.04)',
+              }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: T.textPrimary }}>{r.name}</div>
+                <div style={{ fontSize: 12, color: T.textSecondary, marginTop: 5, lineHeight: 1.5 }}>
+                  <span style={{ fontWeight: 600, color: T.textPrimary }}>{r.visits}</span> 次打开
+                  <span style={{ color: T.textMuted, margin: '0 6px' }}>·</span>
+                  累计 <span style={{ fontWeight: 600, color: T.textPrimary }}>{r.mins}</span>
+                </div>
+                <span style={{
+                  display: 'inline-block', marginTop: 8, fontSize: 10, fontWeight: 600,
+                  color: T.textSecondary, background: '#F3F4F6', borderRadius: 6, padding: '3px 8px',
+                }}>{r.note}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// Screen 9: Live Activity
+// ============================================
+const LiveActivityScreen = ({ nav }) => {
+  const [liveStatus, setLiveStatus] = React.useState('notstarted');
+  const [identityVerified, setIdentityVerified] = React.useState(false);
+
+  const statusMap = {
+    notstarted: { label: '未开始', color: T.textSecondary, bg: '#F3F4F6' },
+    live: { label: '直播中', color: T.primary, bg: '#FFF0EE' },
+    ended: { label: '已结束', color: T.textMuted, bg: '#F3F4F6' }
+  };
+
+  const laStyles = {
+    container: { height: '100%', background: T.bg },
+    content: { padding: '8px 14px', overflowY: 'auto', height: 'calc(100% - 54px)' },
+    statusTag: (s) => ({ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, background: s.bg, color: s.color, marginBottom: T.sectionGap }),
+    infoCard: { marginBottom: T.sectionGap },
+    title: { fontSize: 16, fontWeight: 700, fontFamily: "'Noto Serif SC', serif", marginBottom: 8 },
+    meta: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: T.textSecondary, marginBottom: 4 },
+    btnRow: { display: 'flex', gap: 10, marginBottom: T.sectionGap },
+    btn: (primary) => ({ flex: 1, padding: '12px 0', borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: 'pointer', background: primary ? T.primary : T.surface, color: primary ? '#fff' : T.textPrimary, border: primary ? 'none' : `1px solid ${T.border}` }),
+    rulesCard: { marginBottom: T.sectionGap },
+    rulesTitle: { fontSize: 13, fontWeight: 600, marginBottom: 8 },
+    rulesList: { fontSize: 12, color: T.textSecondary, lineHeight: 1.8, paddingLeft: 16 },
+    demoBtns: { display: 'flex', gap: 8, padding: '0 14px 20px' },
+    demoBtn: (s) => ({ flex: 1, padding: '10px 0', border: `1.5px solid ${s === liveStatus ? T.primary : T.border}`, borderRadius: 10, background: s === liveStatus ? T.primaryLight : T.surface, fontSize: 12, fontWeight: 600, color: s === liveStatus ? T.primary : T.textSecondary, cursor: 'pointer' })
+  };
+
+  const st = statusMap[liveStatus];
+
+  return (
+    <div style={laStyles.container}>
+      <NavBar title="直播活动" onBack={nav.goBack} />
+      <div style={laStyles.content}>
+        <div style={laStyles.statusTag(st)}>
+          {liveStatus === 'live' && <span style={{ width: 6, height: 6, borderRadius: '50%', background: T.primary, animation: 'pulse 1.5s infinite' }} />}
+          {st.label}
+        </div>
+
+        <Card style={laStyles.infoCard}>
+          <div style={laStyles.title}>学习贯彻党的二十大精神直播讲座</div>
+          <div style={laStyles.meta}><Icons.Calendar /> 2025-03-20 14:00-16:30</div>
+          <div style={laStyles.meta}><Icons.User /> 主讲：王教授</div>
+          <div style={laStyles.meta}><Icons.MapPin /> 线上直播</div>
+        </Card>
+
+        <div style={laStyles.btnRow}>
+          {(identityVerified || liveStatus === 'live') ? (
+            <a href="https://example-zhibo-platform.com/live/xxx-activity-id" target="_blank" rel="noopener noreferrer" style={{...laStyles.btn(true), display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none'}}>
+              进入直播间
+            </a>
+          ) : (
+            <button style={laStyles.btn(true)} onClick={() => {
+              setIdentityVerified(true);
+              alert('签到成功！');
+            }}>
+              {liveStatus === 'live' ? '进入直播间' : '签到'}
+            </button>
+          )}
+        </div>
+
+        <Card style={laStyles.rulesCard}>
+          <div style={laStyles.rulesTitle}>活动说明</div>
+          <div style={laStyles.rulesList}>
+            <div>· 活动开始前15分钟开放签到（与 PC 活动签到规则默认项一致）</div>
+            <div>· 签到成功后可直接访问直播平台</div>
+            <div>· 点击"签到"按钮完成签到</div>
+          </div>
+        </Card>
+      </div>
+
+      <div style={{ ...laStyles.demoBtns, borderTop: `1px solid ${T.border}`, background: T.surface, padding: '12px 14px 20px' }}>
+        {Object.entries(statusMap).map(([k, v]) => (
+          <button key={k} style={laStyles.demoBtn(k)} onClick={() => {
+            setLiveStatus(k);
+            if(k !== 'notstarted') setIdentityVerified(false);
+          }}>
+            {v.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// Screen 10: AI QA
+// ============================================
+const AIQAScreen = ({ nav }) => {
+  const [messages, setMessages] = React.useState([
+    { role: 'ai', text: '您好！我是南湾红帆党务智能助手，请问有什么可以帮您？' },
+    { role: 'user', text: '发展党员的具体流程是什么？' },
+    { role: 'ai', text: '发展党员的基本流程如下：\n\n1. 提交入党申请书\n2. 确定入党积极分子\n3. 培养教育考察（一般不少于一年）\n4. 确定发展对象\n5. 政治审查和集中培训\n6. 支部大会讨论表决\n7. 上级党委审批\n8. 入党宣誓仪式' },
+    { role: 'user', text: '入党申请书应该交给谁？' },
+    { role: 'ai', text: '入党申请书应交给您所在党支部的书记或组织委员。如果您不确定联系方式，可以在「我的」页面查看所属支部信息，或通过底部「服务」中的党群共享服务入口获取帮助。' }
+  ]);
+  const [input, setInput] = React.useState('');
+
+  const qaStyles = {
+    container: { height: '100%', background: T.bg, display: 'flex', flexDirection: 'column' },
+    chatArea: { flex: 1, padding: 14, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 },
+    bubble: (role) => ({ maxWidth: '80%', padding: '10px 14px', borderRadius: 14, fontSize: 13, lineHeight: 1.6, textWrap: 'pretty', alignSelf: role === 'user' ? 'flex-end' : 'flex-start', background: role === 'user' ? T.primary : T.surface, color: role === 'user' ? '#fff' : T.textPrimary, borderBottomRightRadius: role === 'user' ? 4 : 14, borderTopLeftRadius: role === 'ai' ? 4 : 14 }),
+    inputBar: { padding: '8px 14px', borderTop: `1px solid ${T.border}`, background: T.surface, display: 'flex', gap: 8, alignItems: 'center', paddingBottom: 16 },
+    input: { flex: 1, padding: '10px 14px', border: `1px solid ${T.border}`, borderRadius: 20, fontSize: 13, outline: 'none', background: T.bg },
+    sendBtn: { width: 36, height: 36, borderRadius: '50%', background: T.primary, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'pointer', border: 'none' }
+  };
+
+  const handleSend = () => {
+    if (!input.trim()) return;
+    setMessages(prev => [...prev, { role: 'user', text: input }]);
+    setInput('');
+    setTimeout(() => {
+      setMessages(prev => [...prev, { role: 'ai', text: '感谢您的提问，正在为您查询相关信息...' }]);
+    }, 800);
+  };
+
+  return (
+    <div style={qaStyles.container}>
+      <NavBar title="党务智能问答" onBack={nav.goBack} />
+      <div style={qaStyles.chatArea}>
+        {messages.map((m, i) => (
+          <div key={i} style={qaStyles.bubble(m.role)}>{m.text}</div>
+        ))}
+      </div>
+      <div style={qaStyles.inputBar}>
+        <input style={qaStyles.input} value={input} onChange={e => setInput(e.target.value)} placeholder="输入党务问题..." onKeyDown={e => e.key === 'Enter' && handleSend()} />
+        <button style={qaStyles.sendBtn} onClick={handleSend}><Icons.Send /></button>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// Screen 11: Career
+// ============================================
+const CareerScreen = ({ nav }) => {
+  const jobs = [
+    { title: '社区工作者', salary: '5000-7000', tags: ['五险一金', '带薪年假'], loc: '南湾街道' },
+    { title: '党建指导员', salary: '6000-8000', tags: ['编制', '住房补贴'], loc: '龙岗区' },
+    { title: '网格员', salary: '4500-5500', tags: ['就近安排', '弹性工作'], loc: '南湾社区' }
+  ];
+
+  const crStyles = {
+    container: { height: '100%', background: T.bg, display: 'flex', flexDirection: 'column' },
+    content: { flex: 1, overflowY: 'auto', padding: '8px 14px 16px' },
+    sectionTitle: { fontSize: 15, fontWeight: 700, fontFamily: "'Noto Serif SC', serif", marginBottom: 10 },
+    jobCard: { background: T.surface, borderRadius: 12, padding: 14, marginBottom: 10, border: `1px solid ${T.border}` },
+    jobTitle: { fontSize: 14, fontWeight: 600, color: T.textPrimary, marginBottom: 4 },
+    salary: { fontSize: 14, fontWeight: 700, color: T.primary, marginBottom: 6 },
+    tags: { display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 },
+    tag: { padding: '2px 8px', background: T.primaryLight, color: T.primary, borderRadius: 4, fontSize: 10, fontWeight: 500 },
+    locText: { fontSize: 11, color: T.textMuted, display: 'flex', alignItems: 'center', gap: 4 },
+    policyCard: { background: 'linear-gradient(135deg, #FEF3C7, #FDE68A)', borderRadius: 12, padding: 14, marginBottom: T.sectionGap, border: '1px solid #F59E0B' },
+    policyTitle: { fontSize: 13, fontWeight: 600, color: '#92400E', marginBottom: 4 },
+    policyText: { fontSize: 11, color: '#92400E', lineHeight: 1.5, textWrap: 'pretty' },
+    quickGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: T.gridGap },
+    quickItem: { background: T.surface, borderRadius: 12, padding: 14, textAlign: 'center', border: `1px solid ${T.border}`, cursor: 'pointer' },
+    quickIcon: { width: 36, height: 36, borderRadius: 10, background: T.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.primary, margin: '0 auto 6px' },
+    quickLabel: { fontSize: 12, color: T.textPrimary }
+  };
+
+  return (
+    <div style={crStyles.container}>
+      <NavBar title="工作创业服务" onBack={nav.goBack} />
+      <div style={crStyles.content}>
+        <div style={crStyles.sectionTitle}>推荐岗位</div>
+        {jobs.map((j, i) => (
+          <div key={i} style={crStyles.jobCard}>
+            <div style={crStyles.jobTitle}>{j.title}</div>
+            <div style={crStyles.salary}>{j.salary}元/月</div>
+            <div style={crStyles.tags}>
+              {j.tags.map((t, ti) => <span key={ti} style={crStyles.tag}>{t}</span>)}
+            </div>
+            <div style={crStyles.locText}><Icons.MapPin /> {j.loc}</div>
+          </div>
+        ))}
+
+        <div style={crStyles.sectionTitle}>政策解读</div>
+        <div style={crStyles.policyCard}>
+          <div style={crStyles.policyTitle}>2026年党员创业扶持政策</div>
+          <div style={crStyles.policyText}>符合条件的党员创业者可申请最高50万元创业贷款，享受贴息补助。详情咨询街道党建办。</div>
+        </div>
+
+        <div style={crStyles.sectionTitle}>快捷服务</div>
+        <div style={crStyles.quickGrid}>
+          {[
+            { icon: Icons.Edit, label: '职业培训' },
+            { icon: Icons.Doc, label: '政策申报' },
+            { icon: Icons.Phone, label: '就业咨询' },
+            { icon: Icons.Search, label: '岗位搜索' }
+          ].map((q, i) => (
+            <div key={i} style={crStyles.quickItem}>
+              <div style={crStyles.quickIcon}>{React.createElement(q.icon)}</div>
+              <div style={crStyles.quickLabel}>{q.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <TabBar active="service" onSwitch={nav.switchTab} items={tabItems} />
+    </div>
+  );
+};
+
+// ============================================
+// Screen 12: 服务 Tab — 党群共享（对齐 i龙岗 五大入口）
+// 定制图标：浅填充 + 描边，略偏产品级视觉
+// ============================================
+const LsIconSharedSpace = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <path d="M3 11.2L12 5l9 6.2V20a1 1 0 01-1 .95H4A1 1 0 013 20V11.2z" fill="currentColor" fillOpacity="0.14" stroke="currentColor" strokeWidth="1.45" strokeLinejoin="round"/>
+    <path d="M9 21V12.2h6V21" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M14.2 8.8h3.3v3.3h-3.3V8.8z" fill="currentColor" fillOpacity="0.28" stroke="currentColor" strokeWidth="1.15"/>
+    <path d="M12 5.2v2.2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" opacity="0.45"/>
+  </svg>
+);
+const LsIconRead = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <path d="M5.2 5.8h6.4A1.35 1.35 0 0113 7.15V18.2c0 .35-.45.55-.75.35l-1.9-1a3.8 3.8 0 00-3.45 0l-1.9 1c-.3.2-.75 0-.75-.35V7.15A1.35 1.35 0 015.2 5.8z" fill="currentColor" fillOpacity="0.16" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+    <path d="M18.8 5.8h-6.4A1.35 1.35 0 0011 7.15V18.2c0 .35.45.55.75.35l1.9-1a3.8 3.8 0 013.45 0l1.9 1c.3.2.75 0 .75-.35V7.15a1.35 1.35 0 00-1.2-1.35z" fill="currentColor" fillOpacity="0.09" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+    <path d="M12 7.3v10.9" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round"/>
+    <path d="M7.8 10.2h2.4M7.8 12.8h2.2M16.2 10.2h-2.4M16.2 12.8h-2.2" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" opacity="0.55"/>
+  </svg>
+);
+const LsIconSport = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <circle cx="12" cy="12" r="8.6" fill="currentColor" fillOpacity="0.13" stroke="currentColor" strokeWidth="1.45"/>
+    <ellipse cx="12" cy="12" rx="8.6" ry="3.2" stroke="currentColor" strokeWidth="1.15" opacity="0.55"/>
+    <path d="M12 3.4v17.2M4.3 8.4c3.6 3.2 11.8 3.2 15.4 0M4.3 15.6c3.6-3.2 11.8-3.2 15.4 0" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round"/>
+  </svg>
+);
+const LsIconHealth = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <rect x="4.5" y="6" width="15" height="12.5" rx="3.2" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="1.45"/>
+    <path d="M12 8.4v7.2M8.4 12h7.2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+    <path d="M8.2 18.8h7.6" stroke="currentColor" strokeWidth="1.15" strokeLinecap="round" opacity="0.4"/>
+    <circle cx="12" cy="12" r="1.35" fill="currentColor" fillOpacity="0.35"/>
+  </svg>
+);
+const LsIconCalendarHero = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <rect x="3.5" y="5" width="17" height="15.5" rx="3" fill="rgba(255,255,255,0.22)" stroke="rgba(255,255,255,0.95)" strokeWidth="1.45"/>
+    <path d="M3.5 10.2h17" stroke="rgba(255,255,255,0.9)" strokeWidth="1.4"/>
+    <path d="M8 3.2V6.8M16 3.2V6.8" stroke="rgba(255,255,255,0.95)" strokeWidth="1.45" strokeLinecap="round"/>
+    <rect x="7.2" y="12.8" width="3.4" height="3.4" rx="0.65" fill="rgba(255,255,255,0.95)"/>
+    <rect x="11.3" y="12.8" width="3.4" height="3.4" rx="0.65" fill="rgba(255,255,255,0.45)"/>
+    <rect x="15.4" y="12.8" width="3.4" height="3.4" rx="0.65" fill="rgba(255,255,255,0.28)"/>
+  </svg>
+);
+
+const LifeServicesScreen = ({ nav }) => {
+  const fourBlocks = [
+    { key: 'space', label: '共享空间', wrapBg: 'linear-gradient(160deg, #F5F3FF 0%, #EDE9FE 55%, #E9E3FF 100%)', iconColor: '#5B21B6', Icon: LsIconSharedSpace },
+    { key: 'read', label: '我要阅读', wrapBg: 'linear-gradient(160deg, #ECFDF5 0%, #D1FAE5 50%, #C6F6D5 100%)', iconColor: '#047857', Icon: LsIconRead },
+    { key: 'sport', label: '我要运动', wrapBg: 'linear-gradient(160deg, #FDF2F8 0%, #FCE7F3 50%, #FBCFE8 100%)', iconColor: '#BE185D', Icon: LsIconSport },
+    { key: 'health', label: '卫生健康', wrapBg: 'linear-gradient(160deg, #FEF2F2 0%, #FEE2E2 50%, #FECACA 100%)', iconColor: '#B91C1C', Icon: LsIconHealth }
+  ];
+
+  const lsStyles = {
+    container: { height: '100%', background: T.bg, display: 'flex', flexDirection: 'column' },
+    content: { flex: 1, overflowY: 'auto', padding: '8px 14px 16px' },
+    blockGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 },
+    blockCard: {
+      background: T.surface, borderRadius: 14, padding: '14px 12px', border: `1px solid ${T.border}`,
+      display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 12, cursor: 'pointer',
+      minHeight: 108, boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+    },
+    blockIconWrap: {
+      width: 52, height: 52, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.75), 0 4px 12px rgba(0,0,0,0.06)'
+    },
+    blockLabel: { fontSize: 15, fontWeight: 600, fontFamily: "'Noto Serif SC', serif", color: T.textPrimary, lineHeight: 1.25 },
+    actCard: {
+      marginTop: 10, width: '100%', border: 'none', borderRadius: 16, padding: 16, cursor: 'pointer', textAlign: 'left',
+      background: 'linear-gradient(145deg, #8B5CF6 0%, #6D28D9 45%, #5B21B6 100%)',
+      color: '#fff', boxShadow: '0 8px 24px rgba(91,33,182,0.35)'
+    },
+    actTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+    actCalIcon: { opacity: 0.95, display: 'flex' },
+    actDate: { fontSize: 12, fontWeight: 500, opacity: 0.92 },
+    actTitle: { fontFamily: "'Noto Serif SC', serif", fontSize: 22, fontWeight: 700, letterSpacing: 0.5 },
+    actSub: { fontSize: 12, opacity: 0.88, marginTop: 6, lineHeight: 1.5 },
+    actBtn: {
+      marginTop: 14, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 18px',
+      borderRadius: 999, border: 'none', background: '#fff', color: '#5B21B6', fontSize: 13, fontWeight: 600, cursor: 'pointer'
+    },
+    tipCard: { background: '#EFF6FF', borderRadius: 12, padding: 14, border: '1px solid #BFDBFE', marginTop: T.sectionGap },
+    tipTitle: { fontSize: 13, fontWeight: 600, color: '#1E40AF', marginBottom: 4 },
+    tipText: { fontSize: 11, color: '#1E40AF', lineHeight: 1.6, textWrap: 'pretty' },
+    wxCta: {
+      width: '100%', padding: '11px 14px', marginTop: T.sectionGap, borderRadius: 12, border: `1px solid ${T.border}`,
+      background: T.surface, color: T.textPrimary, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: "'Noto Serif SC', serif"
+    },
+    wxCtaSub: { fontSize: 10, fontWeight: 400, color: T.textMuted, marginTop: 4, display: 'block' }
+  };
+
+  return (
+    <div style={lsStyles.container}>
+      <NavBar title="党群·共享服务" onBack={nav.goBack} />
+      <div style={lsStyles.content}>
+        <div style={lsStyles.blockGrid}>
+          {fourBlocks.map((b) => (
+            <div key={b.key} style={lsStyles.blockCard} onClick={openILongGangMiniprogram} role="button" tabIndex={0}>
+              <div style={{ ...lsStyles.blockIconWrap, background: b.wrapBg, color: b.iconColor }}>
+                <b.Icon />
+              </div>
+              <div style={lsStyles.blockLabel}>{b.label}</div>
+            </div>
+          ))}
+        </div>
+        <button type="button" style={lsStyles.actCard} onClick={openILongGangMiniprogram}>
+          <div style={lsStyles.actTop}>
+            <span style={lsStyles.actCalIcon}><LsIconCalendarHero /></span>
+            <span style={lsStyles.actDate}>5月1日 星期五</span>
+          </div>
+          <div style={lsStyles.actTitle}>活动日历</div>
+          <div style={lsStyles.actSub}>发现全区 48 场精彩</div>
+          <span style={lsStyles.actBtn}>规划行程 <span aria-hidden>→</span></span>
+        </button>
+        <button type="button" style={lsStyles.wxCta} onClick={openILongGangMiniprogram}>
+          打开「i龙岗」微信小程序
+          <span style={lsStyles.wxCtaSub}>政务办事与更多便民入口（请在微信内使用）</span>
+        </button>
+        <div style={lsStyles.tipCard}>
+          <div style={lsStyles.tipTitle}>温馨提示</div>
+          <div style={lsStyles.tipText}>共享空间、阅读、运动、卫生健康与活动日历等入口均跳转「i龙岗」小程序（请在微信内使用）。紧急帮助请拨打南湾街道便民服务热线：0755-28761234（工作日 8:30-17:30）。</div>
+        </div>
+      </div>
+      <TabBar active="service" onSwitch={nav.switchTab} items={tabItems} />
+    </div>
+  );
+};
+
+// ============================================
+// Screen 13: Disposal
+// ============================================
+const DisposalScreen = ({ nav }) => {
+  const [expandedStep, setExpandedStep] = React.useState(0);
+
+  const situations = [
+    '理想信念缺失，不愿履行党员义务',
+    '组织纪律涣散，无正当理由连续6个月不参加组织生活',
+    '工作中弄虚作假，造成不良影响',
+    '道德品行不端，群众反映强烈'
+  ];
+
+  const steps = [
+    { title: '调查核实', desc: '党支部对问题线索进行调查核实，收集相关证据。', icon: '01' },
+    { title: '谈话提醒', desc: '支部书记与当事人进行谈话提醒，了解情况。', icon: '02' },
+    { title: '支部大会讨论', desc: '召开支部大会，讨论处置意见。', icon: '03' },
+    { title: '党委审批', desc: '报上级党委审批决定。', icon: '04' },
+    { title: '执行和回访', desc: '执行处置决定，定期进行回访教育。', icon: '05' }
+  ];
+
+  const dStyles = {
+    container: { height: '100%', background: T.bg, display: 'flex', flexDirection: 'column' },
+    content: { flex: 1, overflowY: 'auto', padding: '8px 14px 16px' },
+    sectionTitle: { fontSize: 15, fontWeight: 700, fontFamily: "'Noto Serif SC', serif", marginBottom: 10 },
+    sitItem: { display: 'flex', gap: 10, padding: '10px 0', borderBottom: `1px solid ${T.border}`, alignItems: 'flex-start' },
+    sitNum: { width: 22, height: 22, borderRadius: '50%', background: T.primaryLight, color: T.primary, fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 },
+    sitText: { fontSize: 12, color: T.textPrimary, lineHeight: 1.6, textWrap: 'pretty' },
+    stepCard: { background: T.surface, borderRadius: 12, marginBottom: 8, border: `1px solid ${T.border}`, overflow: 'hidden' },
+    stepHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', cursor: 'pointer' },
+    stepLeft: { display: 'flex', alignItems: 'center', gap: 10 },
+    stepNum: { width: 28, height: 28, borderRadius: 8, background: T.primaryLight, color: T.primary, fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    stepTitle: { fontSize: 13, fontWeight: 600, color: T.textPrimary },
+    stepDesc: { fontSize: 12, color: T.textSecondary, lineHeight: 1.6, padding: '0 14px 12px', textWrap: 'pretty' },
+    policyCard: { background: '#F0FDF4', borderRadius: 12, padding: 14, border: '1px solid #BBF7D0', marginTop: T.sectionGap },
+    policyTitle: { fontSize: 13, fontWeight: 600, color: T.success, marginBottom: 4 },
+    policyText: { fontSize: 11, color: '#065F46', lineHeight: 1.6, textWrap: 'pretty' }
+  };
+
+  return (
+    <div style={dStyles.container}>
+      <NavBar title="不合格党员处置指引" onBack={nav.goBack} />
+      <div style={dStyles.content}>
+        <div style={dStyles.sectionTitle}>认定情形</div>
+        {situations.map((s, i) => (
+          <div key={i} style={dStyles.sitItem}>
+            <div style={dStyles.sitNum}>{i + 1}</div>
+            <span style={dStyles.sitText}>{s}</span>
+          </div>
+        ))}
+
+        <div style={{ ...dStyles.sectionTitle, marginTop: T.sectionGap }}>处置流程</div>
+        {steps.map((step, i) => (
+          <div key={i} style={dStyles.stepCard}>
+            <div style={dStyles.stepHeader} onClick={() => setExpandedStep(expandedStep === i ? -1 : i)}>
+              <div style={dStyles.stepLeft}>
+                <div style={dStyles.stepNum}>{step.icon}</div>
+                <span style={dStyles.stepTitle}>{step.title}</span>
+              </div>
+              <span style={{ transform: expandedStep === i ? 'rotate(180deg)' : '', transition: 'transform 0.2s', color: T.textMuted }}>
+                <Icons.ChevronRight />
+              </span>
+            </div>
+            {expandedStep === i && <div style={dStyles.stepDesc}>{step.desc}</div>}
+          </div>
+        ))}
+
+        <div style={dStyles.policyCard}>
+          <div style={dStyles.policyTitle}>政策依据</div>
+          <div style={dStyles.policyText}>《中国共产党党员教育管理工作条例》《中国共产党纪律处分条例》相关规定。</div>
+        </div>
+      </div>
+      <TabBar active={null} onSwitch={nav.switchTab} items={tabItems} />
+    </div>
+  );
+};
+
+// ============================================
+// Screen 14: Admin Checkin Management
+// ============================================
+const AdminCheckinMgmtScreen = ({ nav }) => {
+  const [tab, setTab] = React.useState('ongoing');
+  const adminCmStyles = {
+    container: { height: '100%', background: T.bg, display: 'flex', flexDirection: 'column' },
+    content: { flex: 1, overflowY: 'auto', padding: '8px 14px 16px' },
+    tabs: { display: 'flex', gap: 8, marginBottom: T.sectionGap },
+    tabBtn: (active) => ({ padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: active ? T.primary : T.surface, color: active ? '#fff' : T.textSecondary, border: active ? 'none' : `1px solid ${T.border}` }),
+    actCard: { background: T.surface, borderRadius: 12, padding: 14, marginBottom: 10, border: `1px solid ${T.border}`, cursor: 'pointer' },
+    actTitle: { fontSize: 14, fontWeight: 600, color: T.textPrimary, marginBottom: 6 },
+    actMeta: { fontSize: 11, color: T.textMuted, display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 },
+    actStats: { display: 'flex', gap: 12, marginTop: 8, paddingTop: 8, borderTop: `1px solid ${T.border}` },
+    actStatNum: { fontSize: 16, fontWeight: 700, color: T.primary },
+    actStatLabel: { fontSize: 10, color: T.textMuted },
+    liveDot: { width: 6, height: 6, borderRadius: '50%', background: T.success, display: 'inline-block', marginRight: 4, animation: 'pulse 1.5s infinite' },
+    scanBtn: { width: '100%', padding: '12px 20px', background: 'linear-gradient(135deg, #D44040, #E87040)', color: '#fff', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10 }
+  };
+  const acts = [
+    { name: '学习贯彻党的二十大精神', date: '3月15日 14:00', loc: '南湾街道党群服务中心', checked: 56, total: 60, live: true },
+    { name: '学雷锋志愿服务日', date: '3月8日 9:00', loc: '南湾社区公园', checked: 42, total: 50, live: true },
+    { name: '年度组织生活会', date: '6月15日 15:00', loc: '线上会议', checked: 0, total: 60, live: false },
+  ];
+  const filtered = tab === 'ongoing' ? acts.filter(a => a.live) : tab === 'upcoming' ? acts.filter(a => !a.live) : acts;
+  return (
+    <div style={adminCmStyles.container}>
+      <NavBar title="现场扫码管理" onBack={nav.goBack} />
+      <div style={adminCmStyles.content}>
+        <div style={adminCmStyles.tabs}>
+          <button style={adminCmStyles.tabBtn(tab === 'ongoing')} onClick={() => setTab('ongoing')} >进行中</button>
+          <button style={adminCmStyles.tabBtn(tab === 'upcoming')} onClick={() => setTab('upcoming')}>未开始</button>
+          <button style={adminCmStyles.tabBtn(tab === 'all')} onClick={() => setTab('all')}>全部</button>
+        </div>
+        {filtered.map((a, i) => (
+          <div key={i} style={adminCmStyles.actCard}>
+            <div style={adminCmStyles.actTitle}>
+              {a.live && <span style={adminCmStyles.liveDot} />}
+              {a.name}
+            </div>
+            <div style={adminCmStyles.actMeta}><Icons.Calendar /> {a.date}</div>
+            <div style={adminCmStyles.actMeta}><Icons.MapPin /> {a.loc}</div>
+            <div style={adminCmStyles.actStats}>
+              <div><div style={adminCmStyles.actStatNum}>{a.checked}</div><div style={adminCmStyles.actStatLabel}>已扫码</div></div>
+              <div><div style={adminCmStyles.actStatNum}>{a.total}</div><div style={adminCmStyles.actStatLabel}>应到</div></div>
+              <div><div style={{ ...adminCmStyles.actStatNum, color: a.checked === a.total ? T.success : T.warning }}>{a.total - a.checked}</div><div style={adminCmStyles.actStatLabel}>未扫码</div></div>
+            </div>
+          </div>
+        ))}
+        <button style={adminCmStyles.scanBtn} onClick={() => nav.navigateTo('scanVerify')}>
+          <Icons.QR />
+          开始现场扫码核验
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// Screen 15: Admin Stats
+// ============================================
+const AdminStatsScreen = ({ nav }) => {
+  const stStyles = {
+    container: { height: '100%', background: T.bg, display: 'flex', flexDirection: 'column' },
+    content: { flex: 1, overflowY: 'auto', padding: '8px 14px 16px' },
+    summaryCard: { background: 'linear-gradient(135deg, #D44040, #E87040)', borderRadius: 14, padding: 20, textAlign: 'center', marginBottom: T.sectionGap, color: '#fff' },
+    summaryNum: { fontSize: 36, fontWeight: 700, fontFamily: "'Noto Serif SC', serif" },
+    summaryLabel: { fontSize: 12, opacity: 0.8, marginTop: 4 },
+    dimRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: `1px solid ${T.border}` },
+    dimLabel: { fontSize: 13, color: T.textSecondary },
+    dimVal: { fontSize: 13, fontWeight: 600, color: T.textPrimary },
+    memberItem: { display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: `1px solid ${T.border}` },
+    memberAvatar: { width: 36, height: 36, borderRadius: '50%', background: T.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: T.primary, fontWeight: 700, flexShrink: 0 },
+    memberInfo: { flex: 1 },
+    memberName: { fontSize: 13, fontWeight: 600, color: T.textPrimary },
+    memberBranch: { fontSize: 11, color: T.textMuted },
+    statusBadge: (s) => ({ padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: s === '已扫码' ? '#ECFDF5' : s === '迟到' ? '#FEF3C7' : '#FFF0EE', color: s === '已扫码' ? T.success : s === '迟到' ? T.warning : T.primary })
+  };
+  const members = [
+    { name: '张伟', branch: '南湾街道 南湾社区第一党支部', status: '已扫码', time: '13:42' },
+    { name: '李娜', branch: '南湾街道 南湾社区第一党支部', status: '已扫码', time: '13:45' },
+    { name: '王强', branch: '南湾街道 康乐社区第二党支部', status: '已扫码', time: '13:50' },
+    { name: '刘芳', branch: '南湾街道 康乐社区第二党支部', status: '迟到', time: '14:02' },
+    { name: '陈明', branch: '南湾街道 丹竹头社区第三党支部', status: '迟到', time: '14:05' },
+  ];
+  return (
+    <div style={stStyles.container}>
+      <NavBar title="扫码统计" onBack={nav.goBack} />
+      <div style={stStyles.content}>
+        <div style={stStyles.summaryCard}>
+          <div style={stStyles.summaryNum}>93.3%</div>
+          <div style={stStyles.summaryLabel}>本次活动扫码率（与 PC 活动详情签到统计口径一致，演示）</div>
+        </div>
+        <Card style={{ marginBottom: T.sectionGap }}>
+          <div style={stStyles.dimRow}><span style={stStyles.dimLabel}>应到人数</span><span style={stStyles.dimVal}>60 人</span></div>
+          <div style={stStyles.dimRow}><span style={stStyles.dimLabel}>已扫码</span><span style={{ ...stStyles.dimVal, color: T.success }}>56 人</span></div>
+          <div style={stStyles.dimRow}><span style={stStyles.dimLabel}>迟到</span><span style={{ ...stStyles.dimVal, color: T.warning }}>2 人</span></div>
+          <div style={{ ...stStyles.dimRow, borderBottom: 'none' }}><span style={stStyles.dimLabel}>未扫码</span><span style={{ ...stStyles.dimVal, color: T.primary }}>2 人</span></div>
+        </Card>
+        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6, fontFamily: "'Noto Serif SC', serif" }}>扫码明细</div>
+        <p style={{ fontSize: 11, color: T.textMuted, lineHeight: 1.5, marginBottom: 10 }}>以下为演示节选名单，人名与支部与 PC「活动签到管理」示例一致；完整名册以 PC 为准。</p>
+        {members.map((m, i) => (
+          <div key={i} style={stStyles.memberItem}>
+            <div style={stStyles.memberAvatar}>{m.name[0]}</div>
+            <div style={stStyles.memberInfo}><div style={stStyles.memberName}>{m.name}</div><div style={stStyles.memberBranch}>{m.branch}</div></div>
+            <div style={{ textAlign: 'right' }}><div style={stStyles.statusBadge(m.status)}>{m.status}</div><div style={{ fontSize: 10, color: T.textMuted, marginTop: 2 }}>{m.time}</div></div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// Screen 16: Admin Member List
+// ============================================
+const AdminMemberListScreen = ({ nav }) => {
+  const [search, setSearch] = React.useState('');
+  const mlStyles = {
+    container: { height: '100%', background: T.bg, display: 'flex', flexDirection: 'column' },
+    content: { flex: 1, overflowY: 'auto', padding: '8px 14px 16px' },
+    searchBar: { display: 'flex', alignItems: 'center', gap: 8, padding: '0 14px 10px', background: T.bg },
+    searchInput: { flex: 1, padding: '10px 14px', border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, outline: 'none', background: T.surface },
+    memberItem: { display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: `1px solid ${T.border}` },
+    memberAvatar: { width: 40, height: 40, borderRadius: '50%', background: T.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: T.primary, fontWeight: 700, flexShrink: 0 },
+    memberInfo: { flex: 1 },
+    memberName: { fontSize: 14, fontWeight: 600, color: T.textPrimary },
+    memberBranch: { fontSize: 11, color: T.textMuted, marginTop: 2 },
+    memberCode: { fontSize: 11, color: T.primary, fontWeight: 500 }
+  };
+  const allMembers = [
+    { name: '张伟', branch: '南湾街道 南湾社区第一党支部', code: 'DY001', joinDate: '2019年3月' },
+    { name: '李娜', branch: '南湾街道 南湾社区第一党支部', code: 'DY002', joinDate: '2020年7月' },
+    { name: '王强', branch: '南湾街道 康乐社区第二党支部', code: 'DY003', joinDate: '2018年11月' },
+    { name: '刘芳', branch: '南湾街道 康乐社区第二党支部', code: 'DY004', joinDate: '2021年6月' },
+    { name: '陈明', branch: '南湾街道 丹竹头社区第三党支部', code: 'DY005', joinDate: '2017年5月' },
+    { name: '周婷', branch: '南湾街道 康乐社区第二党支部', code: 'DY008', joinDate: '2023年3月' },
+  ];
+  const filtered = search ? allMembers.filter(m => m.name.includes(search) || m.code.includes(search)) : allMembers;
+  return (
+    <div style={mlStyles.container}>
+      <NavBar title="党员列表" onBack={nav.goBack} />
+      <div style={mlStyles.searchBar}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, ...mlStyles.searchInput }}>
+          <Icons.Search />
+          <input style={{ border: 'none', outline: 'none', fontSize: 13, flex: 1, background: 'transparent' }} value={search} onChange={e => setSearch(e.target.value)} placeholder="搜索姓名或党员编号" />
+        </div>
+      </div>
+      <div style={{ padding: '0 14px', fontSize: 12, color: T.textMuted, marginBottom: 4 }}>共 {filtered.length} 名党员</div>
+      <div style={{ padding: '0 14px' }}>
+        {filtered.map((m, i) => (
+          <div key={i} style={mlStyles.memberItem}>
+            <div style={mlStyles.memberAvatar}>{m.name[0]}</div>
+            <div style={mlStyles.memberInfo}><div style={mlStyles.memberName}>{m.name}</div><div style={mlStyles.memberBranch}>{m.branch} · {m.joinDate}</div></div>
+            <div style={mlStyles.memberCode}>{m.code}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// Screen 17: Admin Exceptions
+// ============================================
+const AdminExceptionsScreen = ({ nav }) => {
+  const exStyles = {
+    container: { height: '100%', background: T.bg, display: 'flex', flexDirection: 'column' },
+    content: { flex: 1, overflowY: 'auto', padding: '8px 14px 16px' },
+    exCard: { background: T.surface, borderRadius: 12, padding: 14, marginBottom: 10, border: `1px solid ${T.border}`, borderLeft: `3px solid ${T.warning}` },
+    exHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 },
+    exType: { fontSize: 13, fontWeight: 600, color: T.textPrimary },
+    exBadge: { padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: '#FEF3C7', color: T.warning },
+    exMeta: { fontSize: 11, color: T.textMuted, display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 },
+    exDesc: { fontSize: 12, color: T.textSecondary, lineHeight: 1.6 }
+  };
+  const exceptions = [
+    { type: '代签到嫌疑', member: '王强', branch: '南湾街道 康乐社区第二党支部', time: '3月15日 14:12', desc: 'GPS定位与活动场地偏差超过500米，签到IP地址异常。' },
+    { type: '连续缺勤', member: '刘芳', branch: '南湾街道 康乐社区第二党支部', time: '近30天', desc: '连续3次活动未签到且未请假，已触发预警。' },
+  ];
+  return (
+    <div style={exStyles.container}>
+      <NavBar title="异常记录" onBack={nav.goBack} />
+      <div style={exStyles.content}>
+        <div style={{ fontSize: 12, color: T.textMuted, marginBottom: 10 }}>共 {exceptions.length} 条异常记录</div>
+        {exceptions.map((ex, i) => (
+          <div key={i} style={exStyles.exCard}>
+            <div style={exStyles.exHeader}>
+              <div style={exStyles.exType}>{ex.type}</div>
+              <span style={exStyles.exBadge}>待处理</span>
+            </div>
+            <div style={exStyles.exMeta}><Icons.User /> {ex.member} · {ex.branch}</div>
+            <div style={exStyles.exMeta}><Icons.Clock /> {ex.time}</div>
+            <div style={exStyles.exDesc}>{ex.desc}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// Screen: Archive Smart Audit（与 PC「档案智能审核」门类口径一致）
+// ============================================
+const ArchiveSmartAuditScreen = ({ nav }) => {
+  const [capturedPhotos, setCapturedPhotos] = React.useState([]);
+  const [localPhotos, setLocalPhotos] = React.useState([]);
+  const [localFiles, setLocalFiles] = React.useState([]);
+  const [issues, setIssues] = React.useState([]);
+  const [audited, setAudited] = React.useState(false);
+  const [records, setRecords] = React.useState([]);
+  const camRef = React.useRef(null);
+  const photoRef = React.useRef(null);
+  const fileRef = React.useRef(null);
+  const currentSubmitter = nav && nav.userRole === 'admin' ? '李建国' : '刘海宝';
+
+  const loadRecords = React.useCallback(() => {
+    try {
+      const raw = localStorage.getItem(AUDIT_RECORDS_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      const normalized = (Array.isArray(parsed) ? parsed : []).map((r) => ({
+        ...r,
+        submitter: (r && r.submitter && r.submitter !== '未填写') ? r.submitter : '刘海宝',
+      }));
+      try {
+        localStorage.setItem(AUDIT_RECORDS_STORAGE_KEY, JSON.stringify(normalized));
+      } catch (x) {}
+      setRecords(normalized);
+    } catch (e) {
+      setRecords([]);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    loadRecords();
+  }, [loadRecords]);
+
+  const pickFiles = (setter) => (e) => {
+    const names = Array.from(e.target.files || []).map(f => f.name);
+    setter(prev => [...prev, ...names]);
+    e.target.value = '';
+  };
+
+  const removeItem = (setter, idx) => {
+    setter(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const runAudit = () => {
+    const total = capturedPhotos.length + localPhotos.length + localFiles.length;
+    if (!total) {
+      alert('请先上传资料后再开始检核。');
+      return;
+    }
+    const generated = [
+      { level: 'high', title: '材料完整性缺失', desc: '发现 1 份材料缺少封面或签章页，请补拍完整页面。' },
+      { level: 'mid', title: '图片清晰度不足', desc: '2 张图片存在反光/模糊，建议重拍并保持画面平整。' },
+      { level: 'mid', title: '文件命名不规范', desc: '检测到文件命名未包含“姓名-门类-日期”，建议统一命名规则。' },
+      { level: 'low', title: '跨资料项引用未对齐', desc: '部分佐证材料未在主表中建立对应索引，请补充关联说明。' },
+    ];
+    if (total <= 2) generated.pop();
+    setIssues(generated);
+    setAudited(true);
+
+    const now = new Date();
+    const record = {
+      id: 'AR-' + now.getTime(),
+      time: now.toLocaleString('zh-CN', { hour12: false }),
+      source: '小程序端',
+      submitter: currentSubmitter,
+      totalFiles: total,
+      captureCount: capturedPhotos.length,
+      localPhotoCount: localPhotos.length,
+      localFileCount: localFiles.length,
+      issueCount: generated.length,
+      highCount: generated.filter(g => g.level === 'high').length,
+      status: generated.some(g => g.level === 'high') ? '待整改' : generated.length ? '建议复核' : '通过',
+      issueTitles: generated.map(g => g.title),
+    };
+    try {
+      const raw = localStorage.getItem(AUDIT_RECORDS_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      const next = [record, ...(Array.isArray(parsed) ? parsed : [])].slice(0, 60);
+      localStorage.setItem(AUDIT_RECORDS_STORAGE_KEY, JSON.stringify(next));
+      setRecords(next);
+    } catch (e) {}
+  };
+
+  const uploadCard = { background: T.surface, borderRadius: 12, border: `1px solid ${T.border}`, padding: 12, marginBottom: 10 };
+  const fileTag = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 8px', borderRadius: 8, background: '#F8FAFC', border: `1px solid ${T.border}`, fontSize: 11, color: T.textSecondary };
+  const actionBtn = { width: '100%', padding: '10px 0', borderRadius: 10, border: `1px dashed ${T.border}`, background: '#FFF', fontSize: 12, color: T.textPrimary, cursor: 'pointer' };
+  const badge = (level) => ({ padding: '2px 8px', borderRadius: 8, fontSize: 11, fontWeight: 600, background: level === 'high' ? '#FFF0EE' : level === 'mid' ? '#FFFBEB' : '#F0FDF4', color: level === 'high' ? T.primary : level === 'mid' ? T.warning : T.success });
+
+  return (
+    <div style={{ height: '100%', background: T.bg, display: 'flex', flexDirection: 'column' }}>
+      <NavBar title="智能资料审核" onBack={nav.goBack} />
+      <div style={{ flex: 1, overflowY: 'auto', padding: '8px 14px 24px' }}>
+        <Card style={{ marginBottom: 12, padding: 14 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "'Noto Serif SC', serif", marginBottom: 6 }}>上传资料并自动检核</div>
+          <div style={{ fontSize: 12, color: T.textSecondary, lineHeight: 1.65 }}>支持现拍照片、本地照片、本地文件组合上传；系统将输出资料审核问题清单。</div>
+        </Card>
+
+        <div style={uploadCard}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>1) 现拍照片</div>
+          <input ref={camRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} multiple onChange={pickFiles(setCapturedPhotos)} />
+          <button type="button" style={actionBtn} onClick={() => camRef.current && camRef.current.click()}>拍摄并上传</button>
+          {capturedPhotos.length > 0 && (
+            <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {capturedPhotos.map((n, i) => <span key={n + i} style={fileTag}>{n} <button type="button" onClick={() => removeItem(setCapturedPhotos, i)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: T.textMuted }}>x</button></span>)}
+            </div>
+          )}
+        </div>
+
+        <div style={uploadCard}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>2) 本地照片</div>
+          <input ref={photoRef} type="file" accept="image/*" style={{ display: 'none' }} multiple onChange={pickFiles(setLocalPhotos)} />
+          <button type="button" style={actionBtn} onClick={() => photoRef.current && photoRef.current.click()}>选择本地照片</button>
+          {localPhotos.length > 0 && (
+            <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {localPhotos.map((n, i) => <span key={n + i} style={fileTag}>{n} <button type="button" onClick={() => removeItem(setLocalPhotos, i)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: T.textMuted }}>x</button></span>)}
+            </div>
+          )}
+        </div>
+
+        <div style={uploadCard}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>3) 本地文件</div>
+          <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.zip,.rar,.txt" style={{ display: 'none' }} multiple onChange={pickFiles(setLocalFiles)} />
+          <button type="button" style={actionBtn} onClick={() => fileRef.current && fileRef.current.click()}>选择本地文件</button>
+          {localFiles.length > 0 && (
+            <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {localFiles.map((n, i) => <span key={n + i} style={fileTag}>{n} <button type="button" onClick={() => removeItem(setLocalFiles, i)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: T.textMuted }}>x</button></span>)}
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+          <button type="button" onClick={runAudit} style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: 'none', background: T.primary, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>开始检核</button>
+          <button type="button" onClick={() => { setCapturedPhotos([]); setLocalPhotos([]); setLocalFiles([]); setIssues([]); setAudited(false); }} style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: `1px solid ${T.border}`, background: T.surface, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: T.textPrimary }}>清空重选</button>
+        </div>
+
+        {audited && (
+          <Card style={{ padding: 14 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "'Noto Serif SC', serif", marginBottom: 10 }}>资料审核问题清单</div>
+            {issues.length === 0 ? (
+              <div style={{ fontSize: 12, color: T.success }}>未发现明显问题，建议人工复核关键页。</div>
+            ) : (
+              issues.map((it, i) => (
+                <div key={i} style={{ paddingBottom: 10, marginBottom: 10, borderBottom: i < issues.length - 1 ? `1px solid ${T.border}` : 'none' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 6 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary }}>{it.title}</div>
+                    <span style={badge(it.level)}>{it.level === 'high' ? '严重' : it.level === 'mid' ? '一般' : '提示'}</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: T.textSecondary, lineHeight: 1.6 }}>{it.desc}</div>
+                </div>
+              ))
+            )}
+          </Card>
+        )}
+        <Card style={{ padding: 14, marginTop: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "'Noto Serif SC', serif" }}>审核记录</div>
+            <button
+              type="button"
+              onClick={loadRecords}
+              style={{ border: `1px solid ${T.border}`, background: '#fff', borderRadius: 8, padding: '4px 10px', fontSize: 11, color: T.textMuted, cursor: 'pointer' }}
+            >
+              刷新
+            </button>
+          </div>
+          {records.length === 0 ? (
+            <div style={{ fontSize: 12, color: T.textMuted }}>暂无审核记录，完成一次检核后自动生成。</div>
+          ) : (
+            records.slice(0, 6).map((r, i) => (
+              <div key={r.id || i} style={{ padding: '10px 0', borderBottom: i < Math.min(records.length, 6) - 1 ? `1px solid ${T.border}` : 'none' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: T.textPrimary }}>{r.id}</div>
+                  <div style={{ fontSize: 11, color: T.textMuted, whiteSpace: 'nowrap' }}>{r.time}</div>
+                </div>
+                <div style={{ fontSize: 11, color: T.textSecondary, lineHeight: 1.6 }}>
+                  提交人：{r.submitter || '刘海宝'} · 共 {r.totalFiles} 份（现拍 {r.captureCount} / 照片 {r.localPhotoCount} / 文件 {r.localFileCount}） · 问题 {r.issueCount} 条（严重 {r.highCount}） · 状态：{r.status}
+                </div>
+              </div>
+            ))
+          )}
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// App Root
+// ============================================
+function App() {
+  const nav = useNavigation('login');
+
+  const handleLogin = (role) => {
+    nav.setUserRole(role);
+    nav.navigateTo('home');
+  };
+
+  const renderScreen = () => {
+    switch (nav.screen) {
+      case 'login': return <LoginScreen onLogin={handleLogin} role={nav.userRole} setRole={nav.setUserRole} />;
+      case 'home': return <HomeScreen nav={nav} />;
+      case 'profile': return <ProfileScreen nav={nav} role={nav.userRole} />;
+      case 'activityHistory': return <ActivityHistoryScreen nav={nav} />;
+      case 'checkin': return <CheckinScreen nav={nav} />;
+      case 'scanVerify': return <ScanVerifyScreen nav={nav} />;
+      case 'learning': return <LearningScreen nav={nav} />;
+      case 'learningPlatformStats': return <LearningPlatformStatsScreen nav={nav} />;
+      case 'pastCourses': return <PastCoursesScreen nav={nav} />;
+      case 'courseDetail': return <CourseDetailScreen nav={nav} />;
+      case 'aiProfile': return <AIProfileScreen nav={nav} />;
+      case 'archiveAudit': return <ArchiveSmartAuditScreen nav={nav} />;
+      case 'liveActivity': return <LiveActivityScreen nav={nav} />;
+      case 'aiQA': return <AIQAScreen nav={nav} />;
+      case 'career': return <CareerScreen nav={nav} />;
+      case 'lifeServices': return <LifeServicesScreen nav={nav} />;
+      case 'disposal': return <DisposalScreen nav={nav} />;
+      case 'adminCheckinMgmt': return <AdminCheckinMgmtScreen nav={nav} />;
+      case 'adminStats': return <AdminStatsScreen nav={nav} />;
+      case 'adminMemberList': return <AdminMemberListScreen nav={nav} />;
+      case 'adminExceptions': return <AdminExceptionsScreen nav={nav} />;
+      default: return <HomeScreen nav={nav} />;
+    }
+  };
+
+  const isLogin = nav.screen === 'login';
+  const darkScreens = ['profile'];
+  const isDark = darkScreens.includes(nav.screen);
+
+  return (
+    <IosFrame time="9:41" battery={85} dark={isDark}>
+      <div style={{ position: 'absolute', top: 54, left: 0, right: 0, bottom: 0 }}>
+        {renderScreen()}
+      </div>
+    </IosFrame>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

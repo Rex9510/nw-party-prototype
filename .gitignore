@@ -1,0 +1,14 @@
+# 本地 / 编辑器（Claude Code 配置不必进远端）
+.claude/
+*.log
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 若后续加 Node
+node_modules/

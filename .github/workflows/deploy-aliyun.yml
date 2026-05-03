@@ -1,0 +1,52 @@
+# 与「投资喵」思路一致：push 到 main 后 SSH 到阿里云轻量，在服务器 git pull。
+# 本仓库为纯静态 HTML，无需 npm build / PM2。
+#
+# GitHub → Settings → Secrets and variables → Actions 配置：
+#   DEPLOY_HOST     轻量服务器公网 IP 或域名
+#   DEPLOY_USER     SSH 用户（如 root 或创建的低权用户）
+#   DEPLOY_SSH_KEY  对应私钥全文
+#   DEPLOY_PATH     （可选）仓库在服务器上的绝对路径，留空则用下方默认值
+#
+# 服务器需已：git clone 本仓库一次、nginx root 指向该目录（见 deploy/nginx-site.example.conf）
+#
+# 若服务器 git pull github HTTPS 不稳定，请在服务器执行：
+#   git remote set-url origin git@github.com:你的用户名/你的仓库名.git
+# 并在 GitHub 仓库 Deploy keys 添加服务器只读公钥。
+
+name: Deploy static to Aliyun
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-nw-party-static
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH pull on server
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          command_timeout: 10m
+          script: |
+            set -euo pipefail
+            APP_DIR='${{ secrets.DEPLOY_PATH }}'
+            if [ -z "${APP_DIR:-}" ] || [ "$APP_DIR" = "" ]; then
+              APP_DIR=/var/www/nw-party-prototype
+            fi
+            mkdir -p "$(dirname "$APP_DIR")"
+            if [ ! -d "$APP_DIR/.git" ]; then
+              echo "首次部署：请先在服务器手动 git clone 本仓库到 $APP_DIR，再重跑 workflow。"
+              exit 1
+            fi
+            cd "$APP_DIR"
+            git fetch origin main
+            git reset --hard origin/main
+            echo "OK: static site updated at $APP_DIR"
