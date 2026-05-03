@@ -12,3 +12,17 @@ venv/
 
 # 若后续加 Node
 node_modules/
+
+# —— 需求调研 / 评估 / 访谈 / 打包材料（仅本机留存，不进 GitHub）——
+*.docx
+*.zip
+generate_interview_docx.py
+party_affairs_interview_confirmation.docx
+龙岗南湾街道党务智能体需求分析总结.md
+南湾红帆党务智管家-开发成本评估.md
+南湾红帆党务智管家-实施成本评估.md
+南湾街道党员党务智能体建设方案.txt
+南湾街道党员党务智能体建设方案.docx
+沟通需求记录.docx
+党组织项目.zip
+prototype/需求-原型对齐说明.md

@@ -2,6 +2,8 @@
 
 纯静态 HTML：PC 管理端（`pc-admin/`）与小程序高保真单页（`prototype/mobile_v2.html`）。本地可用 `python start-servers.py`（根目录 `8080`）。
 
+**仓库范围**：仅收录可部署/可演示的静态原型与部署说明。需求分析、成本评估、访谈稿、Word/ZIP 等已在 `.gitignore` 中排除，仍保留在你本机目录，但不会进入 `git push`。
+
 ## 两种「链接形式」推到 GitHub（建议同时用）
 
 | 形式 | 用途 | 做法摘要 |
