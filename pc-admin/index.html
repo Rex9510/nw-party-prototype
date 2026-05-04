@@ -63,6 +63,151 @@ function showPrototypeToast(text, type) {
   if (prototypeToastRef.set) prototypeToastRef.set({ text, type: type || 'success' });
 }
 
+function nwPcMemberAvatarKey(memberId) {
+  return 'nw_pc_member_avatar_' + String(memberId == null || memberId === '' ? 'create' : memberId);
+}
+
+function readNwPcMemberAvatar(memberId) {
+  try {
+    var v = localStorage.getItem(nwPcMemberAvatarKey(memberId));
+    if (typeof v === 'string' && /^data:image\//i.test(v.trim())) return v.trim();
+  } catch (e0) {}
+  return '';
+}
+
+function writeNwPcMemberAvatar(memberId, dataUrl) {
+  try {
+    var k = nwPcMemberAvatarKey(memberId);
+    if (dataUrl && typeof dataUrl === 'string') localStorage.setItem(k, dataUrl);
+    else localStorage.removeItem(k);
+  } catch (e1) {}
+}
+
+/** 当前登录操作员（顶栏「李建国」）头像，与党员档案照片 key 分离 */
+var NW_PC_OPERATOR_AVATAR_KEY = 'nw_pc_operator_profile_avatar_v1';
+
+function readNwPcOperatorAvatar() {
+  try {
+    var v = localStorage.getItem(NW_PC_OPERATOR_AVATAR_KEY);
+    if (typeof v === 'string' && /^data:image\//i.test(v.trim())) return v.trim();
+  } catch (e2) {}
+  return '';
+}
+
+function writeNwPcOperatorAvatar(dataUrl) {
+  try {
+    if (dataUrl && typeof dataUrl === 'string') localStorage.setItem(NW_PC_OPERATOR_AVATAR_KEY, dataUrl);
+    else localStorage.removeItem(NW_PC_OPERATOR_AVATAR_KEY);
+  } catch (e3) {}
+}
+
+/** 头像大图预览（与小程序原型 showNwAvatarLightbox 行为一致） */
+function showNwAvatarLightbox(opts) {
+  opts = opts || {};
+  var imageSrc = typeof opts.imageSrc === 'string' ? opts.imageSrc.trim() : '';
+  var letterRaw = typeof opts.letter === 'string' ? opts.letter.trim() : '';
+  var letter = letterRaw ? letterRaw.charAt(0) : '?';
+  var caption = typeof opts.caption === 'string' ? opts.caption.trim() : '';
+  var hint = opts.hint || '点击空白处、右上角 × 或「关闭」退出';
+  var id = 'nw-pc-avatar-lightbox-root';
+  var old = document.getElementById(id);
+  if (old) try { old.remove(); } catch (e0) {}
+
+  function close() {
+    try {
+      document.removeEventListener('keydown', onKey);
+    } catch (e1) {}
+    try {
+      el.remove();
+    } catch (e2) {}
+  }
+  function onKey(e) {
+    if (e.key === 'Escape') close();
+  }
+
+  var el = document.createElement('div');
+  el.id = id;
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-modal', 'true');
+  el.setAttribute('aria-label', '头像预览');
+  el.style.cssText =
+    'position:fixed;inset:0;z-index:20050;background:rgba(0,0,0,0.88);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;box-sizing:border-box';
+  el.addEventListener('click', function (e) {
+    if (e.target === el) close();
+  });
+
+  var xbtn = document.createElement('button');
+  xbtn.type = 'button';
+  xbtn.setAttribute('aria-label', '关闭');
+  xbtn.textContent = '×';
+  xbtn.style.cssText =
+    'position:fixed;top:16px;right:20px;width:44px;height:44px;border-radius:50%;border:none;background:rgba(255,255,255,0.14);color:#fff;font-size:26px;line-height:1;cursor:pointer;z-index:20051';
+  xbtn.onclick = function (e) {
+    e.stopPropagation();
+    close();
+  };
+
+  var panel = document.createElement('div');
+  panel.style.cssText =
+    'max-width:100%;max-height:86vh;display:flex;flex-direction:column;align-items:center;gap:14px;pointer-events:none';
+
+  var size = Math.min(Math.floor(window.innerWidth * 0.42), 360);
+  var hasImg = imageSrc && (imageSrc.indexOf('data:image') === 0 || /^https?:\/\//i.test(imageSrc));
+
+  if (hasImg) {
+    var img = document.createElement('img');
+    img.src = imageSrc;
+    img.alt = caption || '头像';
+    img.style.cssText =
+      'width:' +
+      size +
+      'px;height:' +
+      size +
+      'px;border-radius:50%;object-fit:cover;border:3px solid rgba(255,255,255,0.2);box-shadow:0 12px 48px rgba(0,0,0,0.45);pointer-events:auto';
+    panel.appendChild(img);
+  } else {
+    var fs = Math.max(44, Math.floor(size * 0.36));
+    var circle = document.createElement('div');
+    circle.textContent = letter;
+    circle.style.cssText =
+      'width:' +
+      size +
+      'px;height:' +
+      size +
+      'px;border-radius:50%;background:linear-gradient(160deg,#FFF0EE,#D44040);display:flex;align-items:center;justify-content:center;font-size:' +
+      fs +
+      'px;font-weight:700;color:#fff;font-family:Noto Serif SC,serif;border:3px solid rgba(255,255,255,0.25);box-sizing:border-box;pointer-events:auto';
+    panel.appendChild(circle);
+  }
+
+  if (caption) {
+    var cap = document.createElement('div');
+    cap.textContent = caption;
+    cap.style.cssText = 'color:#fff;font-size:17px;font-weight:600;text-align:center;max-width:90vw;pointer-events:auto';
+    panel.appendChild(cap);
+  }
+  var hi = document.createElement('div');
+  hi.textContent = hint;
+  hi.style.cssText = 'color:rgba(255,255,255,0.55);font-size:12px;text-align:center;max-width:320px;line-height:1.55;pointer-events:auto';
+  panel.appendChild(hi);
+
+  var btn = document.createElement('button');
+  btn.type = 'button';
+  btn.textContent = '关闭';
+  btn.style.cssText =
+    'margin-top:6px;padding:11px 40px;border-radius:999px;border:1px solid rgba(255,255,255,0.35);background:rgba(255,255,255,0.12);color:#fff;font-size:14px;font-weight:600;cursor:pointer;pointer-events:auto';
+  btn.onclick = function (e) {
+    e.stopPropagation();
+    close();
+  };
+  panel.appendChild(btn);
+
+  el.appendChild(panel);
+  el.appendChild(xbtn);
+  document.body.appendChild(el);
+  document.addEventListener('keydown', onKey);
+}
+
 // ============================================
 // SVG Icons (replacing emoji)
 // ============================================
@@ -717,21 +862,21 @@ function DashboardPage({ setPage, setActivitySub }) {
 // Demo: members (党员列表 + AI 画像检索共用)
 // ============================================
 const membersListDemo = [
-  { id: '001', name: '张伟', identity: 'secretary', branch: '南湾街道 南湾社区第一党支部', joinDate: '2019-03-15', status: '正式', phone: '138****5678', rating: '优秀', education: '本科' },
-  { id: '002', name: '李娜', identity: 'org_committee', branch: '南湾街道 南湾社区第一党支部', joinDate: '2020-07-01', status: '正式', phone: '139****1234', rating: '良好', education: '硕士' },
-  { id: '003', name: '王强', identity: 'committee', branch: '南湾街道 康乐社区第二党支部', joinDate: '2018-11-20', status: '正式', phone: '137****9876', rating: '优秀', education: '博士' },
-  { id: '004', name: '刘芳', identity: 'member', branch: '南湾街道 康乐社区第二党支部', joinDate: '2021-06-30', status: '预备', phone: '136****5432', rating: '良好', education: '大专' },
-  { id: '005', name: '陈明', identity: 'floating', branch: '南湾街道 丹竹头社区第三党支部', joinDate: '2017-05-12', status: '正式', phone: '135****8765', rating: '合格', education: '高中' },
-  { id: '006', name: '赵丽', identity: 'member', branch: '南湾街道 丹竹头社区第三党支部', joinDate: '2022-01-08', status: '预备', phone: '134****2345', rating: '良好', education: '本科' },
-  { id: '007', name: '孙鹏', identity: 'committee', branch: '南湾街道 南湾社区第一党支部', joinDate: '2016-09-01', status: '正式', phone: '133****6789', rating: '优秀', education: '硕士' },
-  { id: '008', name: '周婷', identity: 'floating', branch: '南湾街道 康乐社区第二党支部', joinDate: '2023-03-15', status: '预备', phone: '132****3456', rating: '待评定', education: '博士' },
+  { id: '001', name: '张伟', identity: 'secretary', branch: '南湾街道 南湾社区第一党支部', joinDate: '2019-03-15', status: '正式', phone: '138****5678', rating: '优秀', education: '本科', outOrgName: '湖南省长沙市望城区××街道机关第一党支部（示例）', outOrgContact: '王某（组织员）· 0731-8****123' },
+  { id: '002', name: '李娜', identity: 'org_committee', branch: '南湾街道 南湾社区第一党支部', joinDate: '2020-07-01', status: '正式', phone: '139****1234', rating: '良好', education: '硕士', outOrgName: '—', outOrgContact: '—' },
+  { id: '003', name: '王强', identity: 'committee', branch: '南湾街道 康乐社区第二党支部', joinDate: '2018-11-20', status: '正式', phone: '137****9876', rating: '优秀', education: '博士', outOrgName: '—', outOrgContact: '—' },
+  { id: '004', name: '刘芳', identity: 'member', branch: '南湾街道 康乐社区第二党支部', joinDate: '2021-06-30', status: '预备', phone: '136****5432', rating: '良好', education: '大专', outOrgName: '—', outOrgContact: '—' },
+  { id: '005', name: '陈明', identity: 'floating', branch: '南湾街道 丹竹头社区第三党支部', joinDate: '2017-05-12', status: '正式', phone: '135****8765', rating: '合格', education: '高中', outOrgName: '河南省郑州市金水区××路街道机关党支部', outOrgContact: '赵某（党务）· 0371-6****890' },
+  { id: '006', name: '赵丽', identity: 'member', branch: '南湾街道 丹竹头社区第三党支部', joinDate: '2022-01-08', status: '预备', phone: '134****2345', rating: '良好', education: '本科', outOrgName: '—', outOrgContact: '—' },
+  { id: '007', name: '孙鹏', identity: 'committee', branch: '南湾街道 南湾社区第一党支部', joinDate: '2016-09-01', status: '正式', phone: '133****6789', rating: '优秀', education: '硕士', outOrgName: '—', outOrgContact: '—' },
+  { id: '008', name: '周婷', identity: 'floating', branch: '南湾街道 康乐社区第二党支部', joinDate: '2023-03-15', status: '预备', phone: '132****3456', rating: '待评定', education: '博士', outOrgName: '湖北省武汉市东湖高新区××社区党支部', outOrgContact: '刘某（组织委员）· 027-8****456' },
 ];
 
 /** 与 AI 画像页「重点关注」等名单对齐，便于按姓名搜索 */
 const membersAiExtraDemo = [
-  { id: 'x01', name: '赵六', identity: 'member', branch: '南湾街道 康乐社区第二党支部', joinDate: '2019-08-01', status: '正式', phone: '131****0001', rating: '待改进', education: '大专' },
-  { id: 'x02', name: '钱七', identity: 'floating', branch: '南湾街道 丹竹头社区第三党支部', joinDate: '2020-02-10', status: '正式', phone: '131****0002', rating: '待改进', education: '本科' },
-  { id: 'x03', name: '孙八', identity: 'member', branch: '南湾街道 南湾社区第一党支部', joinDate: '2021-05-20', status: '预备', phone: '131****0003', rating: '合格', education: '高中' },
+  { id: 'x01', name: '赵六', identity: 'member', branch: '南湾街道 康乐社区第二党支部', joinDate: '2019-08-01', status: '正式', phone: '131****0001', rating: '待改进', education: '大专', outOrgName: '—', outOrgContact: '—' },
+  { id: 'x02', name: '钱七', identity: 'floating', branch: '南湾街道 丹竹头社区第三党支部', joinDate: '2020-02-10', status: '正式', phone: '131****0002', rating: '待改进', education: '本科', outOrgName: '广东省广州市天河区××街道综合党委', outOrgContact: '陈某 · 020-3****210' },
+  { id: 'x03', name: '孙八', identity: 'member', branch: '南湾街道 南湾社区第一党支部', joinDate: '2021-05-20', status: '预备', phone: '131****0003', rating: '合格', education: '高中', outOrgName: '—', outOrgContact: '—' },
 ];
 
 const membersAllForAiSearch = [...membersListDemo, ...membersAiExtraDemo];
@@ -902,6 +1047,76 @@ function AiMonthlyTrendChart({ data, memberId }) {
 }
 
 // ============================================
+// 党员档案 · 个人照片（上传 / 预览 / 本地演示存 localStorage）
+// ============================================
+function PcMemberPhotoUploader({ memberId, demoName }) {
+  const keyId = memberId == null || memberId === '' ? 'create' : memberId;
+  const letter = (demoName && String(demoName).trim().charAt(0)) || '党';
+  const [url, setUrl] = React.useState(() => readNwPcMemberAvatar(keyId));
+  const inp = React.useRef(null);
+  const onFile = (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    if (!/^image\//i.test(f.type)) {
+      showPrototypeToast('请选择图片文件', 'error');
+      e.target.value = '';
+      return;
+    }
+    if (f.size > 2.5 * 1024 * 1024) {
+      showPrototypeToast('单张请小于约 2.5MB（演示）', 'error');
+      e.target.value = '';
+      return;
+    }
+    const r = new FileReader();
+    r.onload = () => {
+      const u = String(r.result || '');
+      writeNwPcMemberAvatar(keyId, u);
+      setUrl(u);
+      showPrototypeToast('照片已载入预览（演示，仅存本机）');
+    };
+    r.readAsDataURL(f);
+    e.target.value = '';
+  };
+  return (
+    <div style={{ marginBottom: 22 }}>
+      <label style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary, display: 'block', marginBottom: 10 }}>个人照片</label>
+      <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={() => showNwAvatarLightbox({ imageSrc: url, letter, caption: (demoName || '党员') + ' · 档案照' })}
+          style={{
+            width: 88, height: 88, borderRadius: '50%', border: `2px solid ${T.border}`, padding: 0, overflow: 'hidden', cursor: 'pointer', flexShrink: 0,
+            background: url ? '#fff' : T.primaryLight, color: T.primary, fontSize: 32, fontWeight: 700, fontFamily: "'Noto Serif SC', serif",
+            display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: T.cardShadow,
+          }}
+        >
+          {url ? <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : letter}
+        </button>
+        <div style={{ flex: 1, minWidth: 220 }}>
+          <input ref={inp} type="file" accept="image/jpeg,image/png,image/webp,image/gif" style={{ display: 'none' }} onChange={onFile} />
+          <div
+            onClick={() => inp.current && inp.current.click()}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inp.current && inp.current.click(); } }}
+            role="button"
+            tabIndex={0}
+            style={{ border: `2px dashed ${url ? T.success : T.border}`, borderRadius: 10, padding: '22px 16px', textAlign: 'center', background: url ? '#ECFDF5' : T.bg, cursor: 'pointer' }}
+          >
+            <div style={{ color: T.textMuted, marginBottom: 8, display: 'flex', justifyContent: 'center' }}><I.User /></div>
+            <p style={{ fontSize: 13, color: T.textPrimary, fontWeight: 600 }}>{url ? '已选择照片 · 点击重新上传' : '点击或拖拽上传个人照片'}</p>
+            <p style={{ fontSize: 12, color: T.textMuted, marginTop: 4 }}>支持 JPG/PNG/WebP/GIF；左侧头像可点击放大查看</p>
+          </div>
+          {url && (
+            <div style={{ marginTop: 10 }}>
+              <SecondaryBtn onClick={() => { writeNwPcMemberAvatar(keyId, ''); setUrl(''); showPrototypeToast('已移除照片预览'); }}><I.Trash /> 移除照片</SecondaryBtn>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
 // Page: Members List
 // ============================================
 function MembersListPage({ onViewAiPortrait }) {
@@ -932,10 +1147,13 @@ function MembersListPage({ onViewAiPortrait }) {
             { label: '党员状态', type: 'select', options: ['正式', '预备'] },
             { label: '工作单位', type: 'input', placeholder: '请输入工作单位' },
             { label: '职务', type: 'input', placeholder: '请输入职务' },
+            { label: '流出地党组织名称', type: 'input', placeholder: '可为空；流动党员等请填写原/流出地党组织全称', optional: true },
+            { label: '流出地对应联系人', type: 'input', placeholder: '姓名、职务、联系电话（便于与原党组织对接）', optional: true },
           ].map((field, i) => (
             <div key={i} style={{ marginBottom: 18 }}>
               <label style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary, display: 'block', marginBottom: 6 }}>
-                {field.label} <span style={{ color: T.primary }}>*</span>
+                {field.label} {!field.optional && <span style={{ color: T.primary }}>*</span>}
+                {field.optional && <span style={{ color: T.textMuted, fontWeight: 400, fontSize: 12 }}>（选填）</span>}
               </label>
               {field.type === 'select' ? (
                 <SelectField style={{ width: '100%' }}>{field.options.map(o => <option key={o}>{o}</option>)}</SelectField>
@@ -944,14 +1162,7 @@ function MembersListPage({ onViewAiPortrait }) {
               )}
             </div>
           ))}
-          <div style={{ marginBottom: 18 }}>
-            <label style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary, display: 'block', marginBottom: 6 }}>个人照片</label>
-            <div style={{ border: `2px dashed ${T.border}`, borderRadius: 10, padding: '30px 0', textAlign: 'center', background: T.bg, cursor: 'pointer' }} onClick={() => showPrototypeToast('请选择本地照片文件（演示）')}>
-              <div style={{ color: T.textMuted, marginBottom: 8, display: 'flex', justifyContent: 'center' }}><I.User /></div>
-              <p style={{ fontSize: 13, color: T.textMuted }}>点击或拖拽上传个人照片</p>
-              <p style={{ fontSize: 12, color: T.textMuted, marginTop: 2 }}>支持 JPG/PNG，单张不超过2MB</p>
-            </div>
-          </div>
+          <PcMemberPhotoUploader memberId={null} demoName="新建党员" />
           <div style={{ display: 'flex', gap: 10 }}>
             <PrimaryBtn style={{ flex: 1 }} onClick={() => {
               const pwd = demoRandomInitialPassword();
@@ -985,6 +1196,7 @@ function MembersListPage({ onViewAiPortrait }) {
         </span>
         <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20, fontFamily: "'Noto Serif SC', serif" }}>编辑党员档案</h2>
         <div style={{ background: T.surface, borderRadius: T.cardRadius, padding: 24, boxShadow: T.cardShadow, border: `1px solid ${T.border}`, maxWidth: 700 }}>
+          <PcMemberPhotoUploader memberId={selectedMember.id} demoName={selectedMember.name} />
           {[
             { label: '姓名', type: 'input', value: selectedMember.name },
             { label: '系统身份', type: 'select', options: PC_SYSTEM_IDENTITIES.map((x) => x.label), value: pcIdentityLabel(selectedMember.identity) },
@@ -996,10 +1208,13 @@ function MembersListPage({ onViewAiPortrait }) {
             { label: '党员状态', type: 'select', options: ['正式', '预备'], value: selectedMember.status },
             { label: '工作单位', type: 'input', placeholder: '请输入工作单位' },
             { label: '职务', type: 'input', placeholder: '请输入职务' },
+            { label: '流出地党组织名称', type: 'input', placeholder: '可为空；流动党员等请填写原/流出地党组织全称', optional: true, value: selectedMember.outOrgName || '' },
+            { label: '流出地对应联系人', type: 'input', placeholder: '姓名、职务、联系电话', optional: true, value: selectedMember.outOrgContact || '' },
           ].map((field, i) => (
             <div key={i} style={{ marginBottom: 18 }}>
               <label style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary, display: 'block', marginBottom: 6 }}>
-                {field.label} <span style={{ color: T.primary }}>*</span>
+                {field.label} {!field.optional && <span style={{ color: T.primary }}>*</span>}
+                {field.optional && <span style={{ color: T.textMuted, fontWeight: 400, fontSize: 12 }}>（选填）</span>}
               </label>
               {field.type === 'select' ? (
                 <SelectField style={{ width: '100%' }} defaultValue={field.value}>{field.options.map(o => <option key={o}>{o}</option>)}</SelectField>
@@ -1033,6 +1248,7 @@ function MembersListPage({ onViewAiPortrait }) {
             <p style={{ fontSize: 13, color: '#1E40AF', marginBottom: 8, fontWeight: 600 }}>导入说明</p>
             <ul style={{ fontSize: 12, color: '#1E40AF', paddingLeft: 18, margin: 0, lineHeight: 1.8 }}>
               <li>模板须含：<strong>姓名、手机号码、身份证号、系统身份</strong>（书记 / 委员 / 组织委员 / 普通党员 / 流动党员 五选一）；导入成功后按行开通账号</li>
+              <li>选填列可含：<strong>流出地党组织名称、流出地对应联系人</strong>（与党员管理编辑页字段对齐，便于流动党员双向联系）</li>
               <li><strong>手机号</strong>即登录账号；系统将生成<strong>随机初始密码</strong>并以短信下发（正文模板与 PC「权限管理」页示例、登录页示例一致）</li>
               <li>支持 .xlsx / .xls 格式，单次导入不超过500条记录</li>
               <li>身份证号去重；失败行在结果报告中标注</li>
@@ -1067,7 +1283,7 @@ function MembersListPage({ onViewAiPortrait }) {
     <div>
       <PageHeader
         title="党员档案管理"
-        subtitle="人员在此新增或导入后开通系统账号：手机号为登录名，系统身份（五选一）在保存时绑定并与「权限管理」模板一致；初始密码短信下发。对齐小程序「我的」党员码与档案数据源。"
+        subtitle="人员在此新增或导入后开通系统账号：手机号为登录名，系统身份（五选一）在保存时绑定并与「权限管理」模板一致；初始密码短信下发。支持维护流出地党组织名称与流出地对应联系人，并与小程序「我的」档案展示对齐。"
         actions={<>
         <PrimaryBtn onClick={() => setSubPage('create')}><I.Plus /> 新建党员</PrimaryBtn>
         <SecondaryBtn onClick={() => setSubPage('import')}><I.Upload /> Excel批量导入</SecondaryBtn>
@@ -1106,7 +1322,7 @@ function MembersListPage({ onViewAiPortrait }) {
         <span style={{ fontSize: 13, color: T.textMuted, marginLeft: 'auto' }}>共 1,286 条记录</span>
       </FilterBar>
 
-      <DataTable columns={['编号', '姓名', '系统身份', '所属支部', '入党时间', '状态', '学历', '手机号', '评定等级', '操作']} actions rows={members.map((m, i) => (
+      <DataTable columns={['编号', '姓名', '系统身份', '所属支部', '入党时间', '状态', '学历', '手机号', '流出地党组织', '流出地联系人', '评定等级', '操作']} actions rows={members.map((m, i) => (
         <tr key={i} style={{ borderBottom: `1px solid ${T.border}`, background: '#fff' }}>
           <td style={{ padding: '12px 16px', fontSize: 13, fontFamily: 'monospace', color: T.textSecondary }}>{m.id}</td>
           <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 600 }}>{m.name}</td>
@@ -1123,6 +1339,12 @@ function MembersListPage({ onViewAiPortrait }) {
               bg={m.education === '博士' ? '#F0F9FF' : m.education === '硕士' ? '#ECFDF5' : m.education === '本科' ? T.primaryLight : '#F3F4F6'}>{m.education}</Badge>
           </td>
           <td style={{ padding: '12px 16px', fontSize: 13, fontFamily: 'monospace', color: T.textSecondary }}>{m.phone}</td>
+          <td style={{ padding: '10px 16px', fontSize: 12, color: T.textSecondary, maxWidth: 200 }} title={m.outOrgName || '—'}>
+            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.outOrgName || '—'}</div>
+          </td>
+          <td style={{ padding: '10px 16px', fontSize: 12, color: T.textSecondary, maxWidth: 160 }} title={m.outOrgContact || '—'}>
+            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.outOrgContact || '—'}</div>
+          </td>
           <td style={{ padding: '12px 16px' }}>
             <Badge color={m.rating === '优秀' ? T.primary : m.rating === '良好' ? '#2563EB' : T.textSecondary}
               bg={m.rating === '优秀' ? T.primaryLight : m.rating === '良好' ? '#EFF6FF' : '#F3F4F6'}>{m.rating}</Badge>
@@ -1144,7 +1366,11 @@ function MembersListPage({ onViewAiPortrait }) {
 // Page: Member Detail
 // ============================================
 function MemberDetailPage({ member, onBack }) {
-  const m = member || { name: '张伟', branch: '南湾街道 南湾社区第一党支部', joinDate: '2019-03-15', status: '正式', phone: '138****5678', education: '本科' };
+  const m = member || { id: '001', name: '张伟', branch: '南湾街道 南湾社区第一党支部', joinDate: '2019-03-15', status: '正式', phone: '138****5678', education: '本科', outOrgName: '—', outOrgContact: '—' };
+  const [detailPhoto, setDetailPhoto] = React.useState(() => readNwPcMemberAvatar(m.id));
+  React.useEffect(() => {
+    setDetailPhoto(readNwPcMemberAvatar(m.id));
+  }, [m.id]);
   return (
     <div>
       <div style={{ marginBottom: 20 }}>
@@ -1159,7 +1385,17 @@ function MemberDetailPage({ member, onBack }) {
         <div style={{ background: T.surface, borderRadius: T.cardRadius, padding: 24, boxShadow: T.cardShadow, border: `1px solid ${T.border}` }}>
           <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 20, paddingBottom: 12, borderBottom: `1px solid ${T.border}`, fontFamily: "'Noto Serif SC', serif" }}>基本信息</h3>
           <div style={{ display: 'flex', gap: 20, marginBottom: 20 }}>
-            <div style={{ width: 64, height: 64, borderRadius: '50%', background: T.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.primary, fontSize: 24, fontWeight: 700, fontFamily: "'Noto Serif SC', serif" }}>{m.name.charAt(0)}</div>
+            <button
+              type="button"
+              onClick={() => showNwAvatarLightbox({ imageSrc: detailPhoto, letter: m.name.charAt(0), caption: m.name + ' · 档案照片' })}
+              style={{
+                width: 64, height: 64, borderRadius: '50%', border: `2px solid ${T.border}`, padding: 0, overflow: 'hidden', cursor: 'pointer', flexShrink: 0,
+                background: detailPhoto ? '#fff' : T.primaryLight, color: T.primary, fontSize: 24, fontWeight: 700, fontFamily: "'Noto Serif SC', serif",
+                display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: T.cardShadow,
+              }}
+            >
+              {detailPhoto ? <img src={detailPhoto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : m.name.charAt(0)}
+            </button>
             <div>
               <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4, fontFamily: "'Noto Serif SC', serif" }}>{m.name}</h2>
               <Badge color={m.status === '正式' ? T.success : T.warning} bg={m.status === '正式' ? '#ECFDF5' : '#FFFBEB'}>{m.status}党员</Badge>
@@ -1172,6 +1408,8 @@ function MemberDetailPage({ member, onBack }) {
             { label: '教育程度', value: m.education },
             { label: '系统身份', value: pcIdentityLabel(m.identity) },
             { label: '手机号码', value: m.phone },
+            { label: '流出地党组织名称', value: m.outOrgName && m.outOrgName !== '—' ? m.outOrgName : '暂无登记' },
+            { label: '流出地对应联系人', value: m.outOrgContact && m.outOrgContact !== '—' ? m.outOrgContact : '暂无登记' },
           ].map((item, i) => (
             <div key={i} style={{ display: 'flex', padding: '10px 0', borderBottom: `1px solid ${T.border}` }}>
               <span style={{ width: 90, fontSize: 13, color: T.textMuted, flexShrink: 0 }}>{item.label}</span>
@@ -5704,6 +5942,8 @@ function App() {
   const [headerTodoFullOpen, setHeaderTodoFullOpen] = React.useState(false);
   const [headerTodoTab, setHeaderTodoTab] = React.useState('pending');
   const [headerAccountModal, setHeaderAccountModal] = React.useState(null);
+  const [operatorAvatarUrl, setOperatorAvatarUrl] = React.useState(() => readNwPcOperatorAvatar());
+  const operatorAvatarFileRef = React.useRef(null);
   const [pwdForm, setPwdForm] = React.useState({ cur: '', next: '', next2: '' });
   const [notifyDemo, setNotifyDemo] = React.useState({ audit: true, activity: true, weekly: false });
   const [aiPortraitMemberId, setAiPortraitMemberId] = React.useState(null);
@@ -5769,7 +6009,32 @@ function App() {
   const openHeaderAccountModal = (mode) => {
     setHeaderMenuOpen(null);
     if (mode === 'password') setPwdForm({ cur: '', next: '', next2: '' });
+    if (mode === 'profile') setOperatorAvatarUrl(readNwPcOperatorAvatar());
     setHeaderAccountModal(mode);
+  };
+
+  const onOperatorAvatarFile = (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    if (!/^image\//i.test(f.type)) {
+      showPrototypeToast('请选择图片文件', 'error');
+      e.target.value = '';
+      return;
+    }
+    if (f.size > 2.5 * 1024 * 1024) {
+      showPrototypeToast('单张请小于约 2.5MB（演示）', 'error');
+      e.target.value = '';
+      return;
+    }
+    const r = new FileReader();
+    r.onload = () => {
+      const u = String(r.result || '');
+      writeNwPcOperatorAvatar(u);
+      setOperatorAvatarUrl(u);
+      showPrototypeToast('头像已更新（演示，仅存本机）');
+    };
+    r.readAsDataURL(f);
+    e.target.value = '';
   };
 
   const setAiPortraitMemberIdSafe = (id) => {
@@ -5976,11 +6241,22 @@ function App() {
                   transition: 'background 0.15s, border 0.15s',
                 }}
               >
-                <div style={{
-                  width: 30, height: 30, borderRadius: '50%', background: T.primaryLight,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 13, fontWeight: 600, color: T.primary,
-                }}>李</div>
+                <button
+                  type="button"
+                  title="查看头像"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    showNwAvatarLightbox({ imageSrc: operatorAvatarUrl, letter: '李', caption: '李建国 · 顶栏头像' });
+                  }}
+                  style={{
+                    width: 30, height: 30, borderRadius: '50%', background: operatorAvatarUrl ? '#fff' : T.primaryLight,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 13, fontWeight: 600, color: T.primary, overflow: 'hidden', flexShrink: 0, border: `1px solid ${T.border}`,
+                    padding: 0, cursor: 'pointer',
+                  }}
+                >
+                  {operatorAvatarUrl ? <img src={operatorAvatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '李'}
+                </button>
                 <div>
                 <div style={{ fontSize: 13, fontWeight: 500 }}>李建国</div>
                 <div style={{ fontSize: 11, color: T.textMuted }}>书记 · 138****8000</div>
@@ -6108,11 +6384,38 @@ function App() {
               <h3 style={{ fontSize: 17, fontWeight: 700, fontFamily: "'Noto Serif SC', serif" }}>个人资料</h3>
               <button type="button" onClick={() => setHeaderAccountModal(null)} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: T.textMuted, lineHeight: 1 }} aria-label="关闭">×</button>
             </div>
-            <div style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
-              <div style={{ width: 56, height: 56, borderRadius: '50%', background: T.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 700, color: T.primary, flexShrink: 0 }}>李</div>
-              <div>
+            <input ref={operatorAvatarFileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" style={{ display: 'none' }} onChange={onOperatorAvatarFile} />
+            <div style={{ display: 'flex', gap: 16, marginBottom: 20, alignItems: 'flex-start' }}>
+              <div style={{ position: 'relative', width: 56, height: 56, flexShrink: 0 }}>
+                <button
+                  type="button"
+                  onClick={() => showNwAvatarLightbox({ imageSrc: operatorAvatarUrl, letter: '李', caption: '李建国 · PC 登录头像' })}
+                  style={{
+                    width: 56, height: 56, borderRadius: '50%', border: `2px solid ${T.border}`, padding: 0, overflow: 'hidden', cursor: 'pointer',
+                    background: operatorAvatarUrl ? '#fff' : T.primaryLight, color: T.primary, fontSize: 22, fontWeight: 700, fontFamily: "'Noto Serif SC', serif",
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: T.cardShadow,
+                  }}
+                >
+                  {operatorAvatarUrl ? <img src={operatorAvatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '李'}
+                </button>
+                <button
+                  type="button"
+                  title="更换头像"
+                  aria-label="更换头像"
+                  onClick={(e) => { e.stopPropagation(); operatorAvatarFileRef.current && operatorAvatarFileRef.current.click(); }}
+                  style={{
+                    position: 'absolute', right: -4, bottom: -4, width: 24, height: 24, borderRadius: '50%', border: `2px solid ${T.surface}`,
+                    background: T.primary, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0,
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                  }}
+                >
+                  <span style={{ display: 'flex', transform: 'scale(0.55)' }}><I.Camera /></span>
+                </button>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 16, fontWeight: 700 }}>李建国</div>
                 <div style={{ marginTop: 6 }}><Badge color={T.primary} bg={T.primaryLight}>系统身份：书记</Badge></div>
+                <p style={{ fontSize: 11, color: T.textMuted, marginTop: 8, lineHeight: 1.5 }}>点头像可放大查看；点右下角相机上传本地照片（演示数据仅存本机浏览器）。</p>
               </div>
             </div>
             {[
