@@ -34,185 +34,39 @@ const T = {
   cardRadius: 14, gridGap: 12, btnPadV: 12, btnPadH: 20
 };
 
-/** i龙岗 小程序短链：仅在微信内置浏览器（含 Windows 微信）中点击可唤起；普通浏览器无法直接打开小程序 */
-const NW_ILG_MINIPROGRAM_LINK_KEY = 'nw_ilg_miniprogram_shortlink_v1';
-const WX_MINIPROGRAM_ILG = '#小程序://i龙岗/wMeWysej0d7okgp';
-/** i龙岗 小程序 AppId（公开标识，与微信后台一致；AppSecret 仅放服务端环境变量，勿写进前端） */
+/** i龙岗：仅使用微信「明文 URL Scheme」weixin://dl/business/?appid=…&path=…（须对方开启明文拉起） */
 const WX_ILG_MINIPROGRAM_APPID = 'wx201f04ef8f8d6b7c';
-/**
- * 明文 Scheme 默认落地 path（与 pc-admin 政务「i龙岗」演示配置一致）。须与 i龙岗 小程序线上包中真实页面一致，否则请改此常量或设 localStorage「nw_ilg_weapp_path_v1」覆盖。
- */
-const WX_ILG_DEFAULT_PLAINTEXT_PATH = 'pages/i-longgang/index';
-
-/**
- * 明文 URL Scheme：weixin://dl/business/?appid=…&path=…&query=…&env_version=…
- * 须由 i龙岗 小程序在微信后台「设置 → 基本设置 → 隐私与安全」开启「明文 Scheme 拉起此小程序」。
- * path：优先 localStorage「nw_ilg_weapp_path_v1」，否则用 WX_ILG_DEFAULT_PLAINTEXT_PATH；query：可选「nw_ilg_plaintext_query_v1」；环境：可选「nw_ilg_env_version_v1」为 release|trial|develop。
- */
-function buildILongGangPlaintextBusinessScheme() {
-  var appid = typeof WX_ILG_MINIPROGRAM_APPID === 'string' ? WX_ILG_MINIPROGRAM_APPID.trim() : '';
-  if (!appid) return '';
-  var path = readILongGangWeappPath();
-  if (!path && typeof WX_ILG_DEFAULT_PLAINTEXT_PATH === 'string' && WX_ILG_DEFAULT_PLAINTEXT_PATH.trim()) {
-    path = WX_ILG_DEFAULT_PLAINTEXT_PATH.trim();
-  }
-  var query = '';
-  try {
-    var rq = localStorage.getItem('nw_ilg_plaintext_query_v1');
-    if (rq != null && String(rq).trim()) query = String(rq).trim();
-  } catch (eq) {}
-  var env = 'release';
-  try {
-    var ev = localStorage.getItem('nw_ilg_env_version_v1');
-    var evs = ev != null ? String(ev).trim().toLowerCase() : '';
-    if (evs === 'trial' || evs === 'develop' || evs === 'release') env = evs;
-  } catch (ee) {}
-  var parts = [];
-  parts.push('appid=' + encodeURIComponent(appid));
-  if (path) parts.push('path=' + encodeURIComponent(path));
-  if (query) parts.push('query=' + encodeURIComponent(query));
-  parts.push('env_version=' + encodeURIComponent(env));
-  return 'weixin://dl/business/?' + parts.join('&');
-}
-
+const WX_ILG_HOME_PATH = 'pages/homenew/uptodateindex';
+const WX_ILG_PATH_SHARESPACE = 'pages/sharespace/index';
+const WX_ILG_PATH_HEALTH = 'pages/lvSide/healthy/index';
+const NW_ILG_H5_READ_URL = 'https://tsg.lggov.cn/ilg/#/search';
+const NW_ILG_H5_SPORT_URL = 'https://ilg.ydmap.cn/access/ilg';
 const AUDIT_RECORDS_STORAGE_KEY = 'nw_archive_audit_records_v1';
 
-function readILongGangMiniProgramShortLink() {
-  try {
-    var raw = localStorage.getItem(NW_ILG_MINIPROGRAM_LINK_KEY);
-    var s = raw != null ? String(raw).trim() : '';
-    if (s.indexOf('#小程序://') === 0) return s;
-  } catch (e) {}
-  return WX_MINIPROGRAM_ILG;
+function buildWxMiniProgramPlaintextScheme(appid, path) {
+  var aid = appid != null ? String(appid).trim() : '';
+  var p = path != null ? String(path).trim() : '';
+  if (!aid || !p) return '';
+  return 'weixin://dl/business/?appid=' + encodeURIComponent(aid) + '&path=' + encodeURIComponent(p);
 }
 
-/**
- * 方案二（补充）：站外唤起仍可用接口返回的 URL Scheme / URL Link（generatescheme 等），或本地静态链。
- * 无后端时：可将微信后台生成的临时链写入 localStorage「nw_ilg_url_scheme_static_v1」做演示（注意有效期）。
- * i龙岗 默认已改为明文 weixin://dl/business/?appid=…（见 buildILongGangPlaintextBusinessScheme），一般不再依赖本段接口。
- */
-const NW_ILG_URL_SCHEME_STATIC_KEY = 'nw_ilg_url_scheme_static_v1';
-const NW_ILG_URL_SCHEME_API_KEY = 'nw_ilg_url_scheme_api_v1';
-
-function getWeChatUrlSchemeApiUrl() {
-  try {
-    if (typeof window.__NW_WX_URL_SCHEME_API__ === 'string' && window.__NW_WX_URL_SCHEME_API__.trim()) {
-      return window.__NW_WX_URL_SCHEME_API__.trim();
-    }
-    var u = localStorage.getItem(NW_ILG_URL_SCHEME_API_KEY);
-    return u && String(u).trim() ? String(u).trim() : '';
-  } catch (eSch0) {}
-  return '';
-}
-
-/**
- * 服务 Tab：可选调后端 GET 走微信 generatescheme（需 AppSecret）。默认关闭，仅当
- * window.__NW_ILG_USE_GENERATESCHEME_API__ === true 或 localStorage「nw_ilg_use_scheme_api_v1」为 1/true 时启用。
- * 优先级：__NW_SERVICE_SCHEME_API__ → nw_service_scheme_api_v1 → nw_ilg_url_scheme_api_v1 → 同源 /api/wechat/url-scheme。
- */
-const NW_SERVICE_SCHEME_API_KEY = 'nw_service_scheme_api_v1';
-
-function shouldUseGenerateschemeApiForILongGang() {
-  try {
-    if (window.__NW_ILG_USE_GENERATESCHEME_API__ === true) return true;
-    var v = localStorage.getItem('nw_ilg_use_scheme_api_v1');
-    if (v === '1' || v === 'true') return true;
-  } catch (eApi0) {}
-  return false;
-}
-
-function getServiceMiniProgramSchemeApiUrl() {
-  try {
-    if (typeof window.__NW_SERVICE_SCHEME_API__ === 'string' && window.__NW_SERVICE_SCHEME_API__.trim()) {
-      return window.__NW_SERVICE_SCHEME_API__.trim();
-    }
-    var s = localStorage.getItem(NW_SERVICE_SCHEME_API_KEY);
-    if (s && String(s).trim()) return String(s).trim();
-  } catch (eSvc0) {}
-  var generic = getWeChatUrlSchemeApiUrl();
-  if (generic) return generic;
-  try {
-    if (location.protocol === 'http:' || location.protocol === 'https:') {
-      return String(location.origin || '').replace(/\/$/, '') + '/api/wechat/url-scheme';
-    }
-  } catch (eSvc1) {}
-  return '';
-}
-
-/** GET：target=ilonggang；兼容后端返回 { openlink } 或 { ok, openlink } */
-function fetchNwUrlSchemeService(targetId, shortLinkOpt) {
-  var api = getServiceMiniProgramSchemeApiUrl();
-  if (!api) return Promise.resolve('');
-  var pageUrl = encodeURIComponent(String(window.location.href.split('#')[0]));
-  var sep = api.indexOf('?') >= 0 ? '&' : '?';
-  var reqUrl = api + sep + 'url=' + pageUrl + '&target=' + encodeURIComponent(targetId || 'ilonggang');
-  if (shortLinkOpt && String(shortLinkOpt).trim()) {
-    reqUrl += '&shortlink=' + encodeURIComponent(String(shortLinkOpt).trim());
+function handleLifeServiceEntryClick(block) {
+  if (!block || !block.kind) return;
+  if (block.kind === 'h5' && block.href) {
+    try {
+      window.location.href = String(block.href).trim();
+    } catch (eH5) {}
+    return;
   }
-  return fetch(reqUrl, { method: 'GET', credentials: 'omit', mode: 'cors' })
-    .then(function (r) {
-      return r.json().then(function (json) {
-        if (!r.ok) return '';
-        var s = pickUrlSchemeFromApiJson(json);
-        if (isWechatExternalOpenLink(s)) return s;
-        return '';
-      });
-    })
-    .catch(function () {
-      return '';
-    });
-}
-
-/** 本地写死的打开链（演示/过渡期）；须为 weixin://… 或 https://wxaurl.cn/… */
-function readILongGangUrlSchemeStatic() {
-  try {
-    var v = localStorage.getItem(NW_ILG_URL_SCHEME_STATIC_KEY);
-    var s = v != null ? String(v).trim() : '';
-    if (!s) return '';
-    if (/^weixin:\/\//i.test(s)) return s;
-    if (/^https?:\/\/wxaurl\.cn\//i.test(s)) return s;
-  } catch (eSch1) {}
-  return '';
-}
-
-function pickUrlSchemeFromApiJson(data) {
-  if (!data || typeof data !== 'object') return '';
-  var keys = ['url_scheme', 'urlScheme', 'openlink', 'open_link', 'scheme', 'url_link', 'urlLink'];
-  for (var i = 0; i < keys.length; i++) {
-    var k = keys[i];
-    if (typeof data[k] === 'string' && data[k].trim()) return data[k].trim();
+  if (block.kind === 'miniprogram' && block.mpPath) {
+    openILongGangMiniProgramAtPath(String(block.mpPath).trim());
   }
-  return '';
 }
 
+/** 仅允许明文 weixin:// 打开链（本页不再使用 wxaurl 加密链、短链、开放标签等） */
 function isWechatExternalOpenLink(s) {
   if (!s || typeof s !== 'string') return false;
-  return /^weixin:\/\//i.test(s) || /^https?:\/\/wxaurl\.cn\//i.test(s.trim());
-}
-
-/** GET 接口：url=当前页；可选 shortlink=当前 #小程序:// 短链，便于后端返回对应打开链 */
-function fetchNwUrlSchemeOpenLink(shortLinkOpt) {
-  var api = getWeChatUrlSchemeApiUrl();
-  if (!api) return Promise.resolve('');
-  var pageUrl = encodeURIComponent(String(window.location.href.split('#')[0]));
-  var sep = api.indexOf('?') >= 0 ? '&' : '?';
-  var reqUrl = api + sep + 'url=' + pageUrl;
-  if (shortLinkOpt && String(shortLinkOpt).trim()) {
-    reqUrl += '&shortlink=' + encodeURIComponent(String(shortLinkOpt).trim());
-  }
-  return fetch(reqUrl, { method: 'GET', credentials: 'omit', mode: 'cors' })
-    .then(function (r) {
-      if (!r.ok) throw new Error('scheme_http');
-      return r.json();
-    })
-    .then(function (json) {
-      var s = pickUrlSchemeFromApiJson(json);
-      if (isWechatExternalOpenLink(s)) return s;
-      throw new Error('bad_scheme_json');
-    })
-    .catch(function () {
-      return '';
-    });
+  return /^weixin:\/\//i.test(s.trim());
 }
 
 function tryNavigateWechatExternalOpen(s) {
@@ -225,396 +79,18 @@ function tryNavigateWechatExternalOpen(s) {
   }
 }
 
-/**
- * 站外打开 #小程序://：方案二（URL Scheme / URL Link）。
- * opts.useStaticSchemeFallback：仅 i龙岗 等单入口场景为 true，会先试 nw_ilg_url_scheme_static_v1。
- */
-function openWechatMpShortLinkFromExternalBrowser(shortLink, opts) {
-  opts = opts || {};
-  var label = (opts.appLabel && String(opts.appLabel).trim()) || '微信小程序';
-  var useStatic = opts.useStaticSchemeFallback === true;
-
-  if (useStatic) {
-    var pre = readILongGangUrlSchemeStatic();
-    if (pre && tryNavigateWechatExternalOpen(pre)) return;
-  }
-
-  var api = getWeChatUrlSchemeApiUrl();
-  if (api) {
-    fetchNwUrlSchemeOpenLink(shortLink).then(function (scheme) {
-      if (scheme && tryNavigateWechatExternalOpen(scheme)) return;
-      window.alert(
-        '未能从接口获取可用的打开链接（请检查接口、CORS、或与 shortlink 的匹配）。\n\n请复制下面短链到微信中打开：\n\n' + shortLink
-      );
-    });
-    return;
-  }
-
-  if (useStatic) {
-    window.alert(
-      '「' + label + '」为微信小程序。\n\n' +
-        '【当前环境】非微信内置浏览器，无法直接使用 #小程序:// 短链打开小程序。\n\n' +
-        '【方案二】在微信开放平台用「URL Scheme / URL Link」生成打开链接后：\n' +
-        '• 演示：localStorage.setItem(\'nw_ilg_url_scheme_static_v1\', \'粘贴整行 weixin:// 或 https://wxaurl.cn/…\') 后刷新再点（链接有过期时间）。\n' +
-        '• 正式：部署后端调微信接口生成链接，再设置「nw_ilg_url_scheme_api_v1」（GET，会附加 url=当前页与 shortlink=短链）。\n\n' +
-        '也可复制下面短链到微信任意聊天里发送后点击：\n\n' +
-        shortLink
-    );
-    return;
-  }
+/** 打开 i龙岗指定原生页：仅明文 appid+path；失败时提示 */
+function openILongGangMiniProgramAtPath(mpPath) {
+  var plain = buildWxMiniProgramPlaintextScheme(WX_ILG_MINIPROGRAM_APPID, mpPath);
+  if (plain && tryNavigateWechatExternalOpen(plain)) return;
   window.alert(
-    '「' +
-      label +
-      '」为微信小程序短链，请在微信内打开本页后再试。\n\n' +
-      '【方案二】有后端时配置 GET「nw_ilg_url_scheme_api_v1」，由接口根据 shortlink 返回 url_scheme / openlink 等；站外即可唤起微信。\n\n' +
-      '复制到微信：\n\n' +
-      shortLink
+    '无法拉起 i龙岗：请使用【微信】打开本页；并确认小程序已在后台开启「明文 Scheme 拉起此小程序」。\n若当前在微信小程序 web-view 内，从 H5 唤起其它小程序可能被平台限制。'
   );
 }
 
-function openILongGangMiniprogramExternal(shortLink) {
-  var plain = buildILongGangPlaintextBusinessScheme();
-  if (plain && tryNavigateWechatExternalOpen(plain)) return;
-  openWechatMpShortLinkFromExternalBrowser(shortLink, { appLabel: 'i龙岗', useStaticSchemeFallback: true });
-}
-
-/**
- * 方案一：微信开放标签 wx-open-launch-weapp 所需「小程序原始 ID」gh_xxx（非短链里的展示名）。
- * 在控制台执行：localStorage.setItem('nw_ilg_weapp_username_v1','gh_xxxx')
- */
-const NW_ILG_WEAPP_USERNAME_KEY = 'nw_ilg_weapp_username_v1';
-const NW_ILG_WEAPP_PATH_KEY = 'nw_ilg_weapp_path_v1';
-const NW_WX_JS_CONFIG_URL_KEY = 'nw_wx_js_config_url_v1';
-
-function readILongGangWeappUsername() {
-  try {
-    var v = localStorage.getItem(NW_ILG_WEAPP_USERNAME_KEY);
-    var s = v != null ? String(v).trim() : '';
-    if (/^gh_[0-9a-z]+$/i.test(s)) return s;
-  } catch (e0) {}
-  return '';
-}
-
-/** 目标小程序页面路径，如 pages/index/index；留空则打开小程序首页 */
-function readILongGangWeappPath() {
-  try {
-    var v = localStorage.getItem(NW_ILG_WEAPP_PATH_KEY);
-    if (v != null && String(v).trim()) return String(v).trim();
-  } catch (e1) {}
-  return '';
-}
-
-/**
- * 拉取 JSSDK 签名的接口完整 URL（GET，需带当前页 url 参数，见 initWxJssdkForOpenTag）。
- * 例：https://your.api/wechat/jssdk-config
- * 或：window.__NW_WX_JS_CONFIG_URL__ = 'https://...'
- * localStorage：nw_wx_js_config_url_v1
- */
-function getWeChatJssdkConfigUrl() {
-  try {
-    if (typeof window.__NW_WX_JS_CONFIG_URL__ === 'string' && window.__NW_WX_JS_CONFIG_URL__.trim()) {
-      return window.__NW_WX_JS_CONFIG_URL__.trim();
-    }
-    var u = localStorage.getItem(NW_WX_JS_CONFIG_URL_KEY);
-    return u && String(u).trim() ? String(u).trim() : '';
-  } catch (e2) {}
-  return '';
-}
-
-function loadJWeixinScript() {
-  return new Promise(function (resolve, reject) {
-    if (typeof window.wx !== 'undefined' && window.wx && typeof window.wx.config === 'function') {
-      resolve();
-      return;
-    }
-    var existing = document.querySelector('script[data-nw-jweixin="1"]');
-    if (existing) {
-      existing.addEventListener('load', function () {
-        resolve();
-      });
-      existing.addEventListener('error', function () {
-        reject(new Error('jweixin load error'));
-      });
-      return;
-    }
-    var s = document.createElement('script');
-    s.src = 'https://res.wx.qq.com/open/js/jweixin-1.6.0.js';
-    s.async = true;
-    s.setAttribute('data-nw-jweixin', '1');
-    s.onload = function () {
-      resolve();
-    };
-    s.onerror = function () {
-      reject(new Error('jweixin load error'));
-    };
-    document.head.appendChild(s);
-  });
-}
-
-/**
- * 公众号 JSSDK 签名成功后注册开放标签；失败走 errback。
- * 后端接口建议返回 JSON：{ appId, timestamp, nonceStr, signature }（与 wx.config 字段一致）。
- */
-function initWxJssdkForOpenTag(done) {
-  var apiBase = getWeChatJssdkConfigUrl();
-  if (!apiBase) {
-    done(new Error('no_jssdk_config_url'));
-    return;
-  }
-  var pageUrl = encodeURIComponent(String(window.location.href.split('#')[0]));
-  var sep = apiBase.indexOf('?') >= 0 ? '&' : '?';
-  var reqUrl = apiBase + sep + 'url=' + pageUrl;
-  fetch(reqUrl, { method: 'GET', credentials: 'omit', mode: 'cors' })
-    .then(function (r) {
-      if (!r.ok) throw new Error('config_http_' + r.status);
-      return r.json();
-    })
-    .then(function (cfg) {
-      if (!cfg || typeof cfg.appId !== 'string' || !cfg.timestamp || !cfg.nonceStr || !cfg.signature) {
-        throw new Error('bad_jssdk_json');
-      }
-      window.wx.config({
-        debug: false,
-        appId: cfg.appId,
-        timestamp: cfg.timestamp,
-        nonceStr: cfg.nonceStr,
-        signature: cfg.signature,
-        jsApiList: [],
-        openTagList: ['wx-open-launch-weapp'],
-      });
-      window.wx.ready(function () {
-        done(null);
-      });
-      window.wx.error(function (res) {
-        done(new Error((res && res.errMsg) || 'wx.error'));
-      });
-    })
-    .catch(function (e) {
-      done(e);
-    });
-}
-
-/** 当前是否处于「其它小程序」的 web-view 内（此时 #小程序:// 常需 JSSDK navigateToMiniProgram，纯 H5 短链可能无效） */
-function isInsideWeChatMiniProgramWebView() {
-  return typeof window.__wxjs_environment === 'string' && window.__wxjs_environment === 'miniprogram';
-}
-
-/** 微信内拉起小程序短链：优先用户直接点的 <a href>；此处为脚本回退：open / replace / href */
-function tryOpenWeChatMiniProgramShortLink(link) {
-  if (isInsideWeChatMiniProgramWebView()) {
-    window.alert('当前页面在「微信小程序」内打开，从 web-view 直接唤起其它小程序常受限制。\n\n请将本页在系统浏览器中打开，或在微信聊天中发送以下短链后点击：\n\n' + link);
-    return;
-  }
-  try {
-    var w = window.open(link, '_top');
-    if (w) return;
-  } catch (e0) {}
-  var topWin = window.top;
-  try {
-    if (topWin && topWin !== window) {
-      topWin.location.replace(link);
-      return;
-    }
-  } catch (e) {}
-  try {
-    window.location.replace(link);
-    return;
-  } catch (e2) {}
-  try {
-    var a = document.createElement('a');
-    a.href = link;
-    a.target = '_top';
-    a.rel = 'noopener noreferrer';
-    a.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function () {
-      try { a.remove(); } catch (x) {}
-    }, 0);
-    return;
-  } catch (e3) {}
-  window.location.href = link;
-}
-
-function isWeChatInAppBrowser() {
-  var ua = (navigator.userAgent || '').toLowerCase();
-  return /micromessenger/i.test(ua);
-}
-
-/** 从 #小程序:// 短链解析展示用名称（如 i龙岗） */
-function guessMiniProgramNameFromShortLink(link) {
-  var m = typeof link === 'string' ? /^#小程序:\/\/([^/]+)\//.exec(link.trim()) : null;
-  return m ? m[1] : '微信小程序';
-}
-
-/**
- * 微信内从 H5 打开其它小程序：平台要求由用户在页面内明确点击后再发起跳转，
- * 不能仅靠首次点击即 replace。此处用中间层说明 +「前往跳转」按钮，对齐常见合规交互（非系统 confirm）。
- * @param {string} link - #小程序://… 短链
- * @param {{ appLabel?: string }} opts - 展示名称，缺省则从短链解析
- */
-function showWeChatMiniProgramJumpModal(link, opts) {
-  opts = opts || {};
-  var appLabel = (opts.appLabel && String(opts.appLabel).trim()) || guessMiniProgramNameFromShortLink(link);
-  if (isInsideWeChatMiniProgramWebView()) {
-    window.alert(
-      '当前 H5 运行在「其它微信小程序」的 web-view 内，通常无法再从页面唤起「' + appLabel + '」。\n\n' +
-        '请用【微信 → 右上角菜单 → 在浏览器打开】或复制下面短链到微信聊天里发送后点击：\n\n' +
-        link
-    );
-    return;
-  }
-  var maskId = 'nw-wx-miniprogram-jump-modal';
-  var old = document.getElementById(maskId);
-  if (old) try { old.remove(); } catch (e) {}
-
-  var mask = document.createElement('div');
-  mask.id = maskId;
-  mask.setAttribute('role', 'dialog');
-  mask.setAttribute('aria-modal', 'true');
-  mask.setAttribute('aria-label', '打开小程序确认');
-  mask.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.48);z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;-webkit-tap-highlight-color:transparent';
-
-  var box = document.createElement('div');
-  box.style.cssText = 'background:#fff;border-radius:16px;max-width:300px;width:100%;padding:20px 18px 18px;box-shadow:0 16px 48px rgba(0,0,0,0.2);font-family:-apple-system,BlinkMacSystemFont,sans-serif';
-  box.onclick = function (e) { e.stopPropagation(); };
-
-  var title = document.createElement('div');
-  title.textContent = '即将跳转小程序';
-  title.style.cssText = 'font-size:16px;font-weight:700;color:#1a1a1a;margin-bottom:10px';
-
-  var body = document.createElement('div');
-  body.style.cssText = 'font-size:13px;color:#6B7280;line-height:1.6;margin-bottom:18px';
-  body.appendChild(document.createTextNode('将打开「'));
-  var strong = document.createElement('strong');
-  strong.style.color = '#1a1a1a';
-  strong.textContent = appLabel;
-  body.appendChild(strong);
-  body.appendChild(document.createTextNode('」。按微信平台规则，需在 H5 页面内由您确认后再点击「前往跳转」完成打开。'));
-
-  var row = document.createElement('div');
-  row.style.cssText = 'display:flex;gap:10px';
-
-  function close() {
-    try { mask.remove(); } catch (e) {}
-  }
-
-  var cancelBtn = document.createElement('button');
-  cancelBtn.type = 'button';
-  cancelBtn.textContent = '取消';
-  cancelBtn.style.cssText = 'flex:1;padding:11px 8px;border:1px solid #E5E7EB;border-radius:12px;background:#FAFAF9;font-size:14px;color:#374151;cursor:pointer';
-
-  /** 微信更认可「用户手指点的带 href 的 <a>」唤起 #小程序://，仅用 button+JS 跳转易被拦截 */
-  var goLink = document.createElement('a');
-  goLink.href = link;
-  /** 默认当前窗口跳转；避免 _top 在嵌套 WebView 里与弹层销毁时机叠加导致唤起失败 */
-  goLink.rel = 'noopener noreferrer';
-  goLink.textContent = '前往跳转';
-  goLink.setAttribute('role', 'button');
-  goLink.style.cssText =
-    'flex:1;padding:11px 8px;border-radius:12px;background:#D44040;font-size:14px;font-weight:600;color:#fff;cursor:pointer;' +
-    'text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;box-sizing:border-box;' +
-    '-webkit-tap-highlight-color:transparent';
-
-  cancelBtn.onclick = function () { close(); };
-  /**
-   * 不在「前往跳转」后主动 close：此前 setTimeout(120ms) remove 整层遮罩，部分微信内核会在 #小程序://
-   * 导航尚未完成时取消唤起（弹窗消失、无反应）。成功打开小程序时页面会切换；未成功时用户可点取消或空白处关闭。
-   */
-
-  var hint = document.createElement('div');
-  hint.style.cssText = 'font-size:11px;color:#9CA3AF;margin-top:12px;line-height:1.5;word-break:break-all';
-  hint.appendChild(document.createTextNode('若按钮无反应，请长按复制：'));
-  hint.appendChild(document.createElement('br'));
-  var mono = document.createElement('span');
-  mono.style.cssText = 'font-family:ui-monospace,monospace;font-size:10px;color:#6B7280;user-select:text';
-  mono.textContent = link;
-  hint.appendChild(mono);
-
-  var row2 = document.createElement('div');
-  row2.style.cssText = 'display:flex;gap:8px;margin-top:10px';
-  var copyBtn = document.createElement('button');
-  copyBtn.type = 'button';
-  copyBtn.textContent = '复制短链';
-  copyBtn.style.cssText = 'flex:1;padding:8px;border:1px solid #E5E7EB;border-radius:10px;background:#fff;font-size:12px;color:#374151;cursor:pointer';
-  var tryBtn = document.createElement('button');
-  tryBtn.type = 'button';
-  tryBtn.textContent = '备用打开';
-  tryBtn.style.cssText = 'flex:1;padding:8px;border:1px solid rgba(212,64,64,0.35);border-radius:10px;background:#FFF5F5;font-size:12px;color:#B83232;cursor:pointer;font-weight:600';
-  copyBtn.onclick = function () {
-    function fallbackCopy() {
-      try {
-        var t = document.createElement('textarea');
-        t.value = link;
-        t.style.position = 'fixed';
-        t.style.left = '-9999px';
-        document.body.appendChild(t);
-        t.select();
-        document.execCommand('copy');
-        t.remove();
-        window.alert('已复制到剪贴板，请到微信任意聊天中粘贴发送后点击该短链。');
-      } catch (e) {
-        window.alert('请手动长按上方灰色短链进行复制。');
-      }
-    }
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(link).then(function () {
-        window.alert('已复制到剪贴板，请到微信任意聊天中粘贴发送后点击该短链。');
-      }).catch(fallbackCopy);
-    } else {
-      fallbackCopy();
-    }
-  };
-  tryBtn.onclick = function () {
-    tryOpenWeChatMiniProgramShortLink(link);
-  };
-  row2.appendChild(copyBtn);
-  row2.appendChild(tryBtn);
-
-  mask.onclick = function (e) {
-    if (e.target === mask) close();
-  };
-
-  row.appendChild(cancelBtn);
-  row.appendChild(goLink);
-  box.appendChild(title);
-  box.appendChild(body);
-  box.appendChild(row);
-  box.appendChild(hint);
-  box.appendChild(row2);
-  mask.appendChild(box);
-  document.body.appendChild(mask);
-}
-
-function openILongGangMiniprogramFallback(link) {
-  if (isWeChatInAppBrowser()) {
-    showWeChatMiniProgramJumpModal(link, { appLabel: 'i龙岗' });
-    return;
-  }
-  openILongGangMiniprogramExternal(link);
-}
-
-/** 服务页入口：优先明文 weixin://dl/business/?appid=…（仅需小程序侧开启明文 Scheme）；可选再走 generatescheme 接口；最后短链 / 弹层 */
+/** 服务页打开 i龙岗首页 */
 function openILongGangMiniprogram() {
-  var link = readILongGangMiniProgramShortLink();
-  var plain = buildILongGangPlaintextBusinessScheme();
-  if (plain && tryNavigateWechatExternalOpen(plain)) return;
-  if (shouldUseGenerateschemeApiForILongGang()) {
-    var api = getServiceMiniProgramSchemeApiUrl();
-    if (api) {
-      fetchNwUrlSchemeService('ilonggang', link).then(function (scheme) {
-        if (scheme) {
-          try {
-            window.location.href = scheme;
-            return;
-          } catch (eGo) {}
-        }
-        openILongGangMiniprogramFallback(link);
-      });
-      return;
-    }
-  }
-  openILongGangMiniprogramFallback(link);
+  openILongGangMiniProgramAtPath(WX_ILG_HOME_PATH);
 }
 
 var NW_MEMBER_PROFILE_AVATAR_KEY = 'nw_member_profile_avatar_dataurl_v1';
@@ -818,7 +294,7 @@ function nwLearningRuntimeDefaults() {
       '深圳智慧党建': 'https://mp.weixin.qq.com/s/ZC1ovvIR68a7ZwyIWb9vGg',
     },
     liveSessions: [s0, s1],
-    /** 党务智能问答 / 底部「AI问答」Tab：默认 DinTal 客服 H5；PC「学习外链配置」可改为其它 https 或 #小程序:// 等 */
+    /** 党务智能问答 / 底部「AI问答」Tab：默认 DinTal 客服 H5；PC「学习外链配置」可改为其它 https（#小程序:// 已不再支持，请改 https） */
     shenXiaoFuMiniLink: 'https://apps.jinrirencai.com/vision-chat/index.html#/chat/ff908081965601960191460192688000',
   };
 }
@@ -868,18 +344,10 @@ function getAiQaExternalH5Url() {
 function openShenXiaoFuMiniProgram() {
   var def = 'https://apps.jinrirencai.com/vision-chat/index.html#/chat/ff908081965601960191460192688000';
   var link = (readLearningRuntime().shenXiaoFuMiniLink || '').trim() || def;
-  if (/^https?:\/\//i.test(link)) {
-    openExternalOrMiniProgramLink(link, '党务智能问答');
-    return;
-  }
-  if (isWeChatInAppBrowser()) {
-    showWeChatMiniProgramJumpModal(link, { appLabel: guessMiniProgramNameFromShortLink(link) });
-    return;
-  }
-  openWechatMpShortLinkFromExternalBrowser(link, { appLabel: '党务智能问答', useStaticSchemeFallback: false });
+  openExternalOrMiniProgramLink(link, '党务智能问答');
 }
 
-/** 学习资源页：一级平台在系统浏览器中直接打开官网/H5；若为 #小程序:// 则仅在微信内跳转；公众号 mp 域名在微信内打开 */
+/** 学习资源页：一级平台在系统浏览器中直接打开官网/H5；#小程序:// 将提示改为 https；公众号 mp 域名在微信内打开 */
 function openExternalOrMiniProgramLink(url, titleForAlert) {
   if (!url || typeof url !== 'string' || !url.trim()) {
     window.alert((titleForAlert || '该入口') + '尚未配置链接，请向实施同事索要正式地址后写入原型配置。');
@@ -887,14 +355,11 @@ function openExternalOrMiniProgramLink(url, titleForAlert) {
   }
   url = url.trim();
   if (url.indexOf('#小程序://') === 0) {
-    if (isWeChatInAppBrowser()) {
-      showWeChatMiniProgramJumpModal(url, { appLabel: guessMiniProgramNameFromShortLink(url) });
-      return;
-    }
-    openWechatMpShortLinkFromExternalBrowser(url, {
-      appLabel: titleForAlert || guessMiniProgramNameFromShortLink(url),
-      useStaticSchemeFallback: false,
-    });
+    window.alert(
+      '「' +
+        (titleForAlert || '该入口') +
+        '」当前为 #小程序:// 短链。本原型已改为仅支持「明文 URL Scheme」（weixin://dl/business/?appid=&path=）。\n请在「学习外链配置」中改为 https 地址，或由管理员提供对应小程序的 AppId+path 后改代码接入。'
+    );
     return;
   }
   /** 微信公众号：profile_ext / 任意图文链接等，仅微信内核可正常进号；外链需复制到微信 */
@@ -3473,85 +2938,13 @@ const LsIconCalendarHero = () => (
   </svg>
 );
 
-/**
- * 方案一：wx-open-launch-weapp。必须用原生 DOM 挂载 script[type=text/wxtag-template]，React 子节点无法等价表达。
- * 调用方需已执行 wx.config 且 openTagList 含 wx-open-launch-weapp。
- */
-function WxOpenLaunchWeappHost({ username, path }) {
-  const wrapRef = React.useRef(null);
-  React.useEffect(
-    function () {
-      var root = wrapRef.current;
-      if (!root || !username) return undefined;
-      root.innerHTML = '';
-      var tag = document.createElement('wx-open-launch-weapp');
-      tag.setAttribute('username', username);
-      if (path) tag.setAttribute('path', path);
-      tag.setAttribute('version', 'release');
-      var tpl = document.createElement('script');
-      tpl.type = 'text/wxtag-template';
-      tpl.innerHTML =
-        '<style>.nw-ilg-wx-open-btn{width:100%;padding:14px 16px;border-radius:14px;border:1px solid #E8E4DF;' +
-        'background:linear-gradient(180deg,#FFFFFF 0%,#FAFAF8 100%);color:#1A1A1A;font-size:13px;font-weight:600;' +
-        'font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;margin:0;box-sizing:border-box;' +
-        '-webkit-tap-highlight-color:transparent;text-align:left;line-height:1.4}' +
-        '.nw-ilg-wx-sub{display:block;margin-top:6px;font-size:10px;font-weight:400;color:#9CA3AF;line-height:1.45}' +
-        '</style><button type="button" class="nw-ilg-wx-open-btn">打开「i龙岗」<span class="nw-ilg-wx-sub">微信开放标签（wx-open-launch-weapp）</span></button>';
-      tag.appendChild(tpl);
-      root.appendChild(tag);
-      return function () {
-        try {
-          root.innerHTML = '';
-        } catch (cx) {}
-      };
-    },
-    [username, path]
-  );
-  return <div ref={wrapRef} style={{ width: '100%', minHeight: 52 }} aria-label="打开 i龙岗 小程序" />;
-}
-
 const LifeServicesScreen = ({ nav }) => {
   const fourBlocks = [
-    { key: 'space', label: '共享空间', wrapBg: 'linear-gradient(160deg, #F5F3FF 0%, #EDE9FE 55%, #E9E3FF 100%)', iconColor: '#5B21B6', Icon: LsIconSharedSpace },
-    { key: 'read', label: '我要阅读', wrapBg: 'linear-gradient(160deg, #ECFDF5 0%, #D1FAE5 50%, #C6F6D5 100%)', iconColor: '#047857', Icon: LsIconRead },
-    { key: 'sport', label: '我要运动', wrapBg: 'linear-gradient(160deg, #FDF2F8 0%, #FCE7F3 50%, #FBCFE8 100%)', iconColor: '#BE185D', Icon: LsIconSport },
-    { key: 'health', label: '卫生健康', wrapBg: 'linear-gradient(160deg, #FEF2F2 0%, #FEE2E2 50%, #FECACA 100%)', iconColor: '#B91C1C', Icon: LsIconHealth }
+    { key: 'space', label: '共享空间', kind: 'miniprogram', mpPath: WX_ILG_PATH_SHARESPACE, wrapBg: 'linear-gradient(160deg, #F5F3FF 0%, #EDE9FE 55%, #E9E3FF 100%)', iconColor: '#5B21B6', Icon: LsIconSharedSpace },
+    { key: 'read', label: '我要阅读', kind: 'h5', href: NW_ILG_H5_READ_URL, wrapBg: 'linear-gradient(160deg, #ECFDF5 0%, #D1FAE5 50%, #C6F6D5 100%)', iconColor: '#047857', Icon: LsIconRead },
+    { key: 'sport', label: '我要运动', kind: 'h5', href: NW_ILG_H5_SPORT_URL, wrapBg: 'linear-gradient(160deg, #FDF2F8 0%, #FCE7F3 50%, #FBCFE8 100%)', iconColor: '#BE185D', Icon: LsIconSport },
+    { key: 'health', label: '我要健康', kind: 'miniprogram', mpPath: WX_ILG_PATH_HEALTH, wrapBg: 'linear-gradient(160deg, #FEF2F2 0%, #FEE2E2 50%, #FECACA 100%)', iconColor: '#B91C1C', Icon: LsIconHealth }
   ];
-
-  const [wxOpenLaunchState, setWxOpenLaunchState] = React.useState('idle');
-
-  React.useEffect(function () {
-    if (!isWeChatInAppBrowser() || isInsideWeChatMiniProgramWebView()) {
-      setWxOpenLaunchState('skip');
-      return undefined;
-    }
-    var gh = readILongGangWeappUsername();
-    var cfgUrl = getWeChatJssdkConfigUrl();
-    if (!gh || !cfgUrl) {
-      setWxOpenLaunchState('unsupported');
-      return undefined;
-    }
-    setWxOpenLaunchState('loading');
-    var cancelled = false;
-    loadJWeixinScript()
-      .then(function () {
-        return new Promise(function (resolve, reject) {
-          initWxJssdkForOpenTag(function (err) {
-            if (err) reject(err);
-            else resolve();
-          });
-        });
-      })
-      .then(function () {
-        if (!cancelled) setWxOpenLaunchState('ready');
-      })
-      .catch(function () {
-        if (!cancelled) setWxOpenLaunchState('error');
-      });
-    return function () {
-      cancelled = true;
-    };
-  }, []);
 
   const lsStyles = {
     container: { height: '100%', background: 'linear-gradient(180deg, #F5F2ED 0%, #FAF8F5 18%, #FAF8F5 100%)', display: 'flex', flexDirection: 'column' },
@@ -3585,19 +2978,13 @@ const LifeServicesScreen = ({ nav }) => {
       borderRadius: 999, border: 'none', background: 'rgba(255,255,255,0.97)', color: '#5B21B6', fontSize: 13, fontWeight: 600, cursor: 'pointer',
       boxShadow: '0 2px 12px rgba(0,0,0,0.12)',
     },
-    tipCard: { background: 'linear-gradient(180deg, #EFF6FF 0%, #E8F0FE 100%)', borderRadius: 14, padding: 16, border: '1px solid rgba(147, 197, 253, 0.65)', marginTop: 14, boxShadow: '0 2px 10px rgba(30, 64, 175, 0.06)' },
-    tipTitle: { fontSize: 13, fontWeight: 700, color: '#1E3A8A', marginBottom: 6, fontFamily: "'Noto Serif SC', serif" },
-    tipText: { fontSize: 11, color: '#1E40AF', lineHeight: 1.65, textWrap: 'pretty' },
     wxCta: {
       width: '100%', padding: '14px 16px', marginTop: 12, borderRadius: 14, border: `1px solid ${T.border}`,
       background: 'linear-gradient(180deg, #FFFFFF 0%, #FAFAF8 100%)', color: T.textPrimary, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: "'Noto Serif SC', serif",
       boxShadow: '0 2px 12px rgba(26,26,26,0.05)', textAlign: 'left', WebkitTapHighlightColor: 'transparent',
     },
     wxCtaSub: { fontSize: 10, fontWeight: 400, color: T.textMuted, marginTop: 4, display: 'block' },
-    wxAnchor: { display: 'block', marginTop: 10, fontSize: 12, fontWeight: 600, color: T.primary, textAlign: 'center', textDecoration: 'underline', textUnderlineOffset: 3, WebkitTapHighlightColor: 'transparent' }
   };
-
-  const ilgShortLink = readILongGangMiniProgramShortLink();
 
   return (
     <div style={lsStyles.container}>
@@ -3606,7 +2993,7 @@ const LifeServicesScreen = ({ nav }) => {
         <div style={lsStyles.sectionEyebrow}>便民与共享</div>
         <div style={lsStyles.blockGrid}>
           {fourBlocks.map((b) => (
-            <div key={b.key} style={lsStyles.blockCard} onClick={openILongGangMiniprogram} role="button" tabIndex={0}>
+            <div key={b.key} style={lsStyles.blockCard} onClick={() => handleLifeServiceEntryClick(b)} role="button" tabIndex={0}>
               <div style={{ ...lsStyles.blockIconWrap, background: b.wrapBg, color: b.iconColor }}>
                 <b.Icon />
               </div>
@@ -3614,20 +3001,7 @@ const LifeServicesScreen = ({ nav }) => {
             </div>
           ))}
         </div>
-        {wxOpenLaunchState === 'loading' && (
-          <div style={{ marginTop: 10, fontSize: 11, color: T.textMuted, paddingLeft: 2 }}>正在初始化微信开放标签（方案一）…</div>
-        )}
-        {wxOpenLaunchState === 'ready' && readILongGangWeappUsername() && (
-          <div style={{ marginTop: 12 }}>
-            <WxOpenLaunchWeappHost username={readILongGangWeappUsername()} path={readILongGangWeappPath()} />
-          </div>
-        )}
-        {wxOpenLaunchState === 'error' && (
-          <div style={{ marginTop: 8, fontSize: 11, color: '#B45309', lineHeight: 1.55, paddingLeft: 2 }}>
-            开放标签初始化失败，已保留下方短链与弹层方式。
-          </div>
-        )}
-        <button type="button" style={lsStyles.actCard} onClick={openILongGangMiniprogram}>
+        <button type="button" style={lsStyles.actCard} onClick={() => openILongGangMiniProgramAtPath(WX_ILG_HOME_PATH)}>
           <div style={lsStyles.actTop}>
             <span style={lsStyles.actCalIcon}><LsIconCalendarHero /></span>
             <span style={lsStyles.actDate}>5月1日 星期五</span>
@@ -3638,33 +3012,8 @@ const LifeServicesScreen = ({ nav }) => {
         </button>
         <button type="button" style={lsStyles.wxCta} onClick={openILongGangMiniprogram}>
           打开「i龙岗」微信小程序
-          <span style={lsStyles.wxCtaSub}>政务办事与更多便民入口（请在微信内使用）</span>
+          <span style={lsStyles.wxCtaSub}>政务办事与更多便民入口（请在微信内使用）。服务咨询：0755-28761234（工作日 8:30–17:30）</span>
         </button>
-        <a
-          href={ilgShortLink}
-          target="_top"
-          rel="noopener noreferrer"
-          style={lsStyles.wxAnchor}
-          onClick={(e) => {
-            if (isInsideWeChatMiniProgramWebView()) {
-              e.preventDefault();
-              openILongGangMiniprogram();
-              return;
-            }
-            if (!isWeChatInAppBrowser()) {
-              e.preventDefault();
-              openILongGangMiniprogram();
-            }
-          }}
-        >
-          纯链接唤起：i龙岗（微信内点本行直达；站外优先明文 Scheme）
-        </a>
-        <div style={lsStyles.tipCard}>
-          <div style={lsStyles.tipTitle}>温馨提示</div>
-          <div style={lsStyles.tipText}>
-            服务页打开「i龙岗」：默认使用明文 URL Scheme「weixin://dl/business/?appid=…」（与常量 WX_ILG_MINIPROGRAM_APPID 一致），须由小程序在微信后台开启「明文 Scheme 拉起此小程序」。可选 localStorage「nw_ilg_weapp_path_v1」指定落地 path、「nw_ilg_plaintext_query_v1」传 query、「nw_ilg_env_version_v1」为 release/trial/develop。若仍需服务端 generatescheme，请设 localStorage「nw_ilg_use_scheme_api_v1」=1 或 window.__NW_ILG_USE_GENERATESCHEME_API__=true，并配置「nw_service_scheme_api_v1」等同源/跨域接口。微信内失败时回退 #小程序:// 弹层或短链。方案一（开放标签）见「nw_ilg_weapp_username_v1」与「nw_wx_js_config_url_v1」。若嵌在其它小程序 web-view 内，唤起常受限。紧急帮助：0755-28761234（工作日 8:30-17:30）。
-          </div>
-        </div>
       </div>
 
       <TabBar active="service" onSwitch={nav.switchTab} items={tabItems} />
