@@ -12,8 +12,8 @@
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body,#root{height:100%;width:100%}
-body{display:flex;align-items:center;justify-content:center;background:#E8E6E1;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+html,body,#root{min-height:100%;min-height:100dvh;height:100%;width:100%}
+body{margin:0;background:#FAF8F5;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 </style>
 </head>
@@ -21,55 +21,16 @@ body{display:flex;align-items:center;justify-content:center;background:#E8E6E1;f
 <div id="root"></div>
 <script type="text/babel">
 // ============================================
-// iOS Frame Component (iPhone 15 Pro specs)
-// Dynamic Island: 124x36, top:12, centered
-// Content starts at top:54, bottom space for home indicator
-// ============================================
-const IosFrameStyles = {
-  wrapper: { width: 393, height: 852, position: 'relative', margin: '0 auto', background: '#000', borderRadius: 55, padding: 4, boxShadow: '0 24px 80px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.08) inset' },
-  bezel: { width: '100%', height: '100%', borderRadius: 51, overflow: 'hidden', position: 'relative', background: '#1C1C1E' },
-  screen: { width: '100%', height: '100%', borderRadius: 47, overflow: 'visible', position: 'relative', background: '#FAF8F5' },
-  island: { position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', width: 124, height: 36, background: '#000', borderRadius: 20, zIndex: 100 },
-  statusBar: { position: 'absolute', top: 0, left: 0, right: 0, height: 54, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', zIndex: 99, color: '#fff', fontSize: 14, fontWeight: 600 },
-  homeIndicator: { position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)', width: 134, height: 5, background: '#fff', borderRadius: 3, opacity: 0.5, zIndex: 100 }
-};
-
-function IosFrame({ time = '9:41', battery = 85, children, dark = false }) {
-  const sigColor = dark ? '#fff' : '#1a1a1a';
-  return (
-    <div style={IosFrameStyles.wrapper}>
-      <div style={IosFrameStyles.bezel}>
-        <div style={IosFrameStyles.screen}>
-          {children}
-          <div style={IosFrameStyles.island} />
-          <div style={IosFrameStyles.statusBar}>
-            <span style={{ color: sigColor, fontSize: 15, fontWeight: 700, fontFamily: '-apple-system, sans-serif' }}>{time}</span>
-            <svg width="64" height="14" viewBox="0 0 64 14" fill="none">
-              <rect x="0" y="3" width="3" height="8" rx="0.5" fill={sigColor}/>
-              <rect x="4" y="2" width="3" height="9" rx="0.5" fill={sigColor}/>
-              <rect x="8" y="1" width="3" height="10" rx="0.5" fill={sigColor}/>
-              <rect x="12" y="0" width="3" height="11" rx="0.5" fill={sigColor} opacity="0.3"/>
-              <text x="20" y="11" fontSize="9" fill={sigColor} fontFamily="-apple-system" fontWeight="500">5G</text>
-              <rect x="38" y="1" width="22" height="12" rx="3" stroke={sigColor} strokeWidth="1.2" fill="none"/>
-              <rect x="40" y="3" width={14 * (battery / 100)} height="8" rx="1.5" fill={battery > 20 ? sigColor : '#D44040'}/>
-              <path d="M61.5 5.5V8.5" stroke={sigColor} strokeWidth="1.2" strokeLinecap="round"/>
-            </svg>
-          </div>
-          <div style={IosFrameStyles.homeIndicator} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ============================================
 // Design Tokens
 // ============================================
+/** 主 Tab 底部固定栏占位（与 TabBar minHeight + safe-area 对齐，避免内容被遮挡） */
+const NW_TAB_SCROLL_BOTTOM_PAD = 'calc(72px + env(safe-area-inset-bottom, 0px))';
+
 const T = {
   bg: '#FAF8F5', surface: '#FFFFFF', primary: '#D44040', primaryDark: '#B83232',
   primaryLight: '#FFF0EE', textPrimary: '#1A1A1A', textSecondary: '#6B7280',
   textMuted: '#9CA3AF', border: '#F0EDEA', success: '#059669', warning: '#D97706',
-  cardPadding: 14, sectionGap: 12, navHeight: 44, tabBarHeight: 50,
+  cardPadding: 14, sectionGap: 12, navHeight: 44, tabBarHeight: 56,
   cardRadius: 14, gridGap: 12, btnPadV: 12, btnPadH: 20
 };
 
@@ -104,6 +65,54 @@ function getWeChatUrlSchemeApiUrl() {
     return u && String(u).trim() ? String(u).trim() : '';
   } catch (eSch0) {}
   return '';
+}
+
+/**
+ * 服务 Tab（i龙岗等）专用：调后端 GET /api/wechat/url-scheme 走微信 generatescheme（方式二）。
+ * 优先级：__NW_SERVICE_SCHEME_API__ → localStorage nw_service_scheme_api_v1 → 通用 nw_ilg_url_scheme_api_v1 → 同源默认路径。
+ */
+const NW_SERVICE_SCHEME_API_KEY = 'nw_service_scheme_api_v1';
+
+function getServiceMiniProgramSchemeApiUrl() {
+  try {
+    if (typeof window.__NW_SERVICE_SCHEME_API__ === 'string' && window.__NW_SERVICE_SCHEME_API__.trim()) {
+      return window.__NW_SERVICE_SCHEME_API__.trim();
+    }
+    var s = localStorage.getItem(NW_SERVICE_SCHEME_API_KEY);
+    if (s && String(s).trim()) return String(s).trim();
+  } catch (eSvc0) {}
+  var generic = getWeChatUrlSchemeApiUrl();
+  if (generic) return generic;
+  try {
+    if (location.protocol === 'http:' || location.protocol === 'https:') {
+      return String(location.origin || '').replace(/\/$/, '') + '/api/wechat/url-scheme';
+    }
+  } catch (eSvc1) {}
+  return '';
+}
+
+/** GET：target=ilonggang；兼容后端返回 { openlink } 或 { ok, openlink } */
+function fetchNwUrlSchemeService(targetId, shortLinkOpt) {
+  var api = getServiceMiniProgramSchemeApiUrl();
+  if (!api) return Promise.resolve('');
+  var pageUrl = encodeURIComponent(String(window.location.href.split('#')[0]));
+  var sep = api.indexOf('?') >= 0 ? '&' : '?';
+  var reqUrl = api + sep + 'url=' + pageUrl + '&target=' + encodeURIComponent(targetId || 'ilonggang');
+  if (shortLinkOpt && String(shortLinkOpt).trim()) {
+    reqUrl += '&shortlink=' + encodeURIComponent(String(shortLinkOpt).trim());
+  }
+  return fetch(reqUrl, { method: 'GET', credentials: 'omit', mode: 'cors' })
+    .then(function (r) {
+      return r.json().then(function (json) {
+        if (!r.ok) return '';
+        var s = pickUrlSchemeFromApiJson(json);
+        if (isWechatExternalOpenLink(s)) return s;
+        return '';
+      });
+    })
+    .catch(function () {
+      return '';
+    });
 }
 
 /** 本地写死的打开链（演示/过渡期）；须为 weixin://… 或 https://wxaurl.cn/… */
@@ -527,13 +536,31 @@ function showWeChatMiniProgramJumpModal(link, opts) {
   document.body.appendChild(mask);
 }
 
-function openILongGangMiniprogram() {
-  var link = readILongGangMiniProgramShortLink();
+function openILongGangMiniprogramFallback(link) {
   if (isWeChatInAppBrowser()) {
     showWeChatMiniProgramJumpModal(link, { appLabel: 'i龙岗' });
     return;
   }
   openILongGangMiniprogramExternal(link);
+}
+
+/** 服务页入口：优先请求后端「方式二」URL Scheme；失败则回退短链 / 弹层 */
+function openILongGangMiniprogram() {
+  var link = readILongGangMiniProgramShortLink();
+  var api = getServiceMiniProgramSchemeApiUrl();
+  if (!api) {
+    openILongGangMiniprogramFallback(link);
+    return;
+  }
+  fetchNwUrlSchemeService('ilonggang', link).then(function (scheme) {
+    if (scheme) {
+      try {
+        window.location.href = scheme;
+        return;
+      } catch (eGo) {}
+    }
+    openILongGangMiniprogramFallback(link);
+  });
 }
 
 var NW_MEMBER_PROFILE_AVATAR_KEY = 'nw_member_profile_avatar_dataurl_v1';
@@ -737,8 +764,8 @@ function nwLearningRuntimeDefaults() {
       '深圳智慧党建': 'https://mp.weixin.qq.com/s/ZC1ovvIR68a7ZwyIWb9vGg',
     },
     liveSessions: [s0, s1],
-    /** 党务智能问答：默认 DinTal 客服 H5；PC「学习外链配置」可改为 #小程序:// 等 */
-    shenXiaoFuMiniLink: 'https://apps.jinrirencai.com/vision-chat/index.html#/chat/ff908081965601960191460192688003',
+    /** 党务智能问答 / 底部「AI问答」Tab：默认 DinTal 客服 H5；PC「学习外链配置」可改为其它 https 或 #小程序:// 等 */
+    shenXiaoFuMiniLink: 'https://apps.jinrirencai.com/vision-chat/index.html#/chat/ff908081965601960191460192688000',
   };
 }
 
@@ -777,8 +804,15 @@ function readLearningRuntime() {
   }
 }
 
+/** 底部「AI问答」与 DinTal 打开：优先 PC/本地配置的 https 智能问答链接，否则用内置默认 */
+function getAiQaExternalH5Url() {
+  var link = (readLearningRuntime().shenXiaoFuMiniLink || '').trim();
+  if (/^https?:\/\//i.test(link)) return link;
+  return 'https://apps.jinrirencai.com/vision-chat/index.html#/chat/ff908081965601960191460192688000';
+}
+
 function openShenXiaoFuMiniProgram() {
-  var def = 'https://apps.jinrirencai.com/vision-chat/index.html#/chat/ff908081965601960191460192688003';
+  var def = 'https://apps.jinrirencai.com/vision-chat/index.html#/chat/ff908081965601960191460192688000';
   var link = (readLearningRuntime().shenXiaoFuMiniLink || '').trim() || def;
   if (/^https?:\/\//i.test(link)) {
     openExternalOrMiniProgramLink(link, '党务智能问答');
@@ -934,21 +968,69 @@ const NavBar = ({ title, onBack, right, dark, bg }) => (
 );
 
 const TabBar = ({ active, onSwitch, items }) => (
-  <div style={{
-    flexShrink: 0, height: T.tabBarHeight,
-    background: T.surface, borderTop: `1px solid ${T.border}`,
-    display: 'flex', alignItems: 'center', justifyContent: 'space-around',
-    zIndex: 50
-  }}>
-    {items.map(item => {
+  <div
+    style={{
+      position: 'fixed',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: 100,
+      minHeight: T.tabBarHeight,
+      paddingTop: 6,
+      paddingBottom: 'max(10px, env(safe-area-inset-bottom, 0px))',
+      paddingLeft: 4,
+      paddingRight: 4,
+      boxSizing: 'border-box',
+      background: T.surface,
+      borderTop: `1px solid ${T.border}`,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-around',
+      boxShadow: '0 -4px 24px rgba(26,26,26,0.06)',
+    }}
+  >
+    {items.map((item) => {
       const isActive = active === item.key;
       return (
-        <div key={item.key} onClick={() => onSwitch(item.key, item.screen)} style={{
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-          cursor: 'pointer', color: isActive ? T.primary : T.textMuted, padding: '4px 12px'
-        }}>
-          {React.createElement(item.icon)}
-          <span style={{ fontSize: 10, fontWeight: isActive ? 600 : 400 }}>{item.label}</span>
+        <div
+          key={item.key}
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            if (item.key === 'aiQA') {
+              window.location.href = getAiQaExternalH5Url();
+              return;
+            }
+            onSwitch(item.key, item.screen);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              if (item.key === 'aiQA') {
+                window.location.href = getAiQaExternalH5Url();
+                return;
+              }
+              onSwitch(item.key, item.screen);
+            }
+          }}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 4,
+            cursor: 'pointer',
+            color: isActive ? T.primary : T.textMuted,
+            padding: '6px 8px',
+            minWidth: 0,
+            flex: '1 1 0',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <span style={{ display: 'flex', lineHeight: 0, transform: 'scale(1.28)', transformOrigin: 'center bottom' }}>
+            {React.createElement(item.icon)}
+          </span>
+          <span style={{ fontSize: 12, fontWeight: isActive ? 700 : 500, letterSpacing: 0.02, whiteSpace: 'nowrap' }}>{item.label}</span>
         </div>
       );
     })}
@@ -958,8 +1040,9 @@ const TabBar = ({ active, onSwitch, items }) => (
 const tabItems = [
   { key: 'home', label: '首页', icon: Icons.Home, screen: 'home' },
   { key: 'learn', label: '学习', icon: Icons.Book, screen: 'learning' },
+  { key: 'aiQA', label: 'AI问答', icon: Icons.Chat, screen: 'aiQA' },
   { key: 'service', label: '服务', icon: Icons.Service, screen: 'lifeServices' },
-  { key: 'profile', label: '我的', icon: Icons.User, screen: 'profile' }
+  { key: 'profile', label: '我的', icon: Icons.User, screen: 'profile' },
 ];
 
 // ============================================
@@ -1091,7 +1174,7 @@ const HomeScreen = ({ nav }) => {
 
   const homeStyles = {
     container: { height: '100%', background: 'linear-gradient(180deg, #F5F2ED 0%, #FAF8F5 18%, #FAF8F5 100%)', display: 'flex', flexDirection: 'column' },
-    content: { flex: 1, overflowY: 'auto', padding: '10px 14px 20px' },
+    content: { flex: 1, overflowY: 'auto', padding: '10px 14px 0', paddingBottom: NW_TAB_SCROLL_BOTTOM_PAD },
     /* 主入口：大卡片 + 左强调色条，避免整屏大红块 */
     heroCard: {
       marginBottom: 18,
@@ -1203,17 +1286,6 @@ const HomeScreen = ({ nav }) => {
           <div style={homeStyles.moduleSub}>总结个人情况，查看成长轨迹、风险提示与能力评估。</div>
         </div>
 
-        <div style={{ ...homeStyles.moduleCard, ...homeStyles.qaCard }} onClick={openShenXiaoFuMiniProgram}>
-          <div style={homeStyles.moduleHead}>
-            <div style={homeStyles.moduleHeadLeft}>
-              <div style={{ ...homeStyles.moduleIcon, ...homeStyles.qaIcon }}><Icons.Chat /></div>
-              <div style={homeStyles.qaTitle}>党务智能问答</div>
-            </div>
-            <div style={homeStyles.qaChevronWrap}><Icons.ChevronRight /></div>
-          </div>
-          <div style={homeStyles.qaSub}>点击打开智能问答，快速咨询党务政策与办事问题（默认 H5；可在 PC 学习外链配置改为小程序等）。</div>
-        </div>
-
         <div style={homeStyles.moduleCard} onClick={() => nav.navigateTo('partyTools')}>
           <div style={homeStyles.moduleHead}>
             <div style={homeStyles.moduleHeadLeft}>
@@ -1284,7 +1356,7 @@ const ProfileScreen = ({ nav, role }) => {
   // Define all styles at the top level to prevent React rendering issues
   const profStyles = {
     container: { height: '100%', background: 'linear-gradient(180deg, #F5F2ED 0%, #FAF8F5 100%)', display: 'flex', flexDirection: 'column' },
-    scrollArea: { flex: 1, overflowY: 'auto', position: 'relative', background: 'linear-gradient(180deg, #EDE9E4 0%, #FAF8F5 28%, #FAF8F5 100%)' },
+    scrollArea: { flex: 1, overflowY: 'auto', position: 'relative', background: 'linear-gradient(180deg, #EDE9E4 0%, #FAF8F5 28%, #FAF8F5 100%)', paddingBottom: NW_TAB_SCROLL_BOTTOM_PAD },
     header: { background: 'linear-gradient(145deg, #C93636 0%, #D44040 42%, #B83232 100%)', padding: '22px 16px 52px', display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0, boxShadow: '0 6px 24px rgba(140, 30, 30, 0.28)' },
     avatarWrap: { position: 'relative', width: 54, height: 54, flexShrink: 0 },
     avatar: { width: 54, height: 54, borderRadius: '50%', background: 'rgba(255,255,255,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: '#fff', fontFamily: "'Noto Serif SC', serif", fontWeight: 700, boxShadow: '0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.25)', overflow: 'hidden', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', border: 'none', padding: 0 },
@@ -1322,7 +1394,7 @@ const ProfileScreen = ({ nav, role }) => {
 
   const adminStyles = {
     container: { height: '100%', background: 'linear-gradient(180deg, #F5F2ED 0%, #FAF8F5 100%)', display: 'flex', flexDirection: 'column' },
-    scrollArea: { flex: 1, overflowY: 'auto', position: 'relative', background: 'linear-gradient(180deg, #EDE9E4 0%, #FAF8F5 24%, #FAF8F5 100%)' },
+    scrollArea: { flex: 1, overflowY: 'auto', position: 'relative', background: 'linear-gradient(180deg, #EDE9E4 0%, #FAF8F5 24%, #FAF8F5 100%)', paddingBottom: NW_TAB_SCROLL_BOTTOM_PAD },
     header: { background: 'linear-gradient(145deg, #C93636 0%, #D44040 42%, #B83232 100%)', padding: '22px 16px 26px', display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0, boxShadow: '0 6px 22px rgba(140, 30, 30, 0.26)' },
     avatarWrap: { position: 'relative', width: 54, height: 54, flexShrink: 0 },
     avatar: { width: 54, height: 54, borderRadius: '50%', background: 'rgba(255,255,255,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: '#fff', fontFamily: "'Noto Serif SC', serif", fontWeight: 700, boxShadow: '0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.25)', overflow: 'hidden', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', border: 'none', padding: 0 },
@@ -1394,7 +1466,7 @@ const ProfileScreen = ({ nav, role }) => {
   if (role === 'member') {
     return (
       <div style={profStyles.container}>
-        <NavBar title="个人信息" onBack={nav.goBack} dark />
+        <NavBar title="个人信息" onBack={nav.history && nav.history.length > 1 ? nav.goBack : undefined} dark />
         <div style={profStyles.scrollArea}>
           <div style={profStyles.header}>
             <div style={profStyles.avatarWrap}>
@@ -1573,7 +1645,7 @@ const ProfileScreen = ({ nav, role }) => {
 
   return (
     <div style={adminStyles.container}>
-      <NavBar title="管理中心" onBack={nav.goBack} dark />
+      <NavBar title="管理中心" onBack={nav.history && nav.history.length > 1 ? nav.goBack : undefined} dark />
       <div style={adminStyles.scrollArea}>
         <div style={adminStyles.header}>
           <div style={adminStyles.avatarWrap}>
@@ -2254,7 +2326,7 @@ const LearningScreen = ({ nav }) => {
 
   const lrStyles = {
     container: { height: '100%', background: 'linear-gradient(180deg, #F5F2ED 0%, #FAF8F5 18%, #FAF8F5 100%)', display: 'flex', flexDirection: 'column' },
-    content: { flex: 1, overflowY: 'auto', padding: '10px 14px 22px' },
+    content: { flex: 1, overflowY: 'auto', padding: '10px 14px 0', paddingBottom: NW_TAB_SCROLL_BOTTOM_PAD },
     sectionCard: { background: T.surface, borderRadius: 18, padding: 18, border: `1px solid ${T.border}`, marginBottom: 14, boxShadow: '0 2px 16px rgba(26,26,26,0.055), 0 1px 0 rgba(255,255,255,0.85) inset' },
     secHead: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 14 },
     secTitle: { fontSize: 16, fontWeight: 700, color: T.textPrimary, fontFamily: "'Noto Serif SC', serif", letterSpacing: '0.02em', paddingLeft: 10, borderLeft: '4px solid ' + T.primary, marginLeft: 2 },
@@ -2316,7 +2388,7 @@ const LearningScreen = ({ nav }) => {
 
   return (
     <div style={lrStyles.container}>
-      <NavBar title="学习资源" onBack={nav.goBack} />
+      <NavBar title="学习资源" onBack={nav.history && nav.history.length > 1 ? nav.goBack : undefined} />
       <div style={lrStyles.content}>
         <div style={lrStyles.sectionEyebrow}>学习中心</div>
         <div style={lrStyles.sectionCard}>
@@ -3193,46 +3265,39 @@ const LiveActivityScreen = ({ nav }) => {
 // ============================================
 // Screen 10: AI QA
 // ============================================
+/** 智能问答为第三方 DinTal H5；若通过 navigateTo 进入则立即跳转（Tab 点击直接 location 不经过此屏） */
 const AIQAScreen = ({ nav }) => {
-  const [messages, setMessages] = React.useState([
-    { role: 'ai', text: '您好！我是南湾红帆党务智能助手，请问有什么可以帮您？' },
-    { role: 'user', text: '发展党员的具体流程是什么？' },
-    { role: 'ai', text: '发展党员的基本流程如下：\n\n1. 提交入党申请书\n2. 确定入党积极分子\n3. 培养教育考察（一般不少于一年）\n4. 确定发展对象\n5. 政治审查和集中培训\n6. 支部大会讨论表决\n7. 上级党委审批\n8. 入党宣誓仪式' },
-    { role: 'user', text: '入党申请书应该交给谁？' },
-    { role: 'ai', text: '入党申请书应交给您所在党支部的书记或组织委员。如果您不确定联系方式，可以在「我的」页面查看所属支部信息，或通过底部「服务」中的党群共享服务入口获取帮助。' }
-  ]);
-  const [input, setInput] = React.useState('');
-
-  const qaStyles = {
-    container: { height: '100%', background: T.bg, display: 'flex', flexDirection: 'column' },
-    chatArea: { flex: 1, padding: 14, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 },
-    bubble: (role) => ({ maxWidth: '80%', padding: '10px 14px', borderRadius: 14, fontSize: 13, lineHeight: 1.6, textWrap: 'pretty', alignSelf: role === 'user' ? 'flex-end' : 'flex-start', background: role === 'user' ? T.primary : T.surface, color: role === 'user' ? '#fff' : T.textPrimary, borderBottomRightRadius: role === 'user' ? 4 : 14, borderTopLeftRadius: role === 'ai' ? 4 : 14 }),
-    inputBar: { padding: '8px 14px', borderTop: `1px solid ${T.border}`, background: T.surface, display: 'flex', gap: 8, alignItems: 'center', paddingBottom: 16 },
-    input: { flex: 1, padding: '10px 14px', border: `1px solid ${T.border}`, borderRadius: 20, fontSize: 13, outline: 'none', background: T.bg },
-    sendBtn: { width: 36, height: 36, borderRadius: '50%', background: T.primary, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'pointer', border: 'none' }
-  };
-
-  const handleSend = () => {
-    if (!input.trim()) return;
-    setMessages(prev => [...prev, { role: 'user', text: input }]);
-    setInput('');
-    setTimeout(() => {
-      setMessages(prev => [...prev, { role: 'ai', text: '感谢您的提问，正在为您查询相关信息...' }]);
-    }, 800);
-  };
-
+  React.useEffect(function () {
+    window.location.replace(getAiQaExternalH5Url());
+  }, []);
+  const canBack = nav.history && nav.history.length > 1;
   return (
-    <div style={qaStyles.container}>
-      <NavBar title="党务智能问答" onBack={nav.goBack} />
-      <div style={qaStyles.chatArea}>
-        {messages.map((m, i) => (
-          <div key={i} style={qaStyles.bubble(m.role)}>{m.text}</div>
-        ))}
+    <div style={{ height: '100%', background: T.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, paddingBottom: NW_TAB_SCROLL_BOTTOM_PAD }}>
+      <NavBar title="AI问答" onBack={canBack ? nav.goBack : undefined} />
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, maxWidth: 320, textAlign: 'center' }}>
+        <div style={{ fontSize: 14, color: T.textSecondary, lineHeight: 1.65 }}>正在打开「DinTal AI客服」…</div>
+        <div style={{ fontSize: 11, color: T.textMuted, wordBreak: 'break-all' }}>{getAiQaExternalH5Url()}</div>
+        <button
+          type="button"
+          onClick={() => {
+            window.location.href = getAiQaExternalH5Url();
+          }}
+          style={{
+            marginTop: 8,
+            padding: '12px 24px',
+            borderRadius: 12,
+            border: 'none',
+            background: T.primary,
+            color: '#fff',
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          若未自动跳转，点此打开
+        </button>
       </div>
-      <div style={qaStyles.inputBar}>
-        <input style={qaStyles.input} value={input} onChange={e => setInput(e.target.value)} placeholder="输入党务问题..." onKeyDown={e => e.key === 'Enter' && handleSend()} />
-        <button style={qaStyles.sendBtn} onClick={handleSend}><Icons.Send /></button>
-      </div>
+      <TabBar active="aiQA" onSwitch={nav.switchTab} items={tabItems} />
     </div>
   );
 };
@@ -3436,7 +3501,7 @@ const LifeServicesScreen = ({ nav }) => {
 
   const lsStyles = {
     container: { height: '100%', background: 'linear-gradient(180deg, #F5F2ED 0%, #FAF8F5 18%, #FAF8F5 100%)', display: 'flex', flexDirection: 'column' },
-    content: { flex: 1, overflowY: 'auto', padding: '10px 14px 22px' },
+    content: { flex: 1, overflowY: 'auto', padding: '10px 14px 0', paddingBottom: NW_TAB_SCROLL_BOTTOM_PAD },
     sectionEyebrow: { fontSize: 11, fontWeight: 600, color: T.textMuted, letterSpacing: '0.08em', marginBottom: 10, paddingLeft: 2 },
     blockGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 },
     blockCard: {
@@ -3543,9 +3608,8 @@ const LifeServicesScreen = ({ nav }) => {
         <div style={lsStyles.tipCard}>
           <div style={lsStyles.tipTitle}>温馨提示</div>
           <div style={lsStyles.tipText}>
-            本页为普通 H5（非必须嵌小程序 web-view）。方案二（URL Scheme / URL Link，适合系统浏览器等站外）：在微信开放平台生成 weixin://… 或 https://wxaurl.cn/…
-            后，可设 localStorage「nw_ilg_url_scheme_static_v1」做演示（有过期时间）；正式环境由后端调微信接口生成并配置 GET「nw_ilg_url_scheme_api_v1」（或 window.__NW_WX_URL_SCHEME_API__），接口返回 JSON 字段支持
-            url_scheme、openlink、url_link 等。未配置站外打开链时，点按钮会说明如何配置并仍可复制 #小程序:// 短链到微信。方案一（开放标签 wx-open-launch-weapp）：需公众号 JSSDK，设置「nw_ilg_weapp_username_v1」（gh_）与「nw_wx_js_config_url_v1」。微信内仍可用大按钮弹层或纯链接短链。若嵌在其它小程序 web-view 内，唤起常受限。紧急帮助：0755-28761234（工作日 8:30-17:30）。
+            本页为普通 H5（非必须嵌小程序 web-view）。服务页打开「i龙岗」等：默认会请求同源 GET「/api/wechat/url-scheme?target=ilonggang」（由仓库内 python start-servers.py 提供，见 server/env.example.txt 配置 WECHAT_MINI_APPID/SECRET 调微信
+            wxa/generatescheme）；成功则跳转 weixin:// 打开链，失败再回退 #小程序:// 弹层或短链。也可单独配置 localStorage「nw_service_scheme_api_v1」或 window.__NW_SERVICE_SCHEME_API__ 指向其它域名后端。演示仍可用「nw_ilg_url_scheme_static_v1」静态链。方案一（开放标签）见「nw_ilg_weapp_username_v1」与「nw_wx_js_config_url_v1」。若嵌在其它小程序 web-view 内，唤起常受限。紧急帮助：0755-28761234（工作日 8:30-17:30）。
           </div>
         </div>
       </div>
@@ -3578,7 +3642,7 @@ const DisposalScreen = ({ nav }) => {
 
   const dStyles = {
     container: { height: '100%', background: T.bg, display: 'flex', flexDirection: 'column' },
-    content: { flex: 1, overflowY: 'auto', padding: '8px 14px 16px' },
+    content: { flex: 1, overflowY: 'auto', padding: '8px 14px 0', paddingBottom: NW_TAB_SCROLL_BOTTOM_PAD },
     sectionTitle: { fontSize: 15, fontWeight: 700, fontFamily: "'Noto Serif SC', serif", marginBottom: 10 },
     sitItem: { display: 'flex', gap: 10, padding: '10px 0', borderBottom: `1px solid ${T.border}`, alignItems: 'flex-start' },
     sitNum: { width: 22, height: 22, borderRadius: '50%', background: T.primaryLight, color: T.primary, fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 },
@@ -4118,11 +4182,22 @@ function App() {
   const isDark = darkScreens.includes(nav.screen);
 
   return (
-    <IosFrame time="9:41" battery={85} dark={isDark}>
-      <div style={{ position: 'absolute', top: 54, left: 0, right: 0, bottom: 0 }}>
+    <div
+      style={{
+        minHeight: '100dvh',
+        width: '100%',
+        maxWidth: '100%',
+        margin: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        background: isLogin ? '#fff' : isDark ? 'linear-gradient(180deg, #EDE9E4 0%, #FAF8F5 100%)' : T.bg,
+        boxSizing: 'border-box',
+      }}
+    >
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', width: '100%' }}>
         {renderScreen()}
       </div>
-    </IosFrame>
+    </div>
   );
 }
 
