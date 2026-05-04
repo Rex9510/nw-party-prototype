@@ -87,8 +87,21 @@ function readILongGangMiniProgramShortLink() {
   return WX_MINIPROGRAM_ILG;
 }
 
-/** 微信内拉起小程序短链：replace + 顶层 + <a> 点击，减少 iframe / 部分 WebView 下仅改 hash 不唤起的问题 */
+/** 当前是否处于「其它小程序」的 web-view 内（此时 #小程序:// 常需 JSSDK navigateToMiniProgram，纯 H5 短链可能无效） */
+function isInsideWeChatMiniProgramWebView() {
+  return typeof window.__wxjs_environment === 'string' && window.__wxjs_environment === 'miniprogram';
+}
+
+/** 微信内拉起小程序短链：优先用户直接点的 <a href>；此处为脚本回退：open / replace / href */
 function tryOpenWeChatMiniProgramShortLink(link) {
+  if (isInsideWeChatMiniProgramWebView()) {
+    window.alert('当前页面在「微信小程序」内打开，从 web-view 直接唤起其它小程序常受限制。\n\n请将本页在系统浏览器中打开，或在微信聊天中发送以下短链后点击：\n\n' + link);
+    return;
+  }
+  try {
+    var w = window.open(link, '_top');
+    if (w) return;
+  } catch (e0) {}
   var topWin = window.top;
   try {
     if (topWin && topWin !== window) {
@@ -136,6 +149,14 @@ function guessMiniProgramNameFromShortLink(link) {
 function showWeChatMiniProgramJumpModal(link, opts) {
   opts = opts || {};
   var appLabel = (opts.appLabel && String(opts.appLabel).trim()) || guessMiniProgramNameFromShortLink(link);
+  if (isInsideWeChatMiniProgramWebView()) {
+    window.alert(
+      '当前 H5 运行在「其它微信小程序」的 web-view 内，通常无法再从页面唤起「' + appLabel + '」。\n\n' +
+        '请用【微信 → 右上角菜单 → 在浏览器打开】或复制下面短链到微信聊天里发送后点击：\n\n' +
+        link
+    );
+    return;
+  }
   var maskId = 'nw-wx-miniprogram-jump-modal';
   var old = document.getElementById(maskId);
   if (old) try { old.remove(); } catch (e) {}
@@ -176,26 +197,83 @@ function showWeChatMiniProgramJumpModal(link, opts) {
   cancelBtn.textContent = '取消';
   cancelBtn.style.cssText = 'flex:1;padding:11px 8px;border:1px solid #E5E7EB;border-radius:12px;background:#FAFAF9;font-size:14px;color:#374151;cursor:pointer';
 
-  var goBtn = document.createElement('button');
-  goBtn.type = 'button';
-  goBtn.textContent = '前往跳转';
-  goBtn.style.cssText = 'flex:1;padding:11px 8px;border:none;border-radius:12px;background:#D44040;font-size:14px;font-weight:600;color:#fff;cursor:pointer';
+  /** 微信更认可「用户手指点的带 href 的 <a>」唤起 #小程序://，仅用 button+JS 跳转易被拦截 */
+  var goLink = document.createElement('a');
+  goLink.href = link;
+  goLink.target = '_top';
+  goLink.rel = 'noopener noreferrer';
+  goLink.textContent = '前往跳转';
+  goLink.setAttribute('role', 'button');
+  goLink.style.cssText =
+    'flex:1;padding:11px 8px;border-radius:12px;background:#D44040;font-size:14px;font-weight:600;color:#fff;cursor:pointer;' +
+    'text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;box-sizing:border-box;' +
+    '-webkit-tap-highlight-color:transparent';
 
   cancelBtn.onclick = function () { close(); };
-  goBtn.onclick = function () {
-    close();
+  goLink.addEventListener('click', function () {
+    setTimeout(close, 120);
+  });
+
+  var hint = document.createElement('div');
+  hint.style.cssText = 'font-size:11px;color:#9CA3AF;margin-top:12px;line-height:1.5;word-break:break-all';
+  hint.appendChild(document.createTextNode('若按钮无反应，请长按复制：'));
+  hint.appendChild(document.createElement('br'));
+  var mono = document.createElement('span');
+  mono.style.cssText = 'font-family:ui-monospace,monospace;font-size:10px;color:#6B7280;user-select:text';
+  mono.textContent = link;
+  hint.appendChild(mono);
+
+  var row2 = document.createElement('div');
+  row2.style.cssText = 'display:flex;gap:8px;margin-top:10px';
+  var copyBtn = document.createElement('button');
+  copyBtn.type = 'button';
+  copyBtn.textContent = '复制短链';
+  copyBtn.style.cssText = 'flex:1;padding:8px;border:1px solid #E5E7EB;border-radius:10px;background:#fff;font-size:12px;color:#374151;cursor:pointer';
+  var tryBtn = document.createElement('button');
+  tryBtn.type = 'button';
+  tryBtn.textContent = '备用打开';
+  tryBtn.style.cssText = 'flex:1;padding:8px;border:1px solid rgba(212,64,64,0.35);border-radius:10px;background:#FFF5F5;font-size:12px;color:#B83232;cursor:pointer;font-weight:600';
+  copyBtn.onclick = function () {
+    function fallbackCopy() {
+      try {
+        var t = document.createElement('textarea');
+        t.value = link;
+        t.style.position = 'fixed';
+        t.style.left = '-9999px';
+        document.body.appendChild(t);
+        t.select();
+        document.execCommand('copy');
+        t.remove();
+        window.alert('已复制到剪贴板，请到微信任意聊天中粘贴发送后点击该短链。');
+      } catch (e) {
+        window.alert('请手动长按上方灰色短链进行复制。');
+      }
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(link).then(function () {
+        window.alert('已复制到剪贴板，请到微信任意聊天中粘贴发送后点击该短链。');
+      }).catch(fallbackCopy);
+    } else {
+      fallbackCopy();
+    }
+  };
+  tryBtn.onclick = function () {
     tryOpenWeChatMiniProgramShortLink(link);
   };
+  row2.appendChild(copyBtn);
+  row2.appendChild(tryBtn);
 
   mask.onclick = function (e) {
     if (e.target === mask) close();
   };
 
   row.appendChild(cancelBtn);
-  row.appendChild(goBtn);
+  row.appendChild(goLink);
   box.appendChild(title);
   box.appendChild(body);
   box.appendChild(row);
+  box.appendChild(hint);
+  box.appendChild(row2);
   mask.appendChild(box);
   document.body.appendChild(mask);
 }
@@ -207,6 +285,139 @@ function openILongGangMiniprogram() {
     return;
   }
   window.alert('「i龙岗」为微信小程序，请在手机微信或 Windows 微信内置浏览器中打开本页面后再点。\n\n也可复制下面整行到微信任意聊天里发送后点击：\n\n' + link);
+}
+
+var NW_MEMBER_PROFILE_AVATAR_KEY = 'nw_member_profile_avatar_dataurl_v1';
+var NW_ADMIN_PROFILE_AVATAR_KEY = 'nw_admin_profile_avatar_dataurl_v1';
+
+function readProfileAvatarDataUrl(role) {
+  var key = role === 'admin' ? NW_ADMIN_PROFILE_AVATAR_KEY : NW_MEMBER_PROFILE_AVATAR_KEY;
+  try {
+    var v = localStorage.getItem(key);
+    if (typeof v === 'string' && /^data:image\//i.test(v.trim())) return v.trim();
+  } catch (e1) {}
+  return '';
+}
+
+function writeProfileAvatarDataUrl(role, dataUrl) {
+  var key = role === 'admin' ? NW_ADMIN_PROFILE_AVATAR_KEY : NW_MEMBER_PROFILE_AVATAR_KEY;
+  try {
+    if (dataUrl && typeof dataUrl === 'string') localStorage.setItem(key, dataUrl);
+    else localStorage.removeItem(key);
+  } catch (e2) {}
+}
+
+/**
+ * 头像大图预览：支持 data URL / https 图片；无图时展示姓氏字。
+ * opts: { imageSrc?: string, letter?: string, caption?: string, hint?: string }
+ */
+function showNwAvatarLightbox(opts) {
+  opts = opts || {};
+  var imageSrc = typeof opts.imageSrc === 'string' ? opts.imageSrc.trim() : '';
+  var letterRaw = typeof opts.letter === 'string' ? opts.letter.trim() : '';
+  var letter = letterRaw ? letterRaw.charAt(0) : '?';
+  var caption = typeof opts.caption === 'string' ? opts.caption.trim() : '';
+  var hint = opts.hint || '轻触空白处、右上角 × 或「关闭」退出';
+  var id = 'nw-avatar-lightbox-root';
+  var old = document.getElementById(id);
+  if (old) try { old.remove(); } catch (e0) {}
+
+  function close() {
+    try {
+      document.removeEventListener('keydown', onKey);
+    } catch (e1) {}
+    try {
+      el.remove();
+    } catch (e2) {}
+  }
+  function onKey(e) {
+    if (e.key === 'Escape') close();
+  }
+
+  var el = document.createElement('div');
+  el.id = id;
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-modal', 'true');
+  el.setAttribute('aria-label', '头像预览');
+  el.style.cssText =
+    'position:fixed;inset:0;z-index:10002;background:rgba(0,0,0,0.88);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;-webkit-tap-highlight-color:transparent';
+  el.addEventListener('click', function (e) {
+    if (e.target === el) close();
+  });
+
+  var xbtn = document.createElement('button');
+  xbtn.type = 'button';
+  xbtn.setAttribute('aria-label', '关闭');
+  xbtn.textContent = '×';
+  xbtn.style.cssText =
+    'position:fixed;top:12px;right:12px;width:44px;height:44px;border-radius:50%;border:none;background:rgba(255,255,255,0.14);color:#fff;font-size:26px;line-height:1;cursor:pointer;z-index:10003';
+  xbtn.onclick = function (e) {
+    e.stopPropagation();
+    close();
+  };
+
+  var panel = document.createElement('div');
+  panel.style.cssText =
+    'max-width:100%;max-height:86vh;display:flex;flex-direction:column;align-items:center;gap:12px;pointer-events:none';
+  panel.addEventListener('click', function (e) {
+    e.stopPropagation();
+  });
+
+  var size = Math.min(Math.floor(window.innerWidth * 0.78), 320);
+  var hasImg = imageSrc && (imageSrc.indexOf('data:image') === 0 || /^https?:\/\//i.test(imageSrc));
+
+  if (hasImg) {
+    var img = document.createElement('img');
+    img.src = imageSrc;
+    img.alt = caption || '头像';
+    img.style.cssText =
+      'width:' +
+      size +
+      'px;height:' +
+      size +
+      'px;border-radius:50%;object-fit:cover;border:3px solid rgba(255,255,255,0.22);box-shadow:0 12px 48px rgba(0,0,0,0.45);pointer-events:auto';
+    panel.appendChild(img);
+  } else {
+    var fs = Math.max(40, Math.floor(size * 0.38));
+    var circle = document.createElement('div');
+    circle.textContent = letter;
+    circle.style.cssText =
+      'width:' +
+      size +
+      'px;height:' +
+      size +
+      'px;border-radius:50%;background:linear-gradient(160deg,#FFF0EE,#D44040);display:flex;align-items:center;justify-content:center;font-size:' +
+      fs +
+      'px;font-weight:700;color:#fff;font-family:Noto Serif SC,serif;border:3px solid rgba(255,255,255,0.25);box-sizing:border-box;pointer-events:auto';
+    panel.appendChild(circle);
+  }
+
+  if (caption) {
+    var cap = document.createElement('div');
+    cap.textContent = caption;
+    cap.style.cssText = 'color:#fff;font-size:16px;font-weight:600;text-align:center;max-width:92vw;pointer-events:auto';
+    panel.appendChild(cap);
+  }
+  var hi = document.createElement('div');
+  hi.textContent = hint;
+  hi.style.cssText = 'color:rgba(255,255,255,0.55);font-size:12px;text-align:center;max-width:280px;line-height:1.5;pointer-events:auto';
+  panel.appendChild(hi);
+
+  var btn = document.createElement('button');
+  btn.type = 'button';
+  btn.textContent = '关闭';
+  btn.style.cssText =
+    'margin-top:4px;padding:11px 36px;border-radius:999px;border:1px solid rgba(255,255,255,0.35);background:rgba(255,255,255,0.12);color:#fff;font-size:14px;font-weight:600;cursor:pointer;pointer-events:auto';
+  btn.onclick = function (e) {
+    e.stopPropagation();
+    close();
+  };
+  panel.appendChild(btn);
+
+  el.appendChild(panel);
+  el.appendChild(xbtn);
+  document.body.appendChild(el);
+  document.addEventListener('keydown', onKey);
 }
 /** 与 PC 管理端「小程序外链配置」共用 localStorage，正式环境改为接口下发 */
 const NW_LEARNING_RUNTIME_STORAGE_KEY = 'nw_learning_runtime_config_v1';
@@ -789,13 +1000,47 @@ const ProfileScreen = ({ nav, role }) => {
   const [showActModal, setShowActModal] = React.useState(false);
   const [selectedActIdx, setSelectedActIdx] = React.useState(0);
   const [phoneRevealed, setPhoneRevealed] = React.useState(false);
+  const [memberAvatarUrl, setMemberAvatarUrl] = React.useState(() => readProfileAvatarDataUrl('member'));
+  const [adminAvatarUrl, setAdminAvatarUrl] = React.useState(() => readProfileAvatarDataUrl('admin'));
+  const memberFileRef = React.useRef(null);
+  const adminFileRef = React.useRef(null);
+
+  const handleAvatarFile = (which, e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    if (!/^image\//i.test(f.type)) {
+      window.alert('请选择图片文件（JPG/PNG 等）');
+      e.target.value = '';
+      return;
+    }
+    if (f.size > 2.2 * 1024 * 1024) {
+      window.alert('单张图片请小于约 2MB（演示限制）');
+      e.target.value = '';
+      return;
+    }
+    const r = new FileReader();
+    r.onload = () => {
+      const u = String(r.result || '');
+      writeProfileAvatarDataUrl(which, u);
+      if (which === 'admin') setAdminAvatarUrl(u);
+      else setMemberAvatarUrl(u);
+    };
+    r.readAsDataURL(f);
+    e.target.value = '';
+  };
 
   // Define all styles at the top level to prevent React rendering issues
   const profStyles = {
     container: { height: '100%', background: 'linear-gradient(180deg, #F5F2ED 0%, #FAF8F5 100%)', display: 'flex', flexDirection: 'column' },
     scrollArea: { flex: 1, overflowY: 'auto', position: 'relative', background: 'linear-gradient(180deg, #EDE9E4 0%, #FAF8F5 28%, #FAF8F5 100%)' },
     header: { background: 'linear-gradient(145deg, #C93636 0%, #D44040 42%, #B83232 100%)', padding: '22px 16px 52px', display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0, boxShadow: '0 6px 24px rgba(140, 30, 30, 0.28)' },
-    avatar: { width: 54, height: 54, borderRadius: '50%', background: 'rgba(255,255,255,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: '#fff', fontFamily: "'Noto Serif SC', serif", fontWeight: 700, flexShrink: 0, boxShadow: '0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.25)' },
+    avatarWrap: { position: 'relative', width: 54, height: 54, flexShrink: 0 },
+    avatar: { width: 54, height: 54, borderRadius: '50%', background: 'rgba(255,255,255,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: '#fff', fontFamily: "'Noto Serif SC', serif", fontWeight: 700, boxShadow: '0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.25)', overflow: 'hidden', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', border: 'none', padding: 0 },
+    avatarEdit: {
+      position: 'absolute', right: -4, bottom: -4, width: 26, height: 26, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.95)',
+      background: 'linear-gradient(145deg, #D44040, #B83232)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+      boxShadow: '0 2px 10px rgba(0,0,0,0.2)', padding: 0, WebkitTapHighlightColor: 'transparent',
+    },
     name: { fontSize: 17, fontWeight: 700, color: '#fff', fontFamily: "'Noto Serif SC', serif", textShadow: '0 1px 2px rgba(0,0,0,0.12)' },
     branch: { fontSize: 12, color: 'rgba(255,255,255,0.82)', marginTop: 4, lineHeight: 1.45 },
     // QR card
@@ -827,7 +1072,13 @@ const ProfileScreen = ({ nav, role }) => {
     container: { height: '100%', background: 'linear-gradient(180deg, #F5F2ED 0%, #FAF8F5 100%)', display: 'flex', flexDirection: 'column' },
     scrollArea: { flex: 1, overflowY: 'auto', position: 'relative', background: 'linear-gradient(180deg, #EDE9E4 0%, #FAF8F5 24%, #FAF8F5 100%)' },
     header: { background: 'linear-gradient(145deg, #C93636 0%, #D44040 42%, #B83232 100%)', padding: '22px 16px 26px', display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0, boxShadow: '0 6px 22px rgba(140, 30, 30, 0.26)' },
-    avatar: { width: 54, height: 54, borderRadius: '50%', background: 'rgba(255,255,255,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: '#fff', fontFamily: "'Noto Serif SC', serif", fontWeight: 700, flexShrink: 0, boxShadow: '0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.25)' },
+    avatarWrap: { position: 'relative', width: 54, height: 54, flexShrink: 0 },
+    avatar: { width: 54, height: 54, borderRadius: '50%', background: 'rgba(255,255,255,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: '#fff', fontFamily: "'Noto Serif SC', serif", fontWeight: 700, boxShadow: '0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.25)', overflow: 'hidden', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', border: 'none', padding: 0 },
+    avatarEdit: {
+      position: 'absolute', right: -4, bottom: -4, width: 26, height: 26, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.95)',
+      background: 'linear-gradient(145deg, #D44040, #B83232)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+      boxShadow: '0 2px 10px rgba(0,0,0,0.2)', padding: 0, WebkitTapHighlightColor: 'transparent',
+    },
     name: { fontSize: 17, fontWeight: 700, color: '#fff', fontFamily: "'Noto Serif SC', serif", textShadow: '0 1px 2px rgba(0,0,0,0.12)' },
     branch: { fontSize: 12, color: 'rgba(255,255,255,0.82)', marginTop: 4 },
     // Activity selector card
@@ -882,7 +1133,9 @@ const ProfileScreen = ({ nav, role }) => {
     { label: '手机号码', value: '13812345678', sensitive: 'phone' },
     { label: '党籍状态', value: '正式党员' },
     { label: '评定等级', value: '优秀' },
-    { label: '联系人', value: '李芳（党务专员）' },
+    { label: '流出地党组织名称', value: '湖南省长沙市望城区××街道机关第一党支部（示例）' },
+    { label: '流出地对应联系人', value: '王某（组织员）· 0731-8****123' },
+    { label: '本地党务联系人', value: '李芳（党务专员）' },
   ];
 
   // ---- Member view ----
@@ -892,10 +1145,24 @@ const ProfileScreen = ({ nav, role }) => {
         <NavBar title="个人信息" onBack={nav.goBack} dark />
         <div style={profStyles.scrollArea}>
           <div style={profStyles.header}>
-            <div style={profStyles.avatar}>张</div>
+            <div style={profStyles.avatarWrap}>
+              <input ref={memberFileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" style={{ display: 'none' }} onChange={e => handleAvatarFile('member', e)} />
+              <div
+                role="button"
+                tabIndex={0}
+                style={{ ...profStyles.avatar, background: memberAvatarUrl ? '#fff' : profStyles.avatar.background }}
+                onClick={() => showNwAvatarLightbox({ imageSrc: memberAvatarUrl, letter: '张', caption: '张伟 · 头像预览' })}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showNwAvatarLightbox({ imageSrc: memberAvatarUrl, letter: '张', caption: '张伟 · 头像预览' }); } }}
+              >
+                {memberAvatarUrl ? <img src={memberAvatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '张'}
+              </div>
+              <button type="button" aria-label="更换头像" style={profStyles.avatarEdit} onClick={e => { e.stopPropagation(); memberFileRef.current && memberFileRef.current.click(); }}>
+                <span style={{ display: 'flex', transform: 'scale(0.55)' }}><Icons.Camera /></span>
+              </button>
+            </div>
             <div>
               <div style={profStyles.name}>张伟</div>
-              <div style={profStyles.branch}>南湾街道 南湾社区第一党支部</div>
+              <div style={profStyles.branch}>南湾街道 南湾社区第一党支部 · 点头像放大，相机可上传</div>
             </div>
           </div>
 
@@ -1057,10 +1324,24 @@ const ProfileScreen = ({ nav, role }) => {
       <NavBar title="管理中心" onBack={nav.goBack} dark />
       <div style={adminStyles.scrollArea}>
         <div style={adminStyles.header}>
-          <div style={adminStyles.avatar}>李</div>
+          <div style={adminStyles.avatarWrap}>
+            <input ref={adminFileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" style={{ display: 'none' }} onChange={e => handleAvatarFile('admin', e)} />
+            <div
+              role="button"
+              tabIndex={0}
+              style={{ ...adminStyles.avatar, background: adminAvatarUrl ? '#fff' : adminStyles.avatar.background }}
+              onClick={() => showNwAvatarLightbox({ imageSrc: adminAvatarUrl, letter: '李', caption: '李建国 · 管理员头像' })}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showNwAvatarLightbox({ imageSrc: adminAvatarUrl, letter: '李', caption: '李建国 · 管理员头像' }); } }}
+            >
+              {adminAvatarUrl ? <img src={adminAvatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '李'}
+            </div>
+            <button type="button" aria-label="更换管理员头像" style={adminStyles.avatarEdit} onClick={e => { e.stopPropagation(); adminFileRef.current && adminFileRef.current.click(); }}>
+              <span style={{ display: 'flex', transform: 'scale(0.55)' }}><Icons.Camera /></span>
+            </button>
+          </div>
           <div>
             <div style={adminStyles.name}>李建国</div>
-            <div style={adminStyles.branch}>南湾街道 · 管理员</div>
+            <div style={adminStyles.branch}>南湾街道 · 管理员 · 点头像放大，相机可上传</div>
           </div>
         </div>
 
@@ -1250,11 +1531,13 @@ const ScanVerifyScreen = ({ nav }) => {
     overlay: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 60 },
     memberCard: { background: T.surface, borderRadius: '20px 20px 0 0', padding: '24px 20px 32px', width: '100%' },
     memberHeader: { display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 },
-    memberAvatar: { width: 48, height: 48, borderRadius: '50%', background: T.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: T.primary, fontWeight: 700, fontFamily: "'Noto Serif SC', serif" },
+    memberAvatar: { width: 48, height: 48, borderRadius: '50%', background: T.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: T.primary, fontWeight: 700, fontFamily: "'Noto Serif SC', serif", overflow: 'hidden', flexShrink: 0, cursor: 'pointer', WebkitTapHighlightColor: 'transparent', border: 'none', padding: 0 },
     memberName: { fontSize: 18, fontWeight: 700, fontFamily: "'Noto Serif SC', serif" },
     memberBranch: { fontSize: 12, color: T.textMuted, marginTop: 2 },
-    memberInfo: { display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 },
-    memberRow: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: T.textSecondary },
+    memberInfo: { display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16, maxHeight: '38vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch' },
+    memberRow: { display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, color: T.textSecondary, lineHeight: 1.5 },
+    memberRowLabel: { flexShrink: 0, width: 78, fontSize: 12, color: T.textMuted, fontWeight: 600 },
+    memberRowValue: { flex: 1, color: T.textPrimary, fontWeight: 500, wordBreak: 'break-word' },
     activitySelect: { padding: '10px 14px', borderRadius: 10, border: `1px solid ${T.border}`, fontSize: 13, width: '100%', marginBottom: 16, outline: 'none', background: T.bg },
     activitySelectLabel: { fontSize: 12, color: T.textMuted, marginBottom: 6 },
     statusTags: { display: 'flex', gap: 8, marginBottom: 16 },
@@ -1272,11 +1555,25 @@ const ScanVerifyScreen = ({ nav }) => {
   const [selectedActivity, setSelectedActivity] = React.useState(0);
   const [checkinStatus, setCheckinStatus] = React.useState('准时');
 
+  /** 扫码解析后的党员档案摘要（与 PC 党员管理字段对齐演示） */
+  const scannedMember = {
+    name: '张伟',
+    memberNo: 'DY001',
+    branch: '南湾街道 南湾社区第一党支部',
+    inflowTime: '2024年6月',
+    education: '大学本科',
+    phone: '138****5678',
+    outOrgName: '湖南省长沙市望城区××街道机关第一党支部（示例）',
+    outOrgContact: '王某（组织员）· 0731-8****123',
+  };
+
   const activities = [
     '学习贯彻党的二十大精神 (进行中)',
     '学雷锋志愿服务日 (进行中)',
     '年度组织生活会 (未开始)'
   ];
+
+  const linkedScanAvatar = readProfileAvatarDataUrl('member');
 
   const handleScan = () => setScanState('found');
   const handleConfirm = () => {
@@ -1296,9 +1593,9 @@ const ScanVerifyScreen = ({ nav }) => {
           </div>
           <div style={{ ...scanStyles.resultTitle, color: T.success }}>身份核验通过</div>
           <div style={scanStyles.resultSub}>
-            张伟 · 南湾街道 南湾社区第一党支部<br/>
-            已签到：{activities[selectedActivity].split(' (')[0]}<br/>
-            状态：{checkinStatus}
+            {scannedMember.name} · 编号 {scannedMember.memberNo}<br/>
+            {scannedMember.branch}<br/>
+            已签到：{activities[selectedActivity].split(' (')[0]} · 状态：{checkinStatus}
           </div>
           <button style={{ ...scanStyles.resultBtn, background: T.success }} onClick={handleReset}>继续扫码</button>
         </div>
@@ -1339,16 +1636,67 @@ const ScanVerifyScreen = ({ nav }) => {
         <div style={scanStyles.overlay} onClick={() => setScanState('scanning')}>
           <div style={scanStyles.memberCard} onClick={e => e.stopPropagation()}>
             <div style={scanStyles.memberHeader}>
-              <div style={scanStyles.memberAvatar}>张</div>
+              <button
+                type="button"
+                style={{ ...scanStyles.memberAvatar, background: linkedScanAvatar ? '#fff' : T.primaryLight }}
+                onClick={() =>
+                  showNwAvatarLightbox({
+                    imageSrc: linkedScanAvatar,
+                    letter: scannedMember.name.charAt(0),
+                    caption: scannedMember.name + ' · ' + scannedMember.memberNo,
+                    hint: '与「我的」页上传的头像同源（演示）',
+                  })
+                }
+              >
+                {linkedScanAvatar ? (
+                  <img src={linkedScanAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  scannedMember.name.charAt(0)
+                )}
+              </button>
               <div>
-                <div style={scanStyles.memberName}>张伟</div>
-                <div style={scanStyles.memberBranch}>南湾街道 南湾社区第一党支部 · DY001</div>
+                <div style={scanStyles.memberName}>{scannedMember.name}</div>
+                <div style={scanStyles.memberBranch}>管理员扫码后可核对以下档案信息</div>
               </div>
             </div>
 
             <div style={scanStyles.memberInfo}>
-              <div style={scanStyles.memberRow}><Icons.Calendar /> 入党时间：2019年3月</div>
-              <div style={scanStyles.memberRow}><Icons.Shield /> 身份核验：✅ 已认证</div>
+              <div style={scanStyles.memberRow}>
+                <span style={scanStyles.memberRowLabel}>姓名</span>
+                <span style={scanStyles.memberRowValue}>{scannedMember.name}</span>
+              </div>
+              <div style={scanStyles.memberRow}>
+                <span style={scanStyles.memberRowLabel}>编号</span>
+                <span style={scanStyles.memberRowValue}>{scannedMember.memberNo}</span>
+              </div>
+              <div style={scanStyles.memberRow}>
+                <span style={scanStyles.memberRowLabel}>支部</span>
+                <span style={scanStyles.memberRowValue}>{scannedMember.branch}</span>
+              </div>
+              <div style={scanStyles.memberRow}>
+                <span style={scanStyles.memberRowLabel}>流入时间</span>
+                <span style={scanStyles.memberRowValue}>{scannedMember.inflowTime}</span>
+              </div>
+              <div style={scanStyles.memberRow}>
+                <span style={scanStyles.memberRowLabel}>教育程度</span>
+                <span style={scanStyles.memberRowValue}>{scannedMember.education}</span>
+              </div>
+              <div style={scanStyles.memberRow}>
+                <span style={scanStyles.memberRowLabel}>联系方式</span>
+                <span style={scanStyles.memberRowValue}>{scannedMember.phone}</span>
+              </div>
+              <div style={scanStyles.memberRow}>
+                <span style={scanStyles.memberRowLabel}>流出地党组织</span>
+                <span style={scanStyles.memberRowValue}>{scannedMember.outOrgName}</span>
+              </div>
+              <div style={scanStyles.memberRow}>
+                <span style={scanStyles.memberRowLabel}>流出地联系人</span>
+                <span style={scanStyles.memberRowValue}>{scannedMember.outOrgContact}</span>
+              </div>
+              <div style={scanStyles.memberRow}>
+                <span style={scanStyles.memberRowLabel}>身份核验</span>
+                <span style={scanStyles.memberRowValue}>✅ 已认证</span>
+              </div>
             </div>
 
             <div style={scanStyles.activitySelectLabel}>选择活动</div>
@@ -2233,6 +2581,8 @@ const AIProfileScreen = ({ nav }) => {
     return { ...p, label: d.label };
   });
 
+  const aiProfileAvatar = readProfileAvatarDataUrl('member');
+
   return (
     <div style={apStyles.container}>
       <NavBar title="AI智能画像" onBack={nav.goBack} />
@@ -2240,6 +2590,28 @@ const AIProfileScreen = ({ nav }) => {
         <p style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.55, marginBottom: 10 }}>
           党员端展示参与与自评维度（演示）。支部治理、按人检索及近 6 个月趋势维护见 PC「AI 画像管理」。
         </p>
+        <div
+          style={{
+            display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, padding: 12, background: T.surface, borderRadius: 12,
+            border: `1px solid ${T.border}`, boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => showNwAvatarLightbox({ imageSrc: aiProfileAvatar, letter: '张', caption: '张伟 · AI 画像档案照', hint: '与「我的」页头像同源（演示）' })}
+            style={{
+              width: 44, height: 44, borderRadius: '50%', border: 'none', padding: 0, overflow: 'hidden', cursor: 'pointer', flexShrink: 0,
+              background: aiProfileAvatar ? '#fff' : T.primaryLight, color: T.primary, fontSize: 18, fontWeight: 700, fontFamily: "'Noto Serif SC', serif",
+              display: 'flex', alignItems: 'center', justifyContent: 'center', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            {aiProfileAvatar ? <img src={aiProfileAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '张'}
+          </button>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.textPrimary, fontFamily: "'Noto Serif SC', serif" }}>张伟</div>
+            <div style={{ fontSize: 11, color: T.textMuted, marginTop: 2, lineHeight: 1.45 }}>点头像可放大查看；照片在「我的」页上传。</div>
+          </div>
+        </div>
         <div style={apStyles.scoreCard}>
           <div style={apStyles.scoreLabel}>综合评分</div>
           <div style={apStyles.scoreNum}>{totalScore}</div>
@@ -2811,7 +3183,7 @@ const LifeServicesScreen = ({ nav }) => {
         </button>
         <div style={lsStyles.tipCard}>
           <div style={lsStyles.tipTitle}>温馨提示</div>
-          <div style={lsStyles.tipText}>在微信内点击上述入口后，将先出现说明页，需再点「前往跳转」才会打开「i龙岗」小程序（符合从 H5 打开小程序的交互要求）。系统浏览器无法唤起小程序。紧急帮助：0755-28761234（工作日 8:30-17:30）。</div>
+          <div style={lsStyles.tipText}>在微信内点击上述入口后，先出现说明页：请优先点红色「前往跳转」（系统级链接）；若无反应，可用「复制短链」到聊天里打开，或点「备用打开」。若本页嵌在其它小程序 web-view 内，可能无法唤起，请用系统浏览器打开本 H5。紧急帮助：0755-28761234（工作日 8:30-17:30）。</div>
         </div>
       </div>
       <TabBar active="service" onSwitch={nav.switchTab} items={tabItems} />
@@ -2968,7 +3340,7 @@ const AdminStatsScreen = ({ nav }) => {
     dimLabel: { fontSize: 13, color: T.textSecondary },
     dimVal: { fontSize: 13, fontWeight: 600, color: T.textPrimary },
     memberItem: { display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: `1px solid ${T.border}` },
-    memberAvatar: { width: 36, height: 36, borderRadius: '50%', background: T.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: T.primary, fontWeight: 700, flexShrink: 0 },
+    memberAvatar: { width: 36, height: 36, borderRadius: '50%', background: T.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: T.primary, fontWeight: 700, flexShrink: 0, cursor: 'pointer', WebkitTapHighlightColor: 'transparent', border: 'none', padding: 0 },
     memberInfo: { flex: 1 },
     memberName: { fontSize: 13, fontWeight: 600, color: T.textPrimary },
     memberBranch: { fontSize: 11, color: T.textMuted },
@@ -2999,7 +3371,7 @@ const AdminStatsScreen = ({ nav }) => {
         <p style={{ fontSize: 11, color: T.textMuted, lineHeight: 1.5, marginBottom: 10 }}>以下为演示节选名单，人名与支部与 PC「活动签到管理」示例一致；完整名册以 PC 为准。</p>
         {members.map((m, i) => (
           <div key={i} style={stStyles.memberItem}>
-            <div style={stStyles.memberAvatar}>{m.name[0]}</div>
+            <button type="button" style={stStyles.memberAvatar} onClick={() => showNwAvatarLightbox({ letter: m.name[0], caption: m.name + ' · 扫码统计' })}>{m.name[0]}</button>
             <div style={stStyles.memberInfo}><div style={stStyles.memberName}>{m.name}</div><div style={stStyles.memberBranch}>{m.branch}</div></div>
             <div style={{ textAlign: 'right' }}><div style={stStyles.statusBadge(m.status)}>{m.status}</div><div style={{ fontSize: 10, color: T.textMuted, marginTop: 2 }}>{m.time}</div></div>
           </div>
@@ -3020,7 +3392,7 @@ const AdminMemberListScreen = ({ nav }) => {
     searchBar: { display: 'flex', alignItems: 'center', gap: 8, padding: '0 14px 10px', background: T.bg },
     searchInput: { flex: 1, padding: '10px 14px', border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, outline: 'none', background: T.surface },
     memberItem: { display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: `1px solid ${T.border}` },
-    memberAvatar: { width: 40, height: 40, borderRadius: '50%', background: T.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: T.primary, fontWeight: 700, flexShrink: 0 },
+    memberAvatar: { width: 40, height: 40, borderRadius: '50%', background: T.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: T.primary, fontWeight: 700, flexShrink: 0, cursor: 'pointer', WebkitTapHighlightColor: 'transparent', border: 'none', padding: 0 },
     memberInfo: { flex: 1 },
     memberName: { fontSize: 14, fontWeight: 600, color: T.textPrimary },
     memberBranch: { fontSize: 11, color: T.textMuted, marginTop: 2 },
@@ -3048,7 +3420,7 @@ const AdminMemberListScreen = ({ nav }) => {
       <div style={{ padding: '0 14px' }}>
         {filtered.map((m, i) => (
           <div key={i} style={mlStyles.memberItem}>
-            <div style={mlStyles.memberAvatar}>{m.name[0]}</div>
+            <button type="button" style={mlStyles.memberAvatar} onClick={() => showNwAvatarLightbox({ letter: m.name[0], caption: m.name + ' · ' + m.code })}>{m.name[0]}</button>
             <div style={mlStyles.memberInfo}><div style={mlStyles.memberName}>{m.name}</div><div style={mlStyles.memberBranch}>{m.branch} · {m.joinDate}</div></div>
             <div style={mlStyles.memberCode}>{m.code}</div>
           </div>
