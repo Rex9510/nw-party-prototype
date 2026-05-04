@@ -448,7 +448,7 @@ function showWeChatMiniProgramJumpModal(link, opts) {
   /** 微信更认可「用户手指点的带 href 的 <a>」唤起 #小程序://，仅用 button+JS 跳转易被拦截 */
   var goLink = document.createElement('a');
   goLink.href = link;
-  goLink.target = '_top';
+  /** 默认当前窗口跳转；避免 _top 在嵌套 WebView 里与弹层销毁时机叠加导致唤起失败 */
   goLink.rel = 'noopener noreferrer';
   goLink.textContent = '前往跳转';
   goLink.setAttribute('role', 'button');
@@ -458,9 +458,10 @@ function showWeChatMiniProgramJumpModal(link, opts) {
     '-webkit-tap-highlight-color:transparent';
 
   cancelBtn.onclick = function () { close(); };
-  goLink.addEventListener('click', function () {
-    setTimeout(close, 120);
-  });
+  /**
+   * 不在「前往跳转」后主动 close：此前 setTimeout(120ms) remove 整层遮罩，部分微信内核会在 #小程序://
+   * 导航尚未完成时取消唤起（弹窗消失、无反应）。成功打开小程序时页面会切换；未成功时用户可点取消或空白处关闭。
+   */
 
   var hint = document.createElement('div');
   hint.style.cssText = 'font-size:11px;color:#9CA3AF;margin-top:12px;line-height:1.5;word-break:break-all';
