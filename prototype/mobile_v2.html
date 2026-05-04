@@ -37,6 +37,44 @@ const T = {
 /** i龙岗 小程序短链：仅在微信内置浏览器（含 Windows 微信）中点击可唤起；普通浏览器无法直接打开小程序 */
 const NW_ILG_MINIPROGRAM_LINK_KEY = 'nw_ilg_miniprogram_shortlink_v1';
 const WX_MINIPROGRAM_ILG = '#小程序://i龙岗/wMeWysej0d7okgp';
+/** i龙岗 小程序 AppId（公开标识，与微信后台一致；AppSecret 仅放服务端环境变量，勿写进前端） */
+const WX_ILG_MINIPROGRAM_APPID = 'wx201f04ef8f8d6b7c';
+/**
+ * 明文 Scheme 默认落地 path（与 pc-admin 政务「i龙岗」演示配置一致）。须与 i龙岗 小程序线上包中真实页面一致，否则请改此常量或设 localStorage「nw_ilg_weapp_path_v1」覆盖。
+ */
+const WX_ILG_DEFAULT_PLAINTEXT_PATH = 'pages/i-longgang/index';
+
+/**
+ * 明文 URL Scheme：weixin://dl/business/?appid=…&path=…&query=…&env_version=…
+ * 须由 i龙岗 小程序在微信后台「设置 → 基本设置 → 隐私与安全」开启「明文 Scheme 拉起此小程序」。
+ * path：优先 localStorage「nw_ilg_weapp_path_v1」，否则用 WX_ILG_DEFAULT_PLAINTEXT_PATH；query：可选「nw_ilg_plaintext_query_v1」；环境：可选「nw_ilg_env_version_v1」为 release|trial|develop。
+ */
+function buildILongGangPlaintextBusinessScheme() {
+  var appid = typeof WX_ILG_MINIPROGRAM_APPID === 'string' ? WX_ILG_MINIPROGRAM_APPID.trim() : '';
+  if (!appid) return '';
+  var path = readILongGangWeappPath();
+  if (!path && typeof WX_ILG_DEFAULT_PLAINTEXT_PATH === 'string' && WX_ILG_DEFAULT_PLAINTEXT_PATH.trim()) {
+    path = WX_ILG_DEFAULT_PLAINTEXT_PATH.trim();
+  }
+  var query = '';
+  try {
+    var rq = localStorage.getItem('nw_ilg_plaintext_query_v1');
+    if (rq != null && String(rq).trim()) query = String(rq).trim();
+  } catch (eq) {}
+  var env = 'release';
+  try {
+    var ev = localStorage.getItem('nw_ilg_env_version_v1');
+    var evs = ev != null ? String(ev).trim().toLowerCase() : '';
+    if (evs === 'trial' || evs === 'develop' || evs === 'release') env = evs;
+  } catch (ee) {}
+  var parts = [];
+  parts.push('appid=' + encodeURIComponent(appid));
+  if (path) parts.push('path=' + encodeURIComponent(path));
+  if (query) parts.push('query=' + encodeURIComponent(query));
+  parts.push('env_version=' + encodeURIComponent(env));
+  return 'weixin://dl/business/?' + parts.join('&');
+}
+
 const AUDIT_RECORDS_STORAGE_KEY = 'nw_archive_audit_records_v1';
 
 function readILongGangMiniProgramShortLink() {
@@ -49,9 +87,9 @@ function readILongGangMiniProgramShortLink() {
 }
 
 /**
- * 方案二：站外唤起微信打开小程序（URL Scheme / URL Link），须由微信开放平台接口生成。
- * 无后端时：可在微信后台生成临时链接后写入 localStorage「nw_ilg_url_scheme_static_v1」做演示（注意有效期）。
- * 有后端后：配置 GET「nw_ilg_url_scheme_api_v1」或 window.__NW_WX_URL_SCHEME_API__，返回 JSON 含 url_scheme / openlink 等字段。
+ * 方案二（补充）：站外唤起仍可用接口返回的 URL Scheme / URL Link（generatescheme 等），或本地静态链。
+ * 无后端时：可将微信后台生成的临时链写入 localStorage「nw_ilg_url_scheme_static_v1」做演示（注意有效期）。
+ * i龙岗 默认已改为明文 weixin://dl/business/?appid=…（见 buildILongGangPlaintextBusinessScheme），一般不再依赖本段接口。
  */
 const NW_ILG_URL_SCHEME_STATIC_KEY = 'nw_ilg_url_scheme_static_v1';
 const NW_ILG_URL_SCHEME_API_KEY = 'nw_ilg_url_scheme_api_v1';
@@ -68,10 +106,20 @@ function getWeChatUrlSchemeApiUrl() {
 }
 
 /**
- * 服务 Tab（i龙岗等）专用：调后端 GET /api/wechat/url-scheme 走微信 generatescheme（方式二）。
- * 优先级：__NW_SERVICE_SCHEME_API__ → localStorage nw_service_scheme_api_v1 → 通用 nw_ilg_url_scheme_api_v1 → 同源默认路径。
+ * 服务 Tab：可选调后端 GET 走微信 generatescheme（需 AppSecret）。默认关闭，仅当
+ * window.__NW_ILG_USE_GENERATESCHEME_API__ === true 或 localStorage「nw_ilg_use_scheme_api_v1」为 1/true 时启用。
+ * 优先级：__NW_SERVICE_SCHEME_API__ → nw_service_scheme_api_v1 → nw_ilg_url_scheme_api_v1 → 同源 /api/wechat/url-scheme。
  */
 const NW_SERVICE_SCHEME_API_KEY = 'nw_service_scheme_api_v1';
+
+function shouldUseGenerateschemeApiForILongGang() {
+  try {
+    if (window.__NW_ILG_USE_GENERATESCHEME_API__ === true) return true;
+    var v = localStorage.getItem('nw_ilg_use_scheme_api_v1');
+    if (v === '1' || v === 'true') return true;
+  } catch (eApi0) {}
+  return false;
+}
 
 function getServiceMiniProgramSchemeApiUrl() {
   try {
@@ -225,6 +273,8 @@ function openWechatMpShortLinkFromExternalBrowser(shortLink, opts) {
 }
 
 function openILongGangMiniprogramExternal(shortLink) {
+  var plain = buildILongGangPlaintextBusinessScheme();
+  if (plain && tryNavigateWechatExternalOpen(plain)) return;
   openWechatMpShortLinkFromExternalBrowser(shortLink, { appLabel: 'i龙岗', useStaticSchemeFallback: true });
 }
 
@@ -544,23 +594,27 @@ function openILongGangMiniprogramFallback(link) {
   openILongGangMiniprogramExternal(link);
 }
 
-/** 服务页入口：优先请求后端「方式二」URL Scheme；失败则回退短链 / 弹层 */
+/** 服务页入口：优先明文 weixin://dl/business/?appid=…（仅需小程序侧开启明文 Scheme）；可选再走 generatescheme 接口；最后短链 / 弹层 */
 function openILongGangMiniprogram() {
   var link = readILongGangMiniProgramShortLink();
-  var api = getServiceMiniProgramSchemeApiUrl();
-  if (!api) {
-    openILongGangMiniprogramFallback(link);
-    return;
-  }
-  fetchNwUrlSchemeService('ilonggang', link).then(function (scheme) {
-    if (scheme) {
-      try {
-        window.location.href = scheme;
-        return;
-      } catch (eGo) {}
+  var plain = buildILongGangPlaintextBusinessScheme();
+  if (plain && tryNavigateWechatExternalOpen(plain)) return;
+  if (shouldUseGenerateschemeApiForILongGang()) {
+    var api = getServiceMiniProgramSchemeApiUrl();
+    if (api) {
+      fetchNwUrlSchemeService('ilonggang', link).then(function (scheme) {
+        if (scheme) {
+          try {
+            window.location.href = scheme;
+            return;
+          } catch (eGo) {}
+        }
+        openILongGangMiniprogramFallback(link);
+      });
+      return;
     }
-    openILongGangMiniprogramFallback(link);
-  });
+  }
+  openILongGangMiniprogramFallback(link);
 }
 
 var NW_MEMBER_PROFILE_AVATAR_KEY = 'nw_member_profile_avatar_dataurl_v1';
@@ -3603,13 +3657,12 @@ const LifeServicesScreen = ({ nav }) => {
             }
           }}
         >
-          纯链接唤起：i龙岗（微信内点本行直达；站外会先尝试方案二再提示）
+          纯链接唤起：i龙岗（微信内点本行直达；站外优先明文 Scheme）
         </a>
         <div style={lsStyles.tipCard}>
           <div style={lsStyles.tipTitle}>温馨提示</div>
           <div style={lsStyles.tipText}>
-            本页为普通 H5（非必须嵌小程序 web-view）。服务页打开「i龙岗」等：默认会请求同源 GET「/api/wechat/url-scheme?target=ilonggang」（由仓库内 python start-servers.py 提供，见 server/env.example.txt 配置 WECHAT_MINI_APPID/SECRET 调微信
-            wxa/generatescheme）；成功则跳转 weixin:// 打开链，失败再回退 #小程序:// 弹层或短链。也可单独配置 localStorage「nw_service_scheme_api_v1」或 window.__NW_SERVICE_SCHEME_API__ 指向其它域名后端。演示仍可用「nw_ilg_url_scheme_static_v1」静态链。方案一（开放标签）见「nw_ilg_weapp_username_v1」与「nw_wx_js_config_url_v1」。若嵌在其它小程序 web-view 内，唤起常受限。紧急帮助：0755-28761234（工作日 8:30-17:30）。
+            服务页打开「i龙岗」：默认使用明文 URL Scheme「weixin://dl/business/?appid=…」（与常量 WX_ILG_MINIPROGRAM_APPID 一致），须由小程序在微信后台开启「明文 Scheme 拉起此小程序」。可选 localStorage「nw_ilg_weapp_path_v1」指定落地 path、「nw_ilg_plaintext_query_v1」传 query、「nw_ilg_env_version_v1」为 release/trial/develop。若仍需服务端 generatescheme，请设 localStorage「nw_ilg_use_scheme_api_v1」=1 或 window.__NW_ILG_USE_GENERATESCHEME_API__=true，并配置「nw_service_scheme_api_v1」等同源/跨域接口。微信内失败时回退 #小程序:// 弹层或短链。方案一（开放标签）见「nw_ilg_weapp_username_v1」与「nw_wx_js_config_url_v1」。若嵌在其它小程序 web-view 内，唤起常受限。紧急帮助：0755-28761234（工作日 8:30-17:30）。
           </div>
         </div>
       </div>

@@ -2,13 +2,17 @@
 微信小程序「方式二」URL Scheme：服务端调用 wxa/generatescheme。
 文档：https://developers.weixin.qq.com/miniprogram/dev/OpenApiDoc/qrcode-link/url-scheme/url-scheme/api_generatescheme.html
 
-环境变量（必填才能真实出链）：
-  WECHAT_MINI_APPID / WECHAT_MINI_SECRET  — 须为「要拉起的小程序」的 AppID 与 AppSecret（第三方小程序需对方提供或同主体能力）。
+环境变量（必填 Secret 才能真实出链；i龙岗 AppId 默认见下方常量）：
+  target=ilonggang：优先 WECHAT_ILG_APPID + WECHAT_ILG_SECRET，否则 WECHAT_MINI_APPID + WECHAT_MINI_SECRET；
+  若未配置 AppId 则 i龙岗 使用内置公开 AppId wx201f04ef8f8d6b7c（须与微信后台一致）。
+  其它 target：使用 WECHAT_MINI_APPID / WECHAT_MINI_SECRET。
 可选：
   WECHAT_SCHEME_PATH / WECHAT_SCHEME_QUERY — 打开后落地路径与 query（如 pages/index/index）。
   WECHAT_ILG_SCHEME_PATH / WECHAT_ILG_SCHEME_QUERY — target=ilonggang 时优先于上面两项。
   WECHAT_SCHEME_EXPIRE_DAYS — 过期天数 1–30，默认 30。
 """
+
+from __future__ import annotations
 
 import json
 import os
@@ -17,17 +21,19 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-_TOKEN_CACHE: dict = {"token": "", "exp": 0.0}
+# i龙岗小程序 AppId（公开，与产品配置一致）
+DEFAULT_ILONGGANG_APPID = "wx201f04ef8f8d6b7c"
+
+_TOKEN_CACHE: dict = {}
 
 
-def _get_access_token():
-    appid = os.environ.get("WECHAT_MINI_APPID", "").strip()
-    secret = os.environ.get("WECHAT_MINI_SECRET", "").strip()
+def _get_access_token(appid: str, secret: str):
     if not appid or not secret:
-        return None, "missing_env_WECHAT_MINI_APPID_or_WECHAT_MINI_SECRET"
+        return None, "missing_appid_or_secret"
     now = time.time()
-    tok = _TOKEN_CACHE.get("token") or ""
-    exp = float(_TOKEN_CACHE.get("exp") or 0)
+    slot = _TOKEN_CACHE.get(appid) or {}
+    tok = slot.get("token") or ""
+    exp = float(slot.get("exp") or 0)
     if tok and exp > now + 120:
         return tok, None
     q = urllib.parse.urlencode(
@@ -44,9 +50,29 @@ def _get_access_token():
     access = data.get("access_token")
     if not access:
         return None, "no_access_token_in_response"
-    _TOKEN_CACHE["token"] = access
-    _TOKEN_CACHE["exp"] = now + float(data.get("expires_in") or 7200)
+    _TOKEN_CACHE[appid] = {
+        "token": access,
+        "exp": now + float(data.get("expires_in") or 7200),
+    }
     return access, None
+
+
+def _credentials_for_target(target: str) -> tuple[str, str]:
+    t = (target or "").strip()
+    if t == "ilonggang":
+        appid = (
+            os.environ.get("WECHAT_ILG_APPID", "").strip()
+            or os.environ.get("WECHAT_MINI_APPID", "").strip()
+            or DEFAULT_ILONGGANG_APPID
+        )
+        secret = (
+            os.environ.get("WECHAT_ILG_SECRET", "").strip()
+            or os.environ.get("WECHAT_MINI_SECRET", "").strip()
+        )
+    else:
+        appid = os.environ.get("WECHAT_MINI_APPID", "").strip()
+        secret = os.environ.get("WECHAT_MINI_SECRET", "").strip()
+    return appid, secret
 
 
 def _scheme_body_for_target(target: str) -> dict:
@@ -75,9 +101,18 @@ def generate_url_scheme_for_target(target: str) -> dict:
       失败: { "ok": False, "errcode": int|str, "errmsg": str }
     """
     target = (target or "ilonggang").strip() or "ilonggang"
-    token, terr = _get_access_token()
+    appid, secret = _credentials_for_target(target)
+    token, terr = _get_access_token(appid, secret)
     if not token:
-        return {"ok": False, "errcode": -1, "errmsg": terr or "token_error"}
+        msg = terr or "token_error"
+        if not secret and target == "ilonggang":
+            msg = (
+                msg
+                + "（i龙岗需配置 WECHAT_ILG_SECRET 或 WECHAT_MINI_SECRET；AppId 已默认 "
+                + DEFAULT_ILONGGANG_APPID
+                + "）"
+            )
+        return {"ok": False, "errcode": -1, "errmsg": msg}
 
     body = _scheme_body_for_target(target)
     api = "https://api.weixin.qq.com/wxa/generatescheme?access_token=" + urllib.parse.quote(token, safe="")
