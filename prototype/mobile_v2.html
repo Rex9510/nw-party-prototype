@@ -34,20 +34,51 @@ const T = {
   cardRadius: 14, gridGap: 12, btnPadV: 12, btnPadH: 20
 };
 
-/** i龙岗：仅使用微信「明文 URL Scheme」weixin://dl/business/?appid=…&path=…（须对方开启明文拉起） */
+/**
+ * i龙岗：明文 URL Scheme weixin://dl/business/?appid=&path=&env_version=release
+ * 须 MP 后台开启「明文 Scheme 拉起」；path 须与已发布包一致，否则会提示「当前页面无法访问」。
+ * 真机核对 path：localStorage.setItem('nw_ilg_scheme_path_override_v1','你的path') 后刷新，会覆盖所有小程序入口使用的 path（仅调试用）。
+ * 微信内 H5：官方文档推荐 wx-open-launch-weapp；明文 Scheme 在部分微信版本/场景下可能不稳定。
+ */
 const WX_ILG_MINIPROGRAM_APPID = 'wx201f04ef8f8d6b7c';
 const WX_ILG_HOME_PATH = 'pages/homenew/uptodateindex';
 const WX_ILG_PATH_SHARESPACE = 'pages/sharespace/index';
 const WX_ILG_PATH_HEALTH = 'pages/lvSide/healthy/index';
+const NW_ILG_SCHEME_PATH_OVERRIDE_KEY = 'nw_ilg_scheme_path_override_v1';
 const NW_ILG_H5_READ_URL = 'https://tsg.lggov.cn/ilg/#/search';
 const NW_ILG_H5_SPORT_URL = 'https://ilg.ydmap.cn/access/ilg';
 const AUDIT_RECORDS_STORAGE_KEY = 'nw_archive_audit_records_v1';
 
+function readILongGangSchemePathOverride() {
+  try {
+    var v = localStorage.getItem(NW_ILG_SCHEME_PATH_OVERRIDE_KEY);
+    if (v != null && String(v).trim()) return String(v).trim();
+  } catch (e0) {}
+  return '';
+}
+
+function resolveILongGangPlaintextPath(requestedPath) {
+  var o = readILongGangSchemePathOverride();
+  return o || (requestedPath != null ? String(requestedPath).trim() : '');
+}
+
+/** 明文 Scheme：appid + path + env_version（与微信文档一致；env 在微信外打开时生效） */
 function buildWxMiniProgramPlaintextScheme(appid, path) {
   var aid = appid != null ? String(appid).trim() : '';
   var p = path != null ? String(path).trim() : '';
   if (!aid || !p) return '';
-  return 'weixin://dl/business/?appid=' + encodeURIComponent(aid) + '&path=' + encodeURIComponent(p);
+  return (
+    'weixin://dl/business/?appid=' +
+    encodeURIComponent(aid) +
+    '&path=' +
+    encodeURIComponent(p) +
+    '&env_version=' +
+    encodeURIComponent('release')
+  );
+}
+
+function isWeChatInAppBrowser() {
+  return /micromessenger/i.test(String(navigator.userAgent || ''));
 }
 
 function handleLifeServiceEntryClick(block) {
@@ -71,21 +102,33 @@ function isWechatExternalOpenLink(s) {
 
 function tryNavigateWechatExternalOpen(s) {
   if (!isWechatExternalOpenLink(s)) return false;
+  var u = String(s).trim();
   try {
-    window.location.href = String(s).trim();
+    window.location.href = u;
     return true;
-  } catch (eNav) {
-    return false;
-  }
+  } catch (eNav) {}
+  try {
+    if (window.top && window.top !== window) {
+      window.top.location.href = u;
+      return true;
+    }
+  } catch (eTop) {}
+  return false;
 }
 
-/** 打开 i龙岗指定原生页：仅明文 appid+path；失败时提示 */
+/** 打开 i龙岗指定原生页：明文 Scheme（含 env_version=release） */
 function openILongGangMiniProgramAtPath(mpPath) {
-  var plain = buildWxMiniProgramPlaintextScheme(WX_ILG_MINIPROGRAM_APPID, mpPath);
-  if (plain && tryNavigateWechatExternalOpen(plain)) return;
-  window.alert(
-    '无法拉起 i龙岗：请使用【微信】打开本页；并确认小程序已在后台开启「明文 Scheme 拉起此小程序」。\n若当前在微信小程序 web-view 内，从 H5 唤起其它小程序可能被平台限制。'
-  );
+  var pathForScheme = resolveILongGangPlaintextPath(mpPath);
+  if (!pathForScheme) {
+    window.alert('小程序 path 为空，无法拼接打开链。');
+    return;
+  }
+  var plain = buildWxMiniProgramPlaintextScheme(WX_ILG_MINIPROGRAM_APPID, pathForScheme);
+  if (!plain) {
+    window.alert('无法生成打开链（请检查 AppId 与 path）。');
+    return;
+  }
+  tryNavigateWechatExternalOpen(plain);
 }
 
 /** 服务页打开 i龙岗首页 */
@@ -3012,7 +3055,9 @@ const LifeServicesScreen = ({ nav }) => {
         </button>
         <button type="button" style={lsStyles.wxCta} onClick={openILongGangMiniprogram}>
           打开「i龙岗」微信小程序
-          <span style={lsStyles.wxCtaSub}>政务办事与更多便民入口（请在微信内使用）。服务咨询：0755-28761234（工作日 8:30–17:30）</span>
+          <span style={lsStyles.wxCtaSub}>
+            政务办事与更多便民入口（请在微信内使用）。若提示「当前页面无法访问」：核对 path 是否与 i龙岗 正式版一致、是否已开启「明文 Scheme 拉起」。咨询：0755-28761234（工作日 8:30–17:30）
+          </span>
         </button>
       </div>
 
