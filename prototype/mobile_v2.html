@@ -3150,8 +3150,11 @@ const LifeServicesScreen = ({ nav }) => {
       background: 'linear-gradient(180deg, #FFFFFF 0%, #FAFAF8 100%)', color: T.textPrimary, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: "'Noto Serif SC', serif",
       boxShadow: '0 2px 12px rgba(26,26,26,0.05)', textAlign: 'left', WebkitTapHighlightColor: 'transparent',
     },
-    wxCtaSub: { fontSize: 10, fontWeight: 400, color: T.textMuted, marginTop: 4, display: 'block' }
+    wxCtaSub: { fontSize: 10, fontWeight: 400, color: T.textMuted, marginTop: 4, display: 'block' },
+    wxAnchor: { display: 'block', marginTop: 10, fontSize: 12, fontWeight: 600, color: T.primary, textAlign: 'center', textDecoration: 'underline', textUnderlineOffset: 3, WebkitTapHighlightColor: 'transparent' }
   };
+
+  const ilgShortLink = readILongGangMiniProgramShortLink();
 
   return (
     <div style={lsStyles.container}>
@@ -3181,11 +3184,31 @@ const LifeServicesScreen = ({ nav }) => {
           打开「i龙岗」微信小程序
           <span style={lsStyles.wxCtaSub}>政务办事与更多便民入口（请在微信内使用）</span>
         </button>
+        <a
+          href={ilgShortLink}
+          target="_top"
+          rel="noopener noreferrer"
+          style={lsStyles.wxAnchor}
+          onClick={(e) => {
+            if (isInsideWeChatMiniProgramWebView()) {
+              e.preventDefault();
+              openILongGangMiniprogram();
+              return;
+            }
+            if (!isWeChatInAppBrowser()) {
+              e.preventDefault();
+              openILongGangMiniprogram();
+            }
+          }}
+        >
+          纯链接唤起：i龙岗（微信内点本行直达；其它环境点开会提示）
+        </a>
         <div style={lsStyles.tipCard}>
           <div style={lsStyles.tipTitle}>温馨提示</div>
-          <div style={lsStyles.tipText}>在微信内点击上述入口后，先出现说明页：请优先点红色「前往跳转」（系统级链接）；若无反应，可用「复制短链」到聊天里打开，或点「备用打开」。若本页嵌在其它小程序 web-view 内，可能无法唤起，请用系统浏览器打开本 H5。紧急帮助：0755-28761234（工作日 8:30-17:30）。</div>
+          <div style={lsStyles.tipText}>本页为普通 H5（非必须嵌小程序 web-view）。在手机微信内：可先点上方大按钮（带确认弹层），也可点「纯链接唤起」由系统直接处理短链。在其它浏览器中无法直接打开小程序，请按提示复制短链到微信。若本页嵌在其它小程序 web-view 内，唤起常受限，请用「在浏览器打开」或复制短链。紧急帮助：0755-28761234（工作日 8:30-17:30）。</div>
         </div>
       </div>
+
       <TabBar active="service" onSwitch={nav.switchTab} items={tabItems} />
     </div>
   );
