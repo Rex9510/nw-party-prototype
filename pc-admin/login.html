@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>登录 · 南湾红帆 PC管理端</title>
+  <title>登录 · 南湾党建 PC管理端</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -21,6 +21,7 @@
       width:min(420px,100%);background:#fff;border-radius:16px;padding:36px 32px;
       box-shadow:0 12px 40px rgba(0,0,0,0.08);border:1px solid #E8E5E0;
     }
+    .brand-logo{display:block;width:72px;height:auto;max-height:72px;margin:0 auto 12px;object-fit:contain}
     h1{font-family:'Noto Serif SC',serif;font-size:22px;font-weight:700;text-align:center;margin-bottom:6px}
     .sub{font-size:13px;color:#9CA3AF;text-align:center;margin-bottom:18px;line-height:1.55}
     .tabs{display:flex;gap:0;margin-bottom:18px;border-radius:10px;overflow:hidden;border:1px solid #E8E5E0}
@@ -50,7 +51,8 @@
 </head>
 <body>
   <div class="card">
-    <h1>南湾红帆</h1>
+    <img class="brand-logo" src="../assets/nanwan-dangjian-logo.png" width="144" height="144" alt="南湾党建" />
+    <h1>南湾党建</h1>
     <p class="sub">PC 管理端登录 · 账号为党员档案中的<strong style="color:#6B7280">手机号码</strong>；人员仅在「党员管理」中新增或导入后开通</p>
     <div class="tabs" role="tablist">
       <button type="button" class="on" id="tabPwd" aria-selected="true">密码登录</button>
@@ -78,6 +80,9 @@
 
       <button type="submit">登录</button>
       <p id="err" class="err" aria-live="polite"></p>
+      <p class="hint" style="margin-top:14px;text-align:center;line-height:1.65">
+        登录后在侧栏进入「<strong>办公助手</strong>」：可配置 <strong>公文写作</strong> 模板（同步小程序列表），以及 <strong>PPT 制作</strong> 与 <strong>表格制作</strong>（大屏编辑）。
+      </p>
     </form>
   </div>
   <script>
@@ -90,7 +95,7 @@
         }
       }
       function smsText(phone, pwd) {
-        var branding = '南湾红帆';
+        var branding = '南湾党建';
         return '你的' + branding + '账号已注册，账号：' + phone + '，密码：' + pwd + '，请登录PC后自行修改，PC登录链接' + pcLoginUrl();
       }
       var smsEl = document.getElementById('smsText');

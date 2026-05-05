@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>南湾红帆 · 智慧党建平台</title>
+<title>南湾党建 · 智慧党建平台</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -15,6 +15,13 @@
 html,body,#root{min-height:100%;min-height:100dvh;height:100%;width:100%}
 body{margin:0;background:#FAF8F5;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+@keyframes mmWaveBar{0%,100%{transform:scaleY(0.22)}50%{transform:scaleY(1)}}
+.mm-live-bar{transform-origin:center bottom;animation:mmWaveBar 0.52s ease-in-out infinite;width:4px;height:32px;border-radius:99px;background:linear-gradient(180deg,#DDD6FE,#4F46E5);align-self:flex-end}
+@keyframes mmRecRing{0%{transform:scale(0.92);opacity:.55}100%{transform:scale(1.42);opacity:0}}
+.mm-live-ring{position:absolute;inset:-10px;border-radius:9999px;border:2px solid rgba(99,102,241,.5);pointer-events:none;animation:mmRecRing 1.75s ease-out infinite}
+.mm-live-ring2{animation-delay:.85s;border-color:rgba(124,58,237,.35)}
+@keyframes hwSpin{to{transform:rotate(360deg)}}
+.hw-spin{width:42px;height:42px;border-radius:50%;border:3px solid rgba(180,83,9,0.18);border-top-color:#D97706;animation:hwSpin 0.72s linear infinite}
 </style>
 </head>
 <body>
@@ -23,7 +30,7 @@ body{margin:0;background:#FAF8F5;font-family:-apple-system,BlinkMacSystemFont,"S
 // ============================================
 // Design Tokens
 // ============================================
-/** 主 Tab 底部固定栏占位（与 TabBar minHeight + safe-area 对齐，避免内容被遮挡） */
+/** 底栏 Tab 占位（首页 / 学习 / 服务 / 我的；与 TabBar minHeight + safe-area 对齐） */
 const NW_TAB_SCROLL_BOTTOM_PAD = 'calc(72px + env(safe-area-inset-bottom, 0px))';
 
 const T = {
@@ -33,6 +40,9 @@ const T = {
   cardPadding: 14, sectionGap: 12, navHeight: 44, tabBarHeight: 56,
   cardRadius: 14, gridGap: 12, btnPadV: 12, btnPadH: 20
 };
+
+const NW_BRAND_LOGO_SRC = '../assets/nanwan-dangjian-logo.png';
+const NW_BRAND_NAME = '南湾党建';
 
 /**
  * i龙岗：明文 URL Scheme weixin://dl/business/?appid=&path=&env_version=release
@@ -337,7 +347,7 @@ function nwLearningRuntimeDefaults() {
       '深圳智慧党建': 'https://mp.weixin.qq.com/s/ZC1ovvIR68a7ZwyIWb9vGg',
     },
     liveSessions: [s0, s1],
-    /** 党务智能问答 / 底部「AI问答」Tab：默认 DinTal 客服 H5；PC「学习外链配置」可改为其它 https（#小程序:// 已不再支持，请改 https） */
+    /** 智能问答 H5：默认 DinTal；首页「办公助手 → 智能问答」跳转；PC「学习外链配置」可改为其它 https */
     shenXiaoFuMiniLink: 'https://apps.jinrirencai.com/vision-chat/index.html#/chat/ff908081965601960191460192688000',
   };
 }
@@ -377,7 +387,7 @@ function readLearningRuntime() {
   }
 }
 
-/** 底部「AI问答」与 DinTal 打开：优先 PC/本地配置的 https 智能问答链接，否则用内置默认 */
+/** 智能问答：优先 PC/本地配置的 https 链接，否则用内置默认（办公助手九宫格入口） */
 function getAiQaExternalH5Url() {
   var link = (readLearningRuntime().shenXiaoFuMiniLink || '').trim();
   if (/^https?:\/\//i.test(link)) return link;
@@ -427,7 +437,203 @@ function openExternalOrMiniProgramLink(url, titleForAlert) {
   }
 }
 
-// 学习资源外链 / 多场直播 / 党务智能问答链接：默认值见 nwLearningRuntimeDefaults()；由 PC「学习 → 学习外链配置 / 直播管理」写入 localStorage 覆盖
+// 学习资源外链 / 多场直播 / 智能问答链接：默认值见 nwLearningRuntimeDefaults()；由 PC「学习 → 学习外链配置 / 直播管理」写入 localStorage 覆盖
+
+const NW_PAST_COURSE_CAT_KEY = 'nw_past_course_cat_v1';
+/** 与 PC「课程与往期」同源：发布后小程序「往期课程」可查阅 */
+const NW_PUBLISHED_COURSES_KEY = 'nw_published_courses_v1';
+const NW_COURSE_DETAIL_KEY = 'nw_course_detail_v1';
+
+function nwReadPublishedCoursesRaw() {
+  try {
+    const raw = localStorage.getItem(NW_PUBLISHED_COURSES_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+const NW_OFFICE_TOOL_ID_KEY = 'nw_office_tool_id_v1';
+/** 公文写作模板列表：与 PC「办公助手 → 公文写作」共用 localStorage 键 */
+const NW_OFFICE_DOC_TEMPLATES_KEY = 'nw_office_doc_templates_v1';
+const NW_OFFICE_DOC_TEMPLATES_BC = 'nw-office-doc-templates';
+
+function nwOfficeDocTemplatesDefault() {
+  return [
+    {
+      id: 'tpl_notice', name: '通知', desc: '会议、事项、任免等告知性文书',
+      body: '【发文机关全称】（章）\n【成文日期】\n\n关于召开【会议名称】的通知\n\n【主送机关或范围】：\n\n根据【政策依据或工作背景】，定于【会议日期】【会议时段】在【会议地点】召开【会议名称】，请【参会人员要求】准时参加。\n\n联系人：【姓名】　电话：【手机或座机】\n\n特此通知。',
+    },
+    {
+      id: 'tpl_circular', name: '通报', desc: '表扬或批评典型事例',
+      body: '【发文机关全称】\n【成文日期】\n\n关于【通报事由】的通报\n\n【主送范围】：\n\n【事件经过与调查核实情况概述】。根据【制度依据】，经研究，决定【处理意见或表扬决定】。\n\n望【对象】引以为戒（或：望全体学习先进）。\n\n【发文机关】（章）',
+    },
+    {
+      id: 'tpl_report', name: '报告', desc: '向上级汇报工作、反映情况',
+      body: '【发文机关全称】\n【成文日期】\n\n关于【报告主题】的报告\n\n【上级机关全称】：\n\n一、工作进展情况\n【阶段成效与数据】\n\n二、存在问题与原因分析\n【问题描述】\n\n三、下一步工作打算\n【措施与时限】\n\n专此报告，请审阅。',
+    },
+    {
+      id: 'tpl_minutes', name: '纪要', desc: '支委会、办公会等会议记录',
+      body: '【会议名称】纪要\n\n时间：【年月日时段】\n地点：【会议室名称】\n主持人：【职务姓名】\n出席：【名单】\n列席：【名单】\n缺席：【名单及原因】\n\n会议内容：\n一、【议题一】：【讨论要点与议定事项】\n二、【议题二】：【讨论要点与议定事项】\n\n会议要求：【落实责任与时限】\n记录人：【姓名】',
+    },
+    {
+      id: 'tpl_request', name: '请示', desc: '请求指示或批准',
+      body: '【发文机关全称】\n【成文日期】\n\n关于【请示事项】的请示\n\n【上级机关全称】：\n\n【请示缘由与必要性】。\n\n拟采取【方案或措施】，需请贵单位【批示事项：如批准/明确口径/协调资源】。\n\n妥否，请批示。\n\n附件：【附件名称列表】',
+    },
+    {
+      id: 'tpl_reply', name: '批复', desc: '答复下级请示',
+      body: '【发文机关全称】\n【成文日期】\n\n关于【请示标题摘引】的批复\n\n【请示单位全称】：\n\n你单位《【请示文件名】》（【文号】）收悉。经研究，批复如下：\n\n一、【批复意见一】\n二、【批复意见二】\n\n此复。\n\n【发文机关】（章）',
+    },
+    {
+      id: 'tpl_letter', name: '函', desc: '平行或不相隶属单位间商洽工作',
+      body: '【发文机关全称】\n【成文日期】\n\n关于【商洽事项】的函\n\n【主送机关全称】：\n\n【发函缘由】。现就【具体事项】函告如下：\n\n一、【事项说明】\n二、【请求配合或反馈时限】\n\n特此函达，请予支持为盼。\n\n【发文机关】（章）',
+    },
+    {
+      id: 'tpl_decision', name: '决定', desc: '对重要事项作出决策和部署',
+      body: '【发文机关全称】\n【成文日期】\n\n关于【决定事项】的决定\n\n【主送范围】：\n\n为【目的依据】，经研究，决定如下：\n\n一、【决定条款一】\n二、【决定条款二】\n\n本决定自【施行日期】起执行。\n\n【发文机关】（章）',
+    },
+    {
+      id: 'tpl_order', name: '命令（令）', desc: '公布行政法规或嘉奖有关人员',
+      body: '【机关全称】令\n第【序号】号\n\n【命令依据】。现命令：\n\n【命令具体内容】。\n\n【机关首长职务姓名】\n【成文日期】',
+    },
+    {
+      id: 'tpl_opinion', name: '意见', desc: '对重要问题提出见解和处理办法',
+      body: '【发文机关全称】\n【成文日期】\n\n关于【工作主题】的实施意见\n\n【主送范围】：\n\n为【指导思想与目标】，提出如下意见：\n\n一、总体要求\n【原则与指标】\n二、重点任务\n【分工与措施】\n三、保障机制\n【督查与考核】\n\n请结合实际认真贯彻执行。\n\n【发文机关】（章）',
+    },
+  ];
+}
+
+function nwOfficeDocNormalizeItem(t, i) {
+  const id = t && t.id ? String(t.id) : 'tpl_' + String(i + 1);
+  const name = t && t.name ? String(t.name).trim() : '未命名模板';
+  const desc = t && t.desc != null ? String(t.desc) : '';
+  const body = t && t.body != null ? String(t.body) : '';
+  return { id, name, desc, body };
+}
+
+function readNwOfficeDocTemplates() {
+  const defList = nwOfficeDocTemplatesDefault();
+  const defById = new Map(defList.map((d) => [d.id, d]));
+  try {
+    const raw = localStorage.getItem(NW_OFFICE_DOC_TEMPLATES_KEY);
+    if (!raw) return defList;
+    const p = JSON.parse(raw);
+    if (!Array.isArray(p) || p.length === 0) return defList;
+    return p.map((t, idx) => {
+      const n = nwOfficeDocNormalizeItem(t, idx);
+      const fb = defById.get(n.id);
+      if ((!n.body || !String(n.body).trim()) && fb && fb.body) return { ...n, body: fb.body };
+      if (!n.body || !String(n.body).trim()) {
+        return { ...n, body: `【${n.name}】\n\n请将【关键要素一】【关键要素二】等替换为实际内容后提交生成。\n\n【发文机关】\n【日期】` };
+      }
+      return n;
+    });
+  } catch (e) {
+    return defList;
+  }
+}
+
+function writeNwOfficeDocTemplates(arr) {
+  const clean = (Array.isArray(arr) ? arr : []).map(nwOfficeDocNormalizeItem);
+  try {
+    localStorage.setItem(NW_OFFICE_DOC_TEMPLATES_KEY, JSON.stringify(clean));
+  } catch (e) {}
+  try {
+    if (typeof BroadcastChannel !== 'undefined') {
+      const bc = new BroadcastChannel(NW_OFFICE_DOC_TEMPLATES_BC);
+      bc.postMessage({ t: 'doc_templates' });
+      bc.close();
+    }
+  } catch (e2) {}
+  try {
+    window.dispatchEvent(new Event('nw-office-doc-templates-changed'));
+  } catch (e3) {}
+}
+
+/** 会议通知模板：与 PC「办公助手 → 会议通知模板」共用 localStorage 键 */
+const NW_MEETING_NOTICE_TEMPLATES_KEY = 'nw_meeting_notice_templates_v1';
+const NW_MEETING_NOTICE_TEMPLATES_BC = 'nw-meeting-notice-templates';
+
+function nwMeetingNoticeTemplatesDefault() {
+  return [
+    {
+      id: 'mnt_branch_general',
+      name: '支部党员大会会议通知',
+      desc: '传达学习、审议表决、换届推荐等',
+      body: '【发文单位】\n【成文日期】\n\n关于召开【会议名称】的通知\n\n各位党员：\n根据【制度依据或工作安排】，定于【会议日期】【会议时间】在【会议地点】召开【会议名称】。主要议题：【议题一】、【议题二】。\n请妥善安排工作准时出席；确需请假的，请提前向【联系人职务姓名】书面说明。\n\n联系人：【姓名】　电话：【联系电话】\n\n特此通知。',
+    },
+    {
+      id: 'mnt_branch_committee',
+      name: '支委会议通知',
+      desc: '支委会内部议事、酝酿事项',
+      body: '【发文单位】\n【成文日期】\n\n支委会议通知\n\n各位支委：\n定于【会议日期】【会议时间】在【会议地点】召开支委会，研究【议题摘要】。请准时参加。\n\n联系人：【姓名】　【电话】\n\n【党组织名称】',
+    },
+    {
+      id: 'mnt_theme_day',
+      name: '主题党日活动通知',
+      desc: '集结、着装、携带材料与纪律要求',
+      body: '【组织名称】\n【成文日期】\n\n关于开展「【活动主题】」主题党日活动的通知\n\n【对象范围】：\n定于【活动日期】【集合时间】在【集合地点】集合，统一开展【活动形式与内容概要】。\n请着【着装要求】，携带【学习资料或证件】，服从现场工作人员指挥。\n\n联系人：【姓名】　【电话】\n\n特此通知。',
+    },
+  ];
+}
+
+function nwMeetingNoticeNormalizeItem(t, i) {
+  const id = t && t.id ? String(t.id) : 'mnt_' + String(i + 1);
+  const name = t && t.name ? String(t.name).trim() : '未命名模板';
+  const desc = t && t.desc != null ? String(t.desc) : '';
+  const body = t && t.body != null ? String(t.body) : '';
+  return { id, name, desc, body };
+}
+
+function readNwMeetingNoticeTemplates() {
+  const defList = nwMeetingNoticeTemplatesDefault();
+  const defById = new Map(defList.map((d) => [d.id, d]));
+  try {
+    const raw = localStorage.getItem(NW_MEETING_NOTICE_TEMPLATES_KEY);
+    if (!raw) return defList;
+    const p = JSON.parse(raw);
+    if (!Array.isArray(p) || p.length === 0) return defList;
+    return p.map((t, idx) => {
+      const n = nwMeetingNoticeNormalizeItem(t, idx);
+      const fb = defById.get(n.id);
+      if ((!n.body || !String(n.body).trim()) && fb && fb.body) return { ...n, body: fb.body };
+      if (!n.body || !String(n.body).trim()) {
+        return { ...n, body: `【${n.name}】\n\n请将【会议时间】【会议地点】【议题】等【】内占位替换为实际内容。\n\n【发文单位】\n【日期】` };
+      }
+      return n;
+    });
+  } catch (e) {
+    return defList;
+  }
+}
+
+function writeNwMeetingNoticeTemplates(arr) {
+  const clean = (Array.isArray(arr) ? arr : []).map(nwMeetingNoticeNormalizeItem);
+  try {
+    localStorage.setItem(NW_MEETING_NOTICE_TEMPLATES_KEY, JSON.stringify(clean));
+  } catch (e) {}
+  try {
+    if (typeof BroadcastChannel !== 'undefined') {
+      const bc = new BroadcastChannel(NW_MEETING_NOTICE_TEMPLATES_BC);
+      bc.postMessage({ t: 'meeting_notice_templates' });
+      bc.close();
+    }
+  } catch (e2) {}
+  try {
+    window.dispatchEvent(new Event('nw-meeting-notice-templates-changed'));
+  } catch (e3) {}
+}
+
+function nwNavOpenPastCourses(nav, category) {
+  try { sessionStorage.setItem(NW_PAST_COURSE_CAT_KEY, category || 'all'); } catch (e) {}
+  nav.navigateTo('pastCourses');
+}
+
+function nwNavSetOfficeToolAndGo(nav, toolId) {
+  try { sessionStorage.setItem(NW_OFFICE_TOOL_ID_KEY, toolId); } catch (e) {}
+  nav.navigateTo('officeToolPlaceholder');
+}
 
 // ============================================
 // SVG Icons (line-art, no emoji)
@@ -452,6 +658,9 @@ const Icons = {
   Alert: () => <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>,
   Audit: () => <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>,
   GridFour: () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg>,
+  TypeCheck: () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M4 12h10M4 17h14"/><path d="M18.5 11.5l2.5 2.5-3 3L16 15l1.5-1.5z"/></svg>,
+  Mic2: () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round"><path d="M12 14a3 3 0 003-3V5a3 3 0 10-6v6a3 3 0 003 3z"/><path d="M19 10v1a7 7 0 01-14 0v-1M12 18v4M8 22h8"/></svg>,
+  NotebookPen: () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round"><path d="M8 4h10a2 2 0 012 2v12l-4-2-4 2V6a2 2 0 00-2-2z"/><path d="M8 4H6a2 2 0 00-2 2v14"/><path d="M11 12l2 2 4-4"/></svg>,
   Check: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 7"/></svg>,
   X: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>,
   Clock: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>,
@@ -508,7 +717,7 @@ const Card = ({ style: extraStyle, children, onClick }) => (
   }}>{children}</div>
 );
 
-const NavBar = ({ title, onBack, right, dark, bg }) => (
+const NavBar = ({ title, titleImg, onBack, right, dark, bg }) => (
   <div style={{
     position: 'sticky', top: 0, zIndex: 50, height: T.navHeight,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -521,10 +730,13 @@ const NavBar = ({ title, onBack, right, dark, bg }) => (
         <Icons.Back />
       </div>}
     </div>
-    <span style={{
-      fontFamily: "'Noto Serif SC', serif", fontSize: 16, fontWeight: 600,
-      color: dark ? '#fff' : T.textPrimary
-    }}>{title}</span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, maxWidth: 'calc(100% - 96px)', justifyContent: 'center' }}>
+      {titleImg ? <img src={titleImg} alt="" style={{ height: 22, width: 'auto', objectFit: 'contain', flexShrink: 0 }} /> : null}
+      <span style={{
+        fontFamily: "'Noto Serif SC', serif", fontSize: 16, fontWeight: 600,
+        color: dark ? '#fff' : T.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>{title}</span>
+    </div>
     {right && <div style={{ position: 'absolute', right: 8 }}>{right}</div>}
   </div>
 );
@@ -558,20 +770,10 @@ const TabBar = ({ active, onSwitch, items }) => (
           key={item.key}
           role="button"
           tabIndex={0}
-          onClick={() => {
-            if (item.key === 'aiQA') {
-              window.location.href = getAiQaExternalH5Url();
-              return;
-            }
-            onSwitch(item.key, item.screen);
-          }}
+          onClick={() => onSwitch(item.key, item.screen)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
-              if (item.key === 'aiQA') {
-                window.location.href = getAiQaExternalH5Url();
-                return;
-              }
               onSwitch(item.key, item.screen);
             }
           }}
@@ -602,7 +804,6 @@ const TabBar = ({ active, onSwitch, items }) => (
 const tabItems = [
   { key: 'home', label: '首页', icon: Icons.Home, screen: 'home' },
   { key: 'learn', label: '学习', icon: Icons.Book, screen: 'learning' },
-  { key: 'aiQA', label: 'AI问答', icon: Icons.Chat, screen: 'aiQA' },
   { key: 'service', label: '服务', icon: Icons.Service, screen: 'lifeServices' },
   { key: 'profile', label: '我的', icon: Icons.User, screen: 'profile' },
 ];
@@ -623,8 +824,10 @@ const LoginScreen = ({ onLogin, role, setRole }) => {
     return () => window.clearInterval(t);
   }, [smsCd]);
   const loginStyles = {
-    container: { height: '100%', background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32 },
-    logo: { width: 96, height: 96, borderRadius: 24, background: 'linear-gradient(135deg, #D44040, #B83232)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+    container: { height: '100%', background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'stretch', minHeight: 0 },
+    main: { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, width: '100%', boxSizing: 'border-box' },
+    footer: { flexShrink: 0, width: '100%', padding: '12px 32px calc(24px + env(safe-area-inset-bottom, 0px))', boxSizing: 'border-box' },
+    logo: { width: 100, height: 100, borderRadius: 20, background: '#fff', border: `1px solid ${T.border}`, boxShadow: '0 4px 16px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
     appName: { fontFamily: "'Noto Serif SC', serif", fontSize: 20, fontWeight: 700, color: T.textPrimary, marginBottom: 6 },
     subtitle: { fontSize: 13, color: T.textMuted, marginBottom: 40 },
     loginBtn: { width: '100%', padding: '14px 20px', background: 'linear-gradient(135deg, #D44040, #E85D5D)', color: '#fff', border: 'none', borderRadius: 12, fontSize: 16, fontWeight: 600, fontFamily: "'Noto Serif SC', serif", cursor: 'pointer', marginBottom: 16 },
@@ -632,7 +835,7 @@ const LoginScreen = ({ onLogin, role, setRole }) => {
     notice: { background: '#FFF7ED', borderRadius: 10, padding: 12, border: '1px solid #FED7AA', width: '100%' },
     noticeTitle: { fontSize: 12, fontWeight: 600, color: '#C2410C', marginBottom: 4 },
     noticeText: { fontSize: 11, color: '#9A3412', lineHeight: 1.5 },
-    roleBtn: { position: 'absolute', bottom: 20, right: 20, padding: '6px 12px', background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, fontSize: 11, color: T.textMuted, cursor: 'pointer' },
+    roleBtn: { alignSelf: 'flex-end', marginTop: 12, padding: '8px 14px', background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, fontSize: 11, color: T.textMuted, cursor: 'pointer' },
     roleOverlay: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60 },
     roleModal: { background: T.surface, borderRadius: 16, padding: 24, width: '80%', maxWidth: 260 },
     roleOption: (active) => ({ padding: '12px 16px', borderRadius: 10, border: `2px solid ${active ? T.primary : T.border}`, background: active ? T.primaryLight : T.surface, cursor: 'pointer', marginBottom: 10, textAlign: 'center' }),
@@ -657,55 +860,55 @@ const LoginScreen = ({ onLogin, role, setRole }) => {
   };
   return (
     <div style={{ ...loginStyles.container, position: 'relative' }}>
-      <div style={loginStyles.logo}>
-        <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
-          <path d="M26 6 L14 22 L14 46 L22 46 L22 32 L30 32 L30 46 L38 46 L38 22 Z" fill="white" opacity="0.95"/>
-          <circle cx="26" cy="18" r="6" fill="white" opacity="0.9"/>
-          <rect x="22" y="20" width="8" height="12" rx="1" fill="white" opacity="0.85"/>
-        </svg>
+      <div style={loginStyles.main}>
+        <div style={loginStyles.logo}>
+          <img src={NW_BRAND_LOGO_SRC} alt={NW_BRAND_NAME} style={{ width: 72, height: 'auto', maxHeight: 72, objectFit: 'contain' }} />
+        </div>
+        <div style={loginStyles.appName}>{NW_BRAND_NAME}</div>
+        <div style={loginStyles.subtitle}>龙岗南湾街道 · 智慧党建平台 · 与 PC 档案手机号同源</div>
+        <div style={loginStyles.tabRow}>
+          <button type="button" style={loginStyles.tabBtn(loginMethod === 'wechat')} onClick={() => { setLoginMethod('wechat'); setSmsHint(''); }}>微信登录</button>
+          <button type="button" style={loginStyles.tabBtn(loginMethod === 'sms')} onClick={() => { setLoginMethod('sms'); setSmsHint(''); }}>验证码登录</button>
+        </div>
+        {loginMethod === 'wechat' ? (
+          <button style={loginStyles.loginBtn} onClick={() => onLogin(role)}>微信授权手机号登录</button>
+        ) : (
+          <>
+            <input style={loginStyles.input} type="tel" inputMode="numeric" maxLength={11} placeholder="11位手机号" value={smsPhone} onChange={(e) => setSmsPhone(e.target.value)} />
+            <div style={loginStyles.smsRow}>
+              <input style={{ ...loginStyles.input, flex: 1, marginBottom: 0, maxWidth: 'none' }} type="text" inputMode="numeric" maxLength={6} placeholder="6位验证码" value={smsCode} onChange={(e) => setSmsCode(e.target.value)} />
+              <button
+                type="button"
+                style={{ ...loginStyles.smsBtn, opacity: smsCd > 0 ? 0.5 : 1, cursor: smsCd > 0 ? 'default' : 'pointer' }}
+                disabled={smsCd > 0}
+                onClick={() => {
+                  const p = smsPhone.replace(/\D/g, '');
+                  if (p.length !== 11) { setSmsHint('请先填写正确手机号'); return; }
+                  setSmsCd(60);
+                  setSmsCode('123456');
+                  setSmsHint('演示：已自动填入验证码 123456');
+                }}
+              >{smsCd > 0 ? `${smsCd}s` : '获取验证码'}</button>
+            </div>
+            {smsHint ? <div style={{ fontSize: 11, color: '#059669', marginBottom: 10, maxWidth: 320 }}>{smsHint}</div> : null}
+            <button style={loginStyles.loginBtn} onClick={doSmsLogin}>手机号登录</button>
+          </>
+        )}
+        <div style={loginStyles.agree}>
+          {loginMethod === 'wechat'
+            ? <>微信将授权获取您的<strong>手机号码</strong>，作为小程序端<strong>唯一登录标识</strong>（须与 PC「党员管理」档案中手机号一致）。登录即表示同意《用户服务协议》和《隐私政策》</>
+            : <>验证码将发送至已导入白名单的手机号；与 PC 管理端「验证码登录」一致。登录即表示同意《用户服务协议》和《隐私政策》</>}
+        </div>
       </div>
-      <div style={loginStyles.appName}>南湾红帆</div>
-      <div style={loginStyles.subtitle}>龙岗南湾街道 · 智慧党建平台 · 与 PC 档案手机号同源</div>
-      <div style={loginStyles.tabRow}>
-        <button type="button" style={loginStyles.tabBtn(loginMethod === 'wechat')} onClick={() => { setLoginMethod('wechat'); setSmsHint(''); }}>微信登录</button>
-        <button type="button" style={loginStyles.tabBtn(loginMethod === 'sms')} onClick={() => { setLoginMethod('sms'); setSmsHint(''); }}>验证码登录</button>
+      <div style={{ ...loginStyles.footer, display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}>
+        <div style={loginStyles.notice}>
+          <div style={loginStyles.noticeTitle}>提示</div>
+          <div style={loginStyles.noticeText}>本平台仅限辖区党员使用。修改绑定手机号须由具备 PC「党员管理」权限的工作人员在后台档案中办理，小程序内不提供改号入口。</div>
+        </div>
+        <button type="button" style={loginStyles.roleBtn} onClick={() => setShowRole(true)}>
+          当前：{role === 'member' ? '党员' : '管理员'}
+        </button>
       </div>
-      {loginMethod === 'wechat' ? (
-        <button style={loginStyles.loginBtn} onClick={() => onLogin(role)}>微信授权手机号登录</button>
-      ) : (
-        <>
-          <input style={loginStyles.input} type="tel" inputMode="numeric" maxLength={11} placeholder="11位手机号" value={smsPhone} onChange={(e) => setSmsPhone(e.target.value)} />
-          <div style={loginStyles.smsRow}>
-            <input style={{ ...loginStyles.input, flex: 1, marginBottom: 0, maxWidth: 'none' }} type="text" inputMode="numeric" maxLength={6} placeholder="6位验证码" value={smsCode} onChange={(e) => setSmsCode(e.target.value)} />
-            <button
-              type="button"
-              style={{ ...loginStyles.smsBtn, opacity: smsCd > 0 ? 0.5 : 1, cursor: smsCd > 0 ? 'default' : 'pointer' }}
-              disabled={smsCd > 0}
-              onClick={() => {
-                const p = smsPhone.replace(/\D/g, '');
-                if (p.length !== 11) { setSmsHint('请先填写正确手机号'); return; }
-                setSmsCd(60);
-                setSmsCode('123456');
-                setSmsHint('演示：已自动填入验证码 123456');
-              }}
-            >{smsCd > 0 ? `${smsCd}s` : '获取验证码'}</button>
-          </div>
-          {smsHint ? <div style={{ fontSize: 11, color: '#059669', marginBottom: 10, maxWidth: 320 }}>{smsHint}</div> : null}
-          <button style={loginStyles.loginBtn} onClick={doSmsLogin}>手机号登录</button>
-        </>
-      )}
-      <div style={loginStyles.agree}>
-        {loginMethod === 'wechat'
-          ? <>微信将授权获取您的<strong>手机号码</strong>，作为小程序端<strong>唯一登录标识</strong>（须与 PC「党员管理」档案中手机号一致）。登录即表示同意《用户服务协议》和《隐私政策》</>
-          : <>验证码将发送至已导入白名单的手机号；与 PC 管理端「验证码登录」一致。登录即表示同意《用户服务协议》和《隐私政策》</>}
-      </div>
-      <div style={loginStyles.notice}>
-        <div style={loginStyles.noticeTitle}>提示</div>
-        <div style={loginStyles.noticeText}>本平台仅限辖区党员使用。修改绑定手机号须由具备 PC「党员管理」权限的工作人员在后台档案中办理，小程序内不提供改号入口。</div>
-      </div>
-      <button style={loginStyles.roleBtn} onClick={() => setShowRole(true)}>
-        当前：{role === 'member' ? '党员' : '管理员'}
-      </button>
 
       {showRole && (
         <div style={loginStyles.roleOverlay} onClick={() => setShowRole(false)}>
@@ -731,12 +934,101 @@ const LoginScreen = ({ onLogin, role, setRole }) => {
 // ============================================
 // Screen 2: Home
 // ============================================
+const NW_PIONEER_STORY_ID_KEY = 'nw_pioneer_story_id_v1';
+
+/** 首页轮播：照片 + 姓名 + 单位 + 约200字事迹预览；点击进入全文页 */
+const HOME_PIONEER_SLIDES = [
+  {
+    id: 'pf_001',
+    kicker: '党员先锋岗',
+    name: '李卫国',
+    unit: '南湾街道南岭村社区党委 · 第一网格党支部',
+    photo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Unknown_person.jpg/320px-Unknown_person.jpg',
+    fullStory: '李卫国同志扎根社区网格十二年，牵头建立「党员楼长」响应机制，累计协调解决电梯加装、消防通道占用、独居老人探访等诉求380余件。在2025年防汛期间连续值守72小时，组织转移低洼住户46户，事后又主动对接职能部门完善排水改造方案。他坚持每周参加主题党日学习，带动支部年轻党员结对帮扶困难家庭12户，用实干诠释「亮身份、作表率」。支部党员民主评议中连续三年获评优秀，群众满意度调查保持在98%以上。其事迹在南湾街道「党建榜样」专栏刊发后，带动6个社区复制推广「楼长+党员先锋」工作法，为党建引领基层治理提供了可复制的实践样本。',
+  },
+  {
+    id: 'pf_002',
+    kicker: '好人好事',
+    name: '王素芬',
+    unit: '南湾街道康乐社区第二党支部 · 志愿服务队',
+    photo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Unknown_person.jpg/320px-Unknown_person.jpg',
+    fullStory: '王素芬同志退休后主动加入社区志愿服务队，八年来义务担任「四点半课堂」辅导员，累计服务双职工家庭子女超过2100人次。她自学急救知识并取得红十字救护员证，在2024年一次突发情况中及时为倒地老人实施心肺复苏，为后续救治赢得宝贵时间。她发起「邻里一本书」漂流角，募集图书4300余册，促成12个楼栋建立共享阅读角。面对年轻党员请教群众工作方法，她总是手把手带教入户沟通技巧，被居民亲切称为「王大姐」。社区党委将其列为「传帮带」导师，其经验材料被纳入街道新发展党员实践教学案例库。',
+  },
+  {
+    id: 'pf_003',
+    kicker: '组织宣传',
+    name: '南湾街道党群服务中心',
+    unit: '中共南湾街道工作委员会',
+    photo: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&w=480&q=80',
+    fullStory: '南湾街道党群服务中心全年开放「红色驿站」服务窗口，整合政策咨询、组织关系转接、志愿服务报名等事项，推行「一窗受理、内部流转」机制，平均等候时间缩短至8分钟以内。中心联合区委党校开设「流动党课大巴」进社区12场，覆盖党员及入党积极分子860余人；依托智慧党建平台上线「学习打卡+心得互评」模块，推动线上学习与线下组织生活有机衔接。2026年一季度，中心承办区级「AI+党建」现场交流会，展示街道在数字化党务公开、智能问答辅助等方面的探索成果，获得与会代表一致好评，为打造可复制推广的示范阵地奠定了扎实基础。',
+  },
+];
+
+function nwNavOpenPioneerStory(nav, slideId) {
+  try { sessionStorage.setItem(NW_PIONEER_STORY_ID_KEY, slideId); } catch (e) {}
+  nav.navigateTo('pioneerStoryDetail');
+}
+
+function pioneerStoryPreview(text, maxLen) {
+  const t = (text || '').trim();
+  if (t.length <= maxLen) return t;
+  return t.slice(0, maxLen) + '…';
+}
+
 const HomeScreen = ({ nav }) => {
   const [showSub, setShowSub] = React.useState(false);
+  const [bannerIdx, setBannerIdx] = React.useState(0);
+  React.useEffect(() => {
+    const t = window.setInterval(() => setBannerIdx((i) => (i + 1) % HOME_PIONEER_SLIDES.length), 5200);
+    return () => window.clearInterval(t);
+  }, []);
 
   const homeStyles = {
     container: { height: '100%', background: 'linear-gradient(180deg, #F5F2ED 0%, #FAF8F5 18%, #FAF8F5 100%)', display: 'flex', flexDirection: 'column' },
     content: { flex: 1, overflowY: 'auto', padding: '10px 14px 0', paddingBottom: NW_TAB_SCROLL_BOTTOM_PAD },
+    bannerWrap: {
+      marginBottom: 14,
+      borderRadius: 16,
+      overflow: 'hidden',
+      position: 'relative',
+      minHeight: 196,
+      boxShadow: '0 6px 22px rgba(26,26,26,0.12)',
+      border: '1px solid rgba(255,255,255,0.12)',
+      cursor: 'pointer',
+      WebkitTapHighlightColor: 'transparent',
+    },
+    bannerSlideBg: (bg) => ({
+      position: 'absolute', inset: 0, background: bg, zIndex: 0,
+    }),
+    bannerSlideOverlay: {
+      position: 'absolute', inset: 0,
+      background: 'linear-gradient(105deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.22) 55%, rgba(0,0,0,0.35) 100%)',
+      zIndex: 1,
+    },
+    bannerSlideBody: {
+      position: 'relative', zIndex: 2,
+      padding: '12px 12px 14px',
+      display: 'flex', gap: 12, alignItems: 'flex-start',
+      boxSizing: 'border-box',
+    },
+    bannerPhoto: {
+      width: 72, height: 72, borderRadius: 12, flexShrink: 0,
+      objectFit: 'cover',
+      border: '2px solid rgba(255,255,255,0.35)',
+      boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
+      background: 'rgba(0,0,0,0.2)',
+    },
+    bannerTextCol: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 },
+    bannerKicker: { fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.78)', textTransform: 'uppercase' },
+    bannerName: { fontSize: 16, fontWeight: 800, fontFamily: "'Noto Serif SC', serif", color: '#fff', lineHeight: 1.2 },
+    bannerUnit: { fontSize: 10, color: 'rgba(255,255,255,0.88)', lineHeight: 1.45, marginBottom: 2 },
+    bannerIntro: {
+      fontSize: 10, color: 'rgba(255,255,255,0.92)', lineHeight: 1.48,
+      marginTop: 2, wordBreak: 'break-word',
+    },
+    bannerMoreHint: { fontSize: 10, fontWeight: 700, color: '#fff', marginTop: 6, letterSpacing: '0.02em' },
+    bannerDots: { position: 'absolute', bottom: 8, right: 10, display: 'flex', gap: 5, zIndex: 3 },
+    bannerDot: (on) => ({ width: on ? 16 : 6, height: 6, borderRadius: 999, background: on ? '#fff' : 'rgba(255,255,255,0.35)', transition: 'all 0.25s ease' }),
     /* 主入口：大卡片 + 左强调色条，避免整屏大红块 */
     heroCard: {
       marginBottom: 18,
@@ -806,12 +1098,46 @@ const HomeScreen = ({ nav }) => {
 
   return (
     <div style={homeStyles.container}>
-      <NavBar title="南湾红帆" right={
+      <NavBar title={NW_BRAND_NAME} titleImg={NW_BRAND_LOGO_SRC} right={
         <div onClick={() => setShowSub(true)} style={{ cursor: 'pointer', padding: 6, borderRadius: 8, display: 'flex', color: T.textPrimary }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
         </div>
       } />
       <div style={homeStyles.content}>
+        <div
+          role="button"
+          tabIndex={0}
+          style={homeStyles.bannerWrap}
+          aria-roledescription="carousel"
+          aria-label="党员先锋岗与榜样宣传"
+          onClick={() => nwNavOpenPioneerStory(nav, HOME_PIONEER_SLIDES[bannerIdx].id)}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); nwNavOpenPioneerStory(nav, HOME_PIONEER_SLIDES[bannerIdx].id); } }}
+        >
+          {HOME_PIONEER_SLIDES.map((s, i) => (
+            i === bannerIdx ? (
+              <React.Fragment key={s.id}>
+                <div style={homeStyles.bannerSlideBg('linear-gradient(125deg, #7F1D1D 0%, #B91C1C 42%, #DC2626 100%)')} aria-hidden />
+                <div style={homeStyles.bannerSlideOverlay} aria-hidden />
+                <div style={homeStyles.bannerSlideBody}>
+                  <img src={s.photo} alt="" style={homeStyles.bannerPhoto} />
+                  <div style={homeStyles.bannerTextCol}>
+                    <div style={homeStyles.bannerKicker}>{s.kicker}</div>
+                    <div style={homeStyles.bannerName}>{s.name}</div>
+                    <div style={homeStyles.bannerUnit}>{s.unit}</div>
+                    <div style={homeStyles.bannerIntro}>{pioneerStoryPreview(s.fullStory, 200)}</div>
+                    <div style={homeStyles.bannerMoreHint}>点击查看全文 →</div>
+                  </div>
+                </div>
+              </React.Fragment>
+            ) : null
+          ))}
+          <div style={homeStyles.bannerDots} aria-hidden onClick={(e) => e.stopPropagation()}>
+            {HOME_PIONEER_SLIDES.map((_, i) => (
+              <span key={i} style={homeStyles.bannerDot(i === bannerIdx)} />
+            ))}
+          </div>
+        </div>
+
         <div
           role="button"
           tabIndex={0}
@@ -827,36 +1153,25 @@ const HomeScreen = ({ nav }) => {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={homeStyles.heroKicker}>我的活动</div>
-                <div style={homeStyles.heroTitle}>查看活动参加情况</div>
-                <div style={homeStyles.heroSub}>主题党日、组织生活与参会记录，按年度汇总可查。</div>
+                <div style={homeStyles.heroTitle}>历年活动参加情况</div>
+                <div style={homeStyles.heroSub}>按年度时间轴查看主题党日、组织生活与活动照片；每年度下可查看 AI 画像摘要。</div>
               </div>
               <div style={homeStyles.heroChevronWrap} aria-hidden><Icons.ChevronRight /></div>
             </div>
           </div>
         </div>
 
-        <div style={homeStyles.sectionLabel}>能力与服务</div>
-
-        <div style={homeStyles.moduleCard} onClick={() => nav.navigateTo('aiProfile')}>
-          <div style={homeStyles.moduleHead}>
-            <div style={homeStyles.moduleHeadLeft}>
-              <div style={{ ...homeStyles.moduleIcon, ...homeStyles.aiIcon }}><Icons.Chart /></div>
-              <div style={homeStyles.moduleTitle}>AI画像</div>
-            </div>
-            <div style={homeStyles.chevronMuted}><Icons.ChevronRight /></div>
-          </div>
-          <div style={homeStyles.moduleSub}>总结个人情况，查看成长轨迹、风险提示与能力评估。</div>
-        </div>
+        <div style={homeStyles.sectionLabel}>主要入口</div>
 
         <div style={homeStyles.moduleCard} onClick={() => nav.navigateTo('partyTools')}>
           <div style={homeStyles.moduleHead}>
             <div style={homeStyles.moduleHeadLeft}>
               <div style={{ ...homeStyles.moduleIcon, ...homeStyles.toolsIcon }}><Icons.GridFour /></div>
-              <div style={homeStyles.moduleTitle}>党务小工具</div>
+              <div style={homeStyles.moduleTitle}>办公助手</div>
             </div>
             <div style={homeStyles.chevronMuted}><Icons.ChevronRight /></div>
           </div>
-          <div style={homeStyles.moduleSub}>聚合常用党务能力，九宫格入口；当前已上线智能资料审核，更多工具陆续接入。</div>
+          <div style={homeStyles.moduleSub}>公文、会议纪要、会议通知生成、校验、智能问答等九宫格能力；PPT / 表格制作请在 PC 管理端「办公助手」使用。</div>
         </div>
       </div>
 
@@ -874,6 +1189,48 @@ const HomeScreen = ({ nav }) => {
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+// ============================================
+// Screen: 先锋榜样事迹全文
+// ============================================
+const PioneerStoryDetailScreen = ({ nav }) => {
+  let storyId = '';
+  try { storyId = sessionStorage.getItem(NW_PIONEER_STORY_ID_KEY) || ''; } catch (e) {}
+  const slide = HOME_PIONEER_SLIDES.find((s) => s.id === storyId) || HOME_PIONEER_SLIDES[0];
+  const st = {
+    wrap: { height: '100%', background: T.bg, display: 'flex', flexDirection: 'column' },
+    scroll: { flex: 1, overflowY: 'auto', padding: '12px 14px 24px' },
+    hero: { display: 'flex', gap: 14, marginBottom: 16, alignItems: 'flex-start' },
+    photo: { width: 88, height: 88, borderRadius: 14, objectFit: 'cover', flexShrink: 0, border: `1px solid ${T.border}`, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' },
+    meta: { flex: 1, minWidth: 0 },
+    kicker: { fontSize: 11, fontWeight: 700, color: T.primary, marginBottom: 6 },
+    name: { fontSize: 18, fontWeight: 800, fontFamily: "'Noto Serif SC', serif", color: T.textPrimary, lineHeight: 1.25, marginBottom: 6 },
+    unit: { fontSize: 12, color: T.textSecondary, lineHeight: 1.55 },
+    article: {
+      background: T.surface, borderRadius: 14, padding: 16, border: `1px solid ${T.border}`,
+      fontSize: 14, color: T.textPrimary, lineHeight: 1.85, textAlign: 'justify', textWrap: 'pretty',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+    },
+    tip: { fontSize: 11, color: T.textMuted, marginTop: 14, lineHeight: 1.55 },
+  };
+  return (
+    <div style={st.wrap}>
+      <NavBar title="事迹详情" onBack={nav.goBack} />
+      <div style={st.scroll}>
+        <div style={st.hero}>
+          <img src={slide.photo} alt="" style={st.photo} />
+          <div style={st.meta}>
+            <div style={st.kicker}>{slide.kicker}</div>
+            <div style={st.name}>{slide.name}</div>
+            <div style={st.unit}>{slide.unit}</div>
+          </div>
+        </div>
+        <div style={st.article}>{slide.fullStory}</div>
+        <p style={st.tip}>以上内容仅供演示排版；正式环境由管理端发布并支持富文本与附件。</p>
+      </div>
     </div>
   );
 };
@@ -1327,10 +1684,27 @@ const ProfileScreen = ({ nav, role }) => {
 // ============================================
 // Screen 4: Activity History
 // ============================================
+const ACTIVITY_YEARS_ORDER = ['2026', '2025', '2024', '2023'];
+
+const YEAR_AI_SNAPSHOT = {
+  '2026': { score: 90, actCount: 2, studyPts: 420, blurb: '本年度活动与学习积分稳步积累，继续保持参与节奏。' },
+  '2025': { score: 91, actCount: 4, studyPts: 1280, blurb: '活动参与积极，学习积分支部前列，服务贡献有提升空间。' },
+  '2024': { score: 88, actCount: 3, studyPts: 960, blurb: '政治素养与纪律作风表现稳定，直播学习完成率良好。' },
+  '2023': { score: 86, actCount: 2, studyPts: 720, blurb: '基础参与达标，建议加强线下活动频次与心得沉淀。' },
+};
+
 const ActivityHistoryScreen = ({ nav }) => {
-  const [expandedYears, setExpandedYears] = React.useState({ '2025': true, '2024': false, '2023': false });
+  const [expandedYears, setExpandedYears] = React.useState(() => {
+    const o = {};
+    ACTIVITY_YEARS_ORDER.forEach((y, i) => { o[y] = i === 0; });
+    return o;
+  });
 
   const activities = {
+    '2026': [
+      { theme: '一季度主题党日暨 AI 办公实务交流', date: '2026-04-12', loc: '南湾街道党群服务中心', hasPhoto: true },
+      { theme: '学雷锋志愿服务日', date: '2026-03-08', loc: '南湾社区公园', hasPhoto: true },
+    ],
     '2025': [
       { theme: '学习贯彻党的二十大精神', date: '2025-03-15', loc: '南湾街道党群服务中心', hasPhoto: true },
       { theme: '学雷锋志愿服务日', date: '2025-03-08', loc: '南湾社区公园', hasPhoto: true },
@@ -1358,37 +1732,77 @@ const ActivityHistoryScreen = ({ nav }) => {
     item: { background: T.surface, borderRadius: 12, padding: 12, marginBottom: 10, border: `1px solid ${T.border}` },
     itemTitle: { fontSize: 13, fontWeight: 600, color: T.textPrimary, marginBottom: 6 },
     metaRow: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: T.textSecondary, marginBottom: 3 },
-    photoBadge: { display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, color: T.primary, background: T.primaryLight, padding: '2px 6px', borderRadius: 4, marginTop: 6 }
+    photoBadge: { display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, color: T.primary, background: T.primaryLight, padding: '2px 6px', borderRadius: 4, marginTop: 6 },
+    aiBox: {
+      marginTop: 10,
+      padding: 12,
+      borderRadius: 12,
+      border: `1px solid rgba(212, 64, 64, 0.18)`,
+      background: 'linear-gradient(180deg, #FFFBFA 0%, #FFF5F2 100%)',
+    },
+    aiBoxTitle: { fontSize: 12, fontWeight: 700, color: T.primary, marginBottom: 8, fontFamily: "'Noto Serif SC', serif", display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+    aiStatRow: { display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 8 },
+    aiStatPill: { fontSize: 10, color: T.textSecondary, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, padding: '6px 10px' },
+    aiBlurb: { fontSize: 11, color: T.textSecondary, lineHeight: 1.55 },
+    aiLink: { marginTop: 10, fontSize: 11, fontWeight: 600, color: T.primary, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 },
   };
 
   return (
     <div style={actStyles.container}>
-      <NavBar title="历年活动记录" onBack={nav.goBack} />
+      <NavBar title="历年活动参加情况" onBack={nav.goBack} />
       <div style={actStyles.content}>
-        {Object.entries(activities).map(([year, acts], yi) => (
-          <div key={year} style={{ marginBottom: T.sectionGap, paddingBottom: yi === Object.entries(activities).length - 1 ? 20 : 0 }}>
-            <div style={actStyles.yearHeader} onClick={() => toggleYear(year)}>
-              <span style={actStyles.yearTitle}>{year}年</span>
-              <span style={{ fontSize: 12, color: T.textMuted, transform: expandedYears[year] ? 'rotate(180deg)' : '' }}>
-                <Icons.ChevronRight />
-              </span>
-            </div>
-            {expandedYears[year] && acts.map((a, i) => (
-              <div key={i} style={actStyles.item}>
-                <div style={actStyles.itemTitle}>{a.theme}</div>
-                <div style={actStyles.metaRow}>
-                  <Icons.Calendar />
-                  <span>{a.date}</span>
-                </div>
-                <div style={actStyles.metaRow}>
-                  <Icons.MapPin />
-                  <span>{a.loc}</span>
-                </div>
-                {a.hasPhoto && <div style={actStyles.photoBadge}><Icons.Camera /> 含活动照片</div>}
+        <p style={{ fontSize: 11, color: T.textMuted, lineHeight: 1.55, marginBottom: 10 }}>
+          按年度查看活动记录；各年度下附本年度 AI 画像摘要。完整画像与雷达图见「查看完整画像」。
+        </p>
+        {ACTIVITY_YEARS_ORDER.map((year, yi) => {
+          const acts = activities[year] || [];
+          const snap = YEAR_AI_SNAPSHOT[year];
+          return (
+            <div key={year} style={{ marginBottom: T.sectionGap, paddingBottom: yi === ACTIVITY_YEARS_ORDER.length - 1 ? 20 : 0 }}>
+              <div style={actStyles.yearHeader} onClick={() => toggleYear(year)}>
+                <span style={actStyles.yearTitle}>{year}年</span>
+                <span style={{ fontSize: 12, color: T.textMuted, transform: expandedYears[year] ? 'rotate(90deg)' : '' }}>
+                  <Icons.ChevronRight />
+                </span>
               </div>
-            ))}
-          </div>
-        ))}
+              {expandedYears[year] && (
+                <>
+                  {acts.map((a, i) => (
+                    <div key={i} style={actStyles.item}>
+                      <div style={actStyles.itemTitle}>{a.theme}</div>
+                      <div style={actStyles.metaRow}>
+                        <Icons.Calendar />
+                        <span>{a.date}</span>
+                      </div>
+                      <div style={actStyles.metaRow}>
+                        <Icons.MapPin />
+                        <span>{a.loc}</span>
+                      </div>
+                      {a.hasPhoto && <div style={actStyles.photoBadge}><Icons.Camera /> 含活动照片</div>}
+                    </div>
+                  ))}
+                  {snap && (
+                    <div style={actStyles.aiBox}>
+                      <div style={actStyles.aiBoxTitle}>
+                        <span>{year}年度 · AI 画像摘要</span>
+                        <span style={{ fontSize: 10, color: T.textMuted, fontWeight: 600 }}>演示数据</span>
+                      </div>
+                      <div style={actStyles.aiStatRow}>
+                        <span style={actStyles.aiStatPill}>综合评分 <strong style={{ color: T.primary }}>{snap.score}</strong></span>
+                        <span style={actStyles.aiStatPill}>活动 <strong>{snap.actCount}</strong> 场</span>
+                        <span style={actStyles.aiStatPill}>学习积分 <strong>{snap.studyPts}</strong></span>
+                      </div>
+                      <div style={actStyles.aiBlurb}>{snap.blurb}</div>
+                      <div role="button" tabIndex={0} style={actStyles.aiLink} onClick={() => nav.navigateTo('aiProfile')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); nav.navigateTo('aiProfile'); } }}>
+                        查看完整画像（多维度雷达）→
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -1955,21 +2369,10 @@ const LearningScreen = ({ nav }) => {
         <div style={lrStyles.sectionEyebrow}>学习中心</div>
         <div style={lrStyles.sectionCard}>
           <div style={lrStyles.secHead}>
-            <div style={lrStyles.secTitle}>在线课程</div>
-            <div style={lrStyles.secSub}>两级入口 · PC「直播管理 / 学习外链配置」可配</div>
+            <div style={lrStyles.secTitle}>课程平台</div>
+            <div style={lrStyles.secSub}>外链四大平台 · PC「学习外链配置」可配</div>
           </div>
-          <button type="button" onClick={() => nav.navigateTo('learningPlatformStats')} style={lrStyles.statsEntry} aria-label="查看外链学习行为明细">
-            <div style={lrStyles.statsEntryBar} aria-hidden />
-            <div style={lrStyles.statsEntryRow}>
-              <div style={lrStyles.statsEntryIcon}><Icons.Chart /></div>
-              <div style={lrStyles.statsEntryBody}>
-                <div style={lrStyles.statsEntryTitle}>外链学习行为明细</div>
-                <div style={lrStyles.statsEntrySub}>各平台打开次数与累计停留时长 · 与 PC 统计口径一致</div>
-              </div>
-              <div style={lrStyles.statsEntryChevron} aria-hidden><Icons.ChevronRight /></div>
-            </div>
-          </button>
-          <div style={lrStyles.lvTitle}>一级课程平台</div>
+          <div style={lrStyles.lvTitle}>重要课程</div>
           <div style={lrStyles.platformGrid}>
             {onlinePlatforms.map((name) => {
               const acc = platformChipAccent[name] || {
@@ -1988,11 +2391,40 @@ const LearningScreen = ({ nav }) => {
               </button>
             );})}
           </div>
-          <div style={lrStyles.lvTitle}>二级课程内容</div>
-          <button type="button" style={lrStyles.pastCourseBtn} onClick={() => nav.navigateTo('pastCourses')}>
+          <div style={lrStyles.lvTitle}>其他课程</div>
+          <p style={{ fontSize: 10, color: T.textMuted, lineHeight: 1.45, marginBottom: 10 }}>管理员掌握外链学习行为数据并催办；党员端不展示外链行为明细。</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 10 }}>
+            {[
+              { id: 'political', label: '政治素养', sub: '新思想、全会精神等', bg: 'linear-gradient(165deg, #FFF5F5 0%, #FFE4E6 100%)', bd: '1px solid rgba(220, 38, 38, 0.2)', c: '#9F1239' },
+              { id: 'ai_skill', label: 'AI 技能', sub: '豆包、绘图工具等', bg: 'linear-gradient(165deg, #F0FDFA 0%, #CCFBF1 100%)', bd: '1px solid rgba(13, 148, 136, 0.22)', c: '#0F766E' },
+              { id: 'grassroots', label: '基层治理', sub: '传帮带与实务技巧', bg: 'linear-gradient(165deg, #FFFBEB 0%, #FEF3C7 100%)', bd: '1px solid rgba(217, 119, 6, 0.25)', c: '#92400E' },
+              { id: 'vocational', label: '职业技能', sub: '办公、安全、公文等', bg: 'linear-gradient(165deg, #FAF5FF 0%, #EDE9FE 100%)', bd: '1px solid rgba(109, 40, 217, 0.22)', c: '#5B21B6' },
+            ].map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => nwNavOpenPastCourses(nav, cat.id)}
+                style={{
+                  textAlign: 'left',
+                  padding: '12px 12px',
+                  borderRadius: 14,
+                  border: cat.bd,
+                  background: cat.bg,
+                  color: cat.c,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 10px rgba(26,26,26,0.05)',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{cat.label}</div>
+                <div style={{ fontSize: 10, opacity: 0.92, lineHeight: 1.4 }}>{cat.sub}</div>
+              </button>
+            ))}
+          </div>
+          <button type="button" style={{ ...lrStyles.pastCourseBtn, marginTop: 2 }} onClick={() => nwNavOpenPastCourses(nav, 'all')}>
             <div style={{ textAlign: 'left', flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary }}>往期课程</div>
-              <div style={lrStyles.pastCourseMeta}>回看历史专题课程与配套课件</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary }}>查看全部往期课程</div>
+              <div style={lrStyles.pastCourseMeta}>含视频 / 音频 / PPT / 图文等，与 PC「课程与往期」发布口径一致</div>
             </div>
             <div style={lrStyles.pastCourseChevron} aria-hidden><Icons.ChevronRight /></div>
           </button>
@@ -2213,25 +2645,75 @@ const LearningScreen = ({ nav }) => {
 // ============================================
 // Screen 6b: Past Courses（PC 后台上传；原型内展示已学/未学）
 // ============================================
+const PAST_COURSE_CAT_LABELS = {
+  all: '全部',
+  political: '政治素养',
+  ai_skill: 'AI 技能',
+  grassroots: '基层治理',
+  vocational: '职业技能',
+};
+
 const PAST_COURSES_MOCK = [
-  { id: '1', title: '党的二十大精神解读（专题一）', type: '视频', duration: '45分钟', publishedAt: '2026-03-12', status: 'completed', progress: 100 },
-  { id: '2', title: '中国共产党纪律处分条例解读', type: '图文', duration: '约30分钟', publishedAt: '2026-03-05', status: 'completed', progress: 100 },
-  { id: '3', title: 'AI 赋能基层治理实务', type: '视频', duration: '52分钟', publishedAt: '2026-02-28', status: 'in_progress', progress: 62 },
-  { id: '4', title: '发展党员工作细则培训', type: '视频', duration: '38分钟', publishedAt: '2026-02-18', status: 'not_started', progress: 0 },
-  { id: '5', title: '组织生活会规范与案例', type: '图文', duration: '约25分钟', publishedAt: '2026-02-01', status: 'not_started', progress: 0 },
-  { id: '6', title: '党章党规党纪学习（必修）', type: '在线测试', duration: '20分钟', publishedAt: '2026-01-20', status: 'completed', progress: 100 }
+  { id: '1', title: '党的二十大精神解读（专题一）', type: '视频', duration: '45分钟', publishedAt: '2026-03-12', status: 'completed', progress: 100, category: 'political' },
+  { id: '2', title: '中国共产党纪律处分条例解读', type: '图文', duration: '约30分钟', publishedAt: '2026-03-05', status: 'completed', progress: 100, category: 'political' },
+  { id: '3', title: 'AI 赋能基层治理实务', type: '视频', duration: '52分钟', publishedAt: '2026-02-28', status: 'in_progress', progress: 62, category: 'ai_skill' },
+  { id: '4', title: '发展党员工作细则培训', type: '视频', duration: '38分钟', publishedAt: '2026-02-18', status: 'not_started', progress: 0, category: 'grassroots' },
+  { id: '5', title: '组织生活会规范与案例', type: '图文', duration: '约25分钟', publishedAt: '2026-02-01', status: 'not_started', progress: 0, category: 'grassroots' },
+  { id: '6', title: '党章党规党纪学习（音频导读·必修）', type: '音频', duration: '22分钟', publishedAt: '2026-01-20', status: 'completed', progress: 100, category: 'political' },
+  { id: '7', title: '办公软件与安全培训合辑', type: '视频', duration: '40分钟', publishedAt: '2026-01-08', status: 'not_started', progress: 0, category: 'vocational' },
+  { id: '8', title: '党支部书记应知应会（音频课）', type: '音频', duration: '28分钟', publishedAt: '2026-01-28', status: 'in_progress', progress: 38, category: 'grassroots' },
 ];
+
+function nwMergedPastCoursesList() {
+  const raw = nwReadPublishedCoursesRaw();
+  const fromPc = raw.map((c) => ({
+    id: String(c.id),
+    title: c.name || c.title || '未命名课程',
+    type: c.type || '视频',
+    duration: c.duration || '—',
+    publishedAt: c.publishedAt || '',
+    status: (c.status === 'completed' || c.status === 'in_progress' || c.status === 'not_started') ? c.status : 'not_started',
+    progress: typeof c.progress === 'number' ? c.progress : 0,
+    category: c.category || 'political',
+    fileName: c.fileName || '',
+  }));
+  const ids = new Set(fromPc.map((x) => x.id));
+  const mockRest = PAST_COURSES_MOCK.filter((m) => !ids.has(String(m.id)));
+  return [...fromPc, ...mockRest];
+}
 
 const PastCoursesScreen = ({ nav }) => {
   const [filter, setFilter] = React.useState('all');
+  const [listTick, setListTick] = React.useState(0);
+  const [catScope, setCatScope] = React.useState(() => {
+    try { return sessionStorage.getItem(NW_PAST_COURSE_CAT_KEY) || 'all'; } catch (e) { return 'all'; }
+  });
+  const setCatScopeAndStore = (c) => {
+    setCatScope(c);
+    try { sessionStorage.setItem(NW_PAST_COURSE_CAT_KEY, c); } catch (e) {}
+  };
 
-  const doneCount = PAST_COURSES_MOCK.filter(c => c.status === 'completed').length;
-  const undoneCount = PAST_COURSES_MOCK.length - doneCount;
-  const filtered = PAST_COURSES_MOCK.filter(c => {
+  React.useEffect(() => {
+    const bump = () => setListTick((t) => t + 1);
+    window.addEventListener('storage', bump);
+    const onVis = () => { if (document.visibilityState === 'visible') bump(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      window.removeEventListener('storage', bump);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, []);
+
+  const allCourses = React.useMemo(() => nwMergedPastCoursesList(), [listTick]);
+  const scopedList = allCourses.filter((c) => catScope === 'all' || c.category === catScope);
+  const doneCount = scopedList.filter(c => c.status === 'completed').length;
+  const undoneCount = scopedList.length - doneCount;
+  const filtered = scopedList.filter(c => {
     if (filter === 'done') return c.status === 'completed';
     if (filter === 'undone') return c.status !== 'completed';
     return true;
   });
+  const navTitle = catScope === 'all' ? '往期课程' : `往期课程 · ${PAST_COURSE_CAT_LABELS[catScope] || ''}`;
 
   const pcStyles = {
     wrap: { height: '100%', background: T.bg, display: 'flex', flexDirection: 'column' },
@@ -2264,20 +2746,33 @@ const PastCoursesScreen = ({ nav }) => {
 
   return (
     <div style={pcStyles.wrap}>
-      <NavBar title="往期课程" onBack={nav.goBack} />
+      <NavBar title={navTitle} onBack={nav.goBack} />
       <div style={pcStyles.summary}>
         <div style={pcStyles.summaryText}>
-          课程由 PC 管理后台发布。当前示例共 <span style={pcStyles.summaryNums}>{PAST_COURSES_MOCK.length}</span> 门：
+          课程由 PC「课程与往期」发布，<strong>视频、音频、PPT、图文</strong>均可在本页进入详情查阅（与 PC 共用本地存储键演示同步）。当前分类下共 <span style={pcStyles.summaryNums}>{scopedList.length}</span> 门：
           已学完 <span style={pcStyles.summaryNums}>{doneCount}</span> 门，
           未学完 <span style={pcStyles.summaryNums}>{undoneCount}</span> 门（含进行中）。
         </div>
+        <div style={{ ...pcStyles.chips, flexWrap: 'wrap', marginBottom: 8 }}>
+          {[
+            { id: 'all', label: '全部分类' },
+            { id: 'political', label: '政治素养' },
+            { id: 'ai_skill', label: 'AI 技能' },
+            { id: 'grassroots', label: '基层治理' },
+            { id: 'vocational', label: '职业技能' },
+          ].map(t => (
+            <button key={t.id} type="button" style={pcStyles.chip(catScope === t.id)} onClick={() => setCatScopeAndStore(t.id)}>
+              {t.label}
+            </button>
+          ))}
+        </div>
         <div style={pcStyles.chips}>
           {[
-            { id: 'all', label: '全部' },
-            { id: 'done', label: '已学完' },
-            { id: 'undone', label: '未学完' }
+            { id: 'p_all', fk: 'all', label: '进度·全部' },
+            { id: 'p_done', fk: 'done', label: '已学完' },
+            { id: 'p_undone', fk: 'undone', label: '未学完' }
           ].map(t => (
-            <button key={t.id} type="button" style={pcStyles.chip(filter === t.id)} onClick={() => setFilter(t.id)}>
+            <button key={t.id} type="button" style={pcStyles.chip(filter === t.fk)} onClick={() => setFilter(t.fk)}>
               {t.label}
             </button>
           ))}
@@ -2287,7 +2782,26 @@ const PastCoursesScreen = ({ nav }) => {
         {filtered.map(c => {
           const b = pcStyles.badge(c.status);
           return (
-            <button key={c.id} type="button" style={pcStyles.row} onClick={() => nav.navigateTo('courseDetail')}>
+            <button
+              key={c.id}
+              type="button"
+              style={pcStyles.row}
+              onClick={() => {
+                try {
+                  sessionStorage.setItem(NW_COURSE_DETAIL_KEY, JSON.stringify({
+                    id: c.id,
+                    title: c.title,
+                    type: c.type,
+                    duration: c.duration,
+                    publishedAt: c.publishedAt,
+                    status: c.status,
+                    progress: c.progress,
+                    fileName: c.fileName || '',
+                  }));
+                } catch (e2) {}
+                nav.navigateTo('courseDetail');
+              }}
+            >
               <div style={pcStyles.rowTop}>
                 <div style={pcStyles.rowTitle}>{c.title}</div>
                 <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 999, background: b.bg, color: b.color }}>{b.label}</span>
@@ -2309,27 +2823,100 @@ const PastCoursesScreen = ({ nav }) => {
 };
 
 // ============================================
-// Screen 7: Course Detail
+// Screen 7: Course Detail（视频 / 音频 / PPT / 图文；入口参数见 sessionStorage nw_course_detail_v1）
 // ============================================
 const CourseDetailScreen = ({ nav }) => {
+  const detail = React.useMemo(() => {
+    try {
+      const raw = sessionStorage.getItem(NW_COURSE_DETAIL_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    return null;
+  }, []);
+
+  const course = detail || {
+    id: 'default',
+    title: '党的二十大精神解读',
+    type: '视频',
+    duration: '28:45',
+    publishedAt: '',
+    status: 'in_progress',
+    progress: 45,
+    fileName: '',
+  };
+
+  const isPpt = course.type === 'PPT';
+  const isVideo = course.type === '视频';
+  const isAudio = course.type === '音频';
+  const isArticle = course.type === '图文';
+
+  const articleDemo = React.useMemo(() => {
+    const t = String(course.title || '');
+    if (t.includes('纪律处分') || t.includes('条例')) {
+      return {
+        coverLine: '以案释纪 · 学用结合',
+        blocks: [
+          { kind: 'p', text: '本课围绕《中国共产党纪律处分条例》修订背景、总体框架与常见违纪情形作导读，帮助支部党员在日常工作中划清底线、把握政策边界。' },
+          { kind: 'h', text: '一、为何再次修订《条例》' },
+          { kind: 'p', text: '坚持问题导向，把党的十八大以来管党治党新鲜经验上升为纪律规范；与宪法、监察法、政务处分法等相衔接，形成党纪国法贯通的制度闭环。' },
+          { kind: 'quote', text: '把纪律挺在前面，抓早抓小、防微杜渐。' },
+          { kind: 'h', text: '二、党员最需关注的六类红线（节选）' },
+          { kind: 'ul', items: ['政治纪律：在重大原则问题上不同党中央保持一致且有实际言论、行为或者造成不良后果的。', '组织纪律：违反民主集中制原则，拒不执行党组织重大决定。', '廉洁纪律：借用管理和服务对象钱款、住房、车辆等，影响公正执行公务。', '群众纪律：在办理涉及群众事务时刁难群众、吃拿卡要。', '工作纪律：工作中不负责任或者疏于管理，贯彻执行、检查督促落实上级决策部署不力。', '生活纪律：违背社会公序良俗，在公共场所、网络空间有不当言行，造成不良影响。'] },
+          { kind: 'figure', caption: '配图示意：条例结构导图（正式环境由 PC 上传高清图）' },
+          { kind: 'h', text: '三、支部研学建议' },
+          { kind: 'p', text: '可结合本单位「三重一大」事项清单、经费使用与招投标案例组织讨论；对苗头性问题及时运用第一种形态，做好纪实与归档。' },
+        ],
+      };
+    }
+    if (t.includes('组织生活会')) {
+      return {
+        coverLine: '规范程序 · 见人见事',
+        blocks: [
+          { kind: 'p', text: '组织生活会是党支部或党小组以交流思想、总结经验教训、开展批评与自我批评为中心内容的组织活动。本图文课演示「会前—会中—会后」材料如何呈现在手机端。' },
+          { kind: 'h', text: '一、会前准备（可查清单）' },
+          { kind: 'ul', items: ['确定主题并报上级党组织同意；组织集中学习、谈心谈话、征求意见。', '支部委员之间、委员与党员之间开展谈心，形成问题清单。', '党员领导干部以普通党员身份参加所在支部组织生活会。'] },
+          { kind: 'h', text: '二、会议主要议程（示例）' },
+          { kind: 'ol', items: ['支部书记代表班子作对照检查。', '党员逐一发言，开展批评与自我批评。', '上级党组织到会同志点评。', '支部书记作表态、明确整改方向。'] },
+          { kind: 'figure', caption: '配图示意：组织生活会记录表（脱敏）' },
+          { kind: 'h', text: '三、会后整改与通报' },
+          { kind: 'p', text: '列出整改事项、责任人和完成时限；在一定范围内通报会议情况，接受党员群众监督。正式环境可将整改清单与附件在详情页折叠展示。' },
+        ],
+      };
+    }
+    return {
+      coverLine: '图文课件',
+      blocks: [
+        { kind: 'p', text: '本课程为图文类学习材料演示：支持标题、引用、列表与配图混排，由 PC「课程与往期」维护正文与图片，小程序端按阅读进度记录学习时长。' },
+        { kind: 'h', text: '学习提示' },
+        { kind: 'ul', items: ['可上下滑动阅读全文；长按图片可保存（正式版受权限控制）。', '阅读到底部并点击「标记已学完」可同步完成率（演示）。'] },
+        { kind: 'figure', caption: '配图占位' },
+      ],
+    };
+  }, [course.title]);
+
   const chapters = [
     { title: '第一章：大会历史意义', duration: '25:30', done: true },
     { title: '第二章：核心思想概述', duration: '32:15', done: true },
     { title: '第三章：理论创新成果', duration: '28:45', done: true },
     { title: '第四章：实践应用指南', duration: '35:20', done: false },
     { title: '第五章：基层治理实践', duration: '22:10', done: false },
-    { title: '第六章：总结与展望', duration: '18:50', done: false }
+    { title: '第六章：总结与展望', duration: '18:50', done: false },
+  ];
+
+  const pptSlides = [
+    { n: 1, title: '导学', sub: '学习目标与目录' },
+    { n: 2, title: course.title || '正文', sub: '正式环境为转码缩略图，可双指缩放' },
+    { n: 3, title: '案例与流程', sub: '与 PC 上传的 PPT 页序一致' },
+    { n: 4, title: '小结', sub: '延展阅读与自测' },
   ];
 
   const cdStyles = {
     container: { height: '100%', background: T.bg },
-    videoArea: { background: '#1C1C1E', height: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', position: 'relative' },
     playBtn: { width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
     progressRow: { width: '80%', display: 'flex', alignItems: 'center', gap: 8 },
     progressBar: { flex: 1, height: 3, background: 'rgba(255,255,255,0.2)', borderRadius: 2, overflow: 'hidden' },
-    progressFill: { width: '45%', height: '100%', background: T.primary, borderRadius: 2 },
+    progressFill: (pct) => ({ width: `${pct}%`, height: '100%', background: T.primary, borderRadius: 2 }),
     timeCode: { fontSize: 11, opacity: 0.7 },
-    content: { padding: '8px 14px 20px', overflowY: 'auto', height: 'calc(100% - 54px - 200px)' },
     infoCard: { marginBottom: T.sectionGap },
     title: { fontSize: 16, fontWeight: 700, fontFamily: "'Noto Serif SC', serif", marginBottom: 8 },
     statsRow: { display: 'flex', gap: 12, marginTop: 8 },
@@ -2341,40 +2928,187 @@ const CourseDetailScreen = ({ nav }) => {
     chLeft: { display: 'flex', alignItems: 'center', gap: 10 },
     chDot: (done) => ({ width: 8, height: 8, borderRadius: '50%', background: done ? T.success : T.border }),
     chTitle: (done) => ({ fontSize: 13, color: done ? T.textSecondary : T.textPrimary, fontWeight: done ? 400 : 500 }),
-    chDuration: { fontSize: 11, color: T.textMuted }
+    chDuration: { fontSize: 11, color: T.textMuted },
   };
+
+  const progPct = typeof course.progress === 'number' ? Math.min(100, Math.max(0, course.progress)) : 0;
+  const mediaTitle = isPpt ? '幻灯片预览' : (isVideo || isAudio) ? '播放区' : '学习内容';
+  const heroArticleH = 122;
+  const heroBelowNav = isPpt ? 168 : (isVideo || isAudio) ? 156 : isArticle ? heroArticleH : 100;
+  const scrollBelowNav = `calc(100% - 54px - ${heroBelowNav}px)`;
 
   return (
     <div style={cdStyles.container}>
       <NavBar title="课程详情" onBack={nav.goBack} dark bg="rgba(28,28,30,0.95)" />
-      <div style={{ background: '#1C1C1E', height: 156, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
-        <div style={cdStyles.playBtn}><Icons.Play /></div>
-        <div style={cdStyles.progressRow}>
-          <div style={cdStyles.progressBar}><div style={cdStyles.progressFill} /></div>
-          <span style={cdStyles.timeCode}>12:30 / 28:45</span>
+      {isPpt ? (
+        <div style={{ background: 'linear-gradient(180deg,#1e3a5f,#0f172a)', padding: '12px 0 14px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ padding: '0 14px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.92)' }}>{mediaTitle}</span>
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>左右滑动 · 全屏查阅</span>
+          </div>
+          <div style={{ display: 'flex', gap: 10, overflowX: 'auto', padding: '4px 14px 2px', WebkitOverflowScrolling: 'touch' }}>
+            {pptSlides.map((s) => (
+              <div
+                key={s.n}
+                style={{
+                  flex: '0 0 auto', width: 'min(72vw, 260px)', minHeight: 132, borderRadius: 12,
+                  background: 'linear-gradient(145deg,#fff,#f1f5f9)', color: '#0f172a',
+                  border: '1px solid rgba(255,255,255,0.35)', boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+                  padding: '14px 14px 12px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+                }}
+              >
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#64748B' }}>第 {s.n} 页</div>
+                <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "'Noto Serif SC', serif", lineHeight: 1.35 }}>{s.title}</div>
+                <div style={{ fontSize: 11, color: '#64748B', lineHeight: 1.45 }}>{s.sub}</div>
+              </div>
+            ))}
+          </div>
+          {course.fileName ? (
+            <div style={{ padding: '8px 14px 0', fontSize: 11, color: 'rgba(255,255,255,0.65)', fontFamily: 'ui-monospace, Menlo, monospace' }}>源文件：{course.fileName}</div>
+          ) : null}
         </div>
-      </div>
-      <div style={{ padding: '8px 14px', overflowY: 'auto', height: 'calc(100% - 54px - 156px)' }}>
+      ) : (isVideo || isAudio) ? (
+        <div style={{ background: '#1C1C1E', height: 156, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+          <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.75, marginBottom: 6 }}>{isAudio ? '音频课程 · 点击播放' : '视频课程 · 点击播放'}</div>
+          <div style={cdStyles.playBtn}><Icons.Play /></div>
+          <div style={cdStyles.progressRow}>
+            <div style={cdStyles.progressBar}><div style={cdStyles.progressFill(progPct || 45)} /></div>
+            <span style={cdStyles.timeCode}>{isAudio ? (`学习进度 ${progPct}% · 总时长 ${course.duration || '—'}`) : '12:30 / 28:45'}</span>
+          </div>
+        </div>
+      ) : isArticle ? (
+        <div style={{
+          background: 'linear-gradient(118deg,#FFF5F5 0%,#FFF7ED 38%,#FFFBEB 100%)',
+          borderBottom: `1px solid ${T.border}`,
+          padding: '14px 14px 16px',
+          minHeight: heroArticleH,
+          boxSizing: 'border-box',
+        }}
+        >
+          <div style={{ fontSize: 10, fontWeight: 700, color: T.primary, letterSpacing: '0.1em', marginBottom: 6 }}>南湾党建 · {articleDemo.coverLine}</div>
+          <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "'Noto Serif SC', serif", color: T.textPrimary, lineHeight: 1.42 }}>{course.title}</div>
+          <p style={{ fontSize: 11, color: T.textSecondary, marginTop: 8, lineHeight: 1.55 }}>
+            以下为<strong>可滚动正文演示</strong>：正式环境由 PC 富文本与图片上传，移动端流式排版并记录阅读进度。
+          </p>
+        </div>
+      ) : (
+        <div style={{ background: '#F8FAFC', borderBottom: `1px solid ${T.border}`, padding: '14px 14px', minHeight: 100, boxSizing: 'border-box' }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: T.textSecondary, marginBottom: 6 }}>{course.type} 课件</div>
+          <p style={{ fontSize: 13, color: T.textPrimary, lineHeight: 1.65 }}>本类型在正式环境中将按模板渲染。此处为原型占位。</p>
+        </div>
+      )}
+
+      <div style={{ padding: '8px 14px', overflowY: 'auto', height: scrollBelowNav }}>
         <Card style={cdStyles.infoCard}>
-          <div style={cdStyles.title}>党的二十大精神解读</div>
-          <div style={{ fontSize: 12, color: T.textSecondary }}>讲师：王教授 · 共6章</div>
+          <div style={cdStyles.title}>{course.title}</div>
+          <div style={{ fontSize: 12, color: T.textSecondary }}>
+            类型：{course.type}
+            {course.duration ? ` · ${course.duration}` : ''}
+            {course.publishedAt ? ` · 发布 ${course.publishedAt}` : ''}
+          </div>
           <div style={cdStyles.statsRow}>
-            <div style={cdStyles.statCol}><div style={cdStyles.statNum}>6</div><div style={cdStyles.statLabel}>总章节</div></div>
-            <div style={cdStyles.statCol}><div style={cdStyles.statNum}>3</div><div style={cdStyles.statLabel}>已完成</div></div>
-            <div style={cdStyles.statCol}><div style={cdStyles.statNum}>2.5h</div><div style={cdStyles.statLabel}>总时长</div></div>
+            {isArticle ? (
+              <>
+                <div style={cdStyles.statCol}><div style={cdStyles.statNum}>{articleDemo.blocks.filter((b) => b.kind === 'h').length || '—'}</div><div style={cdStyles.statLabel}>小节</div></div>
+                <div style={cdStyles.statCol}><div style={cdStyles.statNum}>{articleDemo.blocks.filter((b) => b.kind === 'figure').length}</div><div style={cdStyles.statLabel}>配图位</div></div>
+                <div style={cdStyles.statCol}><div style={cdStyles.statNum}>{progPct}%</div><div style={cdStyles.statLabel}>阅读进度</div></div>
+              </>
+            ) : (
+              <>
+                <div style={cdStyles.statCol}><div style={cdStyles.statNum}>{isPpt ? pptSlides.length : chapters.length}</div><div style={cdStyles.statLabel}>{isPpt ? '演示页数' : '总章节'}</div></div>
+                <div style={cdStyles.statCol}><div style={cdStyles.statNum}>{isPpt ? Math.min(pptSlides.length, Math.max(0, Math.round(progPct / 34))) : '3'}</div><div style={cdStyles.statLabel}>{isPpt ? '已览页（估）' : '已完成'}</div></div>
+                <div style={cdStyles.statCol}><div style={cdStyles.statNum}>{isPpt ? `${progPct}%` : '2.5h'}</div><div style={cdStyles.statLabel}>{isPpt ? '学习进度' : '总时长'}</div></div>
+              </>
+            )}
           </div>
         </Card>
 
-        <div style={cdStyles.chapterTitle}>章节列表</div>
-        {chapters.map((ch, i) => (
-          <div key={i} style={cdStyles.chapterItem(ch.done)}>
-            <div style={cdStyles.chLeft}>
-              <div style={cdStyles.chDot(ch.done)} />
-              <span style={cdStyles.chTitle(ch.done)}>{ch.title}</span>
+        {isPpt ? (
+          <>
+            <div style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.65, marginBottom: 12 }}>
+              与 PC「课程与往期」上传的 PPT 同源展示：演示环境用占位幻灯片；正式环境可接文档服务生成缩略图与在线放映（与视频课同一详情流）。
             </div>
-            <span style={cdStyles.chDuration}>{ch.duration}</span>
-          </div>
-        ))}
+            <button
+              type="button"
+              style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: 'none', background: T.primary, color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: "'Noto Serif SC', serif" }}
+              onClick={() => { window.alert('已标记本节为已阅（演示）'); }}
+            >
+              标记当前进度已阅
+            </button>
+          </>
+        ) : isArticle ? (
+          <>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, fontFamily: "'Noto Serif SC', serif", color: T.textPrimary }}>正文</div>
+            <div style={{ background: T.surface, borderRadius: T.cardRadius, border: `1px solid ${T.border}`, padding: '14px 14px 16px', marginBottom: 14, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+              {articleDemo.blocks.map((b, i) => {
+                if (b.kind === 'h') {
+                  return <div key={i} style={{ fontSize: 14, fontWeight: 700, color: T.textPrimary, marginTop: i ? 16 : 0, marginBottom: 8, fontFamily: "'Noto Serif SC', serif" }}>{b.text}</div>;
+                }
+                if (b.kind === 'p') {
+                  return <p key={i} style={{ fontSize: 13, color: T.textSecondary, lineHeight: 1.75, marginBottom: 10 }}>{b.text}</p>;
+                }
+                if (b.kind === 'quote') {
+                  return (
+                    <div key={i} style={{ margin: '12px 0', padding: '12px 14px', borderLeft: `4px solid ${T.primary}`, background: T.primaryLight, borderRadius: '0 8px 8px 0', fontSize: 13, color: T.textPrimary, lineHeight: 1.65, fontStyle: 'italic' }}>
+                      {b.text}
+                    </div>
+                  );
+                }
+                if (b.kind === 'ul') {
+                  return (
+                    <ul key={i} style={{ margin: '0 0 12px 0', paddingLeft: 18, fontSize: 13, color: T.textSecondary, lineHeight: 1.7 }}>
+                      {(b.items || []).map((it, j) => <li key={j} style={{ marginBottom: 6 }}>{it}</li>)}
+                    </ul>
+                  );
+                }
+                if (b.kind === 'ol') {
+                  return (
+                    <ol key={i} style={{ margin: '0 0 12px 0', paddingLeft: 18, fontSize: 13, color: T.textSecondary, lineHeight: 1.7 }}>
+                      {(b.items || []).map((it, j) => <li key={j} style={{ marginBottom: 6 }}>{it}</li>)}
+                    </ol>
+                  );
+                }
+                if (b.kind === 'figure') {
+                  return (
+                    <div key={i} style={{ margin: '14px 0' }}>
+                      <div style={{
+                        height: 140, borderRadius: 12, border: `1px dashed ${T.border}`,
+                        background: 'linear-gradient(165deg,#F8FAFC,#EEF2FF)',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, color: T.textMuted,
+                      }}
+                      >
+                        <Icons.Camera />
+                        <span style={{ fontSize: 12, fontWeight: 600, color: T.textSecondary }}>插图区</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: T.textMuted, marginTop: 6, textAlign: 'center' }}>{b.caption}</div>
+                    </div>
+                  );
+                }
+                return null;
+              })}
+            </div>
+            <button
+              type="button"
+              style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: 'none', background: T.primary, color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: "'Noto Serif SC', serif" }}
+              onClick={() => { window.alert('已标记本图文课为已学完（演示），完成率将回写列表'); }}
+            >
+              标记已学完
+            </button>
+          </>
+        ) : (
+          <>
+            <div style={cdStyles.chapterTitle}>章节列表</div>
+            {chapters.map((ch, i) => (
+              <div key={i} style={cdStyles.chapterItem(ch.done)}>
+                <div style={cdStyles.chLeft}>
+                  <div style={cdStyles.chDot(ch.done)} />
+                  <span style={cdStyles.chTitle(ch.done)}>{ch.title}</span>
+                </div>
+                <span style={cdStyles.chDuration}>{ch.duration}</span>
+              </div>
+            ))}
+          </>
+        )}
       </div>
     </div>
   );
@@ -2827,7 +3561,7 @@ const LiveActivityScreen = ({ nav }) => {
 // ============================================
 // Screen 10: AI QA
 // ============================================
-/** 智能问答为第三方 DinTal H5；若通过 navigateTo 进入则立即跳转（Tab 点击直接 location 不经过此屏） */
+/** 智能问答为第三方 DinTal H5；通过办公助手九宫格或 navigateTo('aiQA') 进入则立即跳转 */
 const AIQAScreen = ({ nav }) => {
   React.useEffect(function () {
     window.location.replace(getAiQaExternalH5Url());
@@ -2835,7 +3569,7 @@ const AIQAScreen = ({ nav }) => {
   const canBack = nav.history && nav.history.length > 1;
   return (
     <div style={{ height: '100%', background: T.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, paddingBottom: NW_TAB_SCROLL_BOTTOM_PAD }}>
-      <NavBar title="AI问答" onBack={canBack ? nav.goBack : undefined} />
+      <NavBar title="智能问答" onBack={canBack ? nav.goBack : undefined} />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, maxWidth: 320, textAlign: 'center' }}>
         <div style={{ fontSize: 14, color: T.textSecondary, lineHeight: 1.65 }}>正在打开「DinTal AI客服」…</div>
         <div style={{ fontSize: 11, color: T.textMuted, wordBreak: 'break-all' }}>{getAiQaExternalH5Url()}</div>
@@ -2859,7 +3593,1202 @@ const AIQAScreen = ({ nav }) => {
           若未自动跳转，点此打开
         </button>
       </div>
-      <TabBar active="aiQA" onSwitch={nav.switchTab} items={tabItems} />
+      <TabBar active={null} onSwitch={nav.switchTab} items={tabItems} />
+    </div>
+  );
+};
+
+// ============================================
+// Screen: 办公助手占位工具（大模型 / 模板接入前演示）
+// ============================================
+const OFFICE_TOOL_COPY = {
+  docWriting: { title: '公文写作', desc: '下列模板由 PC 管理端「办公助手 → 公文写作」维护；接入大模型 API 后按本单位要素与所选模板生成初稿。' },
+  typoCheck: { title: '错别字与语句校验', desc: '粘贴文稿即可获得错别字、标点与常见语病提示；正式环境与保密要求对齐（演示占位）。' },
+  meetingMinutes: { title: '会议纪要生成', desc: '参考通义千问「实时记录」：边录边转写、分段展示发言人，结束后生成要点摘要；涉密会议请勿使用录音（演示）。' },
+  homework: { title: '作业批改', desc: '参考豆包等「拍照上传 → 识别 → 分题批改与评语」流程；本机演示不接真实模型 API。' },
+  meetingNotice: { title: '会议通知生成', desc: '下列模板由 PC 管理端「办公助手 → 会议通知模板」维护；选择后在正文中将【】替换为实际要素。与 PC「会议通知生成」同源。' },
+  noticeQuick: { title: '会议通知生成', desc: '下列模板由 PC 管理端「办公助手 → 会议通知模板」维护；选择后在正文中将【】替换为实际要素。与 PC「会议通知生成」同源。' },
+};
+
+const DocWritingScreen = ({ nav }) => {
+  const boot = React.useMemo(() => {
+    const t = readNwOfficeDocTemplates();
+    const first = t[0];
+    return { templates: t, selectedId: (first && first.id) || '', draftBody: (first && first.body) || '' };
+  }, []);
+  const [templates, setTemplates] = React.useState(boot.templates);
+  const [selectedId, setSelectedId] = React.useState(boot.selectedId);
+  const [draftBody, setDraftBody] = React.useState(boot.draftBody);
+
+  React.useEffect(() => {
+    const pull = () => setTemplates(readNwOfficeDocTemplates());
+    window.addEventListener('storage', pull);
+    window.addEventListener('nw-office-doc-templates-changed', pull);
+    let bc = null;
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        bc = new BroadcastChannel(NW_OFFICE_DOC_TEMPLATES_BC);
+        bc.onmessage = pull;
+      }
+    } catch (e) {}
+    return () => {
+      window.removeEventListener('storage', pull);
+      window.removeEventListener('nw-office-doc-templates-changed', pull);
+      if (bc) try { bc.close(); } catch (e2) {}
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (!templates.length) {
+      setSelectedId('');
+      setDraftBody('');
+      return;
+    }
+    const cur = templates.find((x) => x.id === selectedId);
+    if (!cur) {
+      const first = templates[0];
+      setSelectedId(first.id);
+      setDraftBody(first.body || '');
+      return;
+    }
+    setDraftBody(cur.body || '');
+  }, [templates, selectedId]);
+
+  const meta = OFFICE_TOOL_COPY.docWriting;
+  const selectedTpl = templates.find((x) => x.id === selectedId);
+
+  const rowBase = {
+    borderRadius: 12,
+    padding: '12px 14px',
+    marginBottom: 10,
+    cursor: 'pointer',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+    WebkitTapHighlightColor: 'transparent',
+  };
+
+  const pickTemplate = (tpl) => setSelectedId(tpl.id);
+
+  return (
+    <div style={{ height: '100%', background: T.bg, display: 'flex', flexDirection: 'column' }}>
+      <NavBar title="公文写作" onBack={nav.goBack} />
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px 24px' }}>
+        <p style={{ fontSize: 12, color: T.textSecondary, lineHeight: 1.55, marginBottom: 10 }}>{meta.desc}</p>
+
+        <div style={{ fontSize: 11, fontWeight: 700, color: T.primary, marginBottom: 6 }}>关键内容替换</div>
+        <Card style={{ padding: 12, marginBottom: 14 }}>
+          <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 8 }}>
+            当前模板：<strong style={{ color: T.textPrimary }}>{selectedTpl ? selectedTpl.name : '—'}</strong>
+            {' · '}在下方正文中将【】内文字替换为实际内容
+          </div>
+          <textarea
+            value={draftBody}
+            onChange={(e) => setDraftBody(e.target.value)}
+            spellCheck={false}
+            style={{
+              width: '100%',
+              minHeight: 160,
+              padding: '10px 12px',
+              borderRadius: 10,
+              border: `1px solid ${T.border}`,
+              fontSize: 13,
+              lineHeight: 1.55,
+              resize: 'vertical',
+              boxSizing: 'border-box',
+              fontFamily: 'ui-monospace, Menlo, Consolas, monospace',
+              background: T.bg,
+              color: T.textPrimary,
+            }}
+            placeholder="请先选择下方写作模板"
+          />
+        </Card>
+
+        <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, marginBottom: 8, letterSpacing: '0.06em' }}>写作模板</div>
+        {templates.length === 0 ? (
+          <div style={{ fontSize: 12, color: T.textMuted }}>暂无模板，请在 PC 端添加。</div>
+        ) : (
+          templates.map((tpl) => {
+            const on = tpl.id === selectedId;
+            return (
+              <div
+                key={tpl.id}
+                role="button"
+                tabIndex={0}
+                style={{
+                  ...rowBase,
+                  background: T.surface,
+                  border: on ? `2px solid ${T.primary}` : `1px solid ${T.border}`,
+                  padding: on ? '11px 13px' : '12px 14px',
+                }}
+                onClick={() => pickTemplate(tpl)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pickTemplate(tpl); } }}
+              >
+                <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "'Noto Serif SC', serif", color: T.textPrimary, marginBottom: 4 }}>{tpl.name}</div>
+                <div style={{ fontSize: 12, color: T.textSecondary, lineHeight: 1.55 }}>{tpl.desc || '（无说明）'}</div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+};
+
+const MN_NOTICE_ACCENT = '#0F766E';
+
+const MeetingNoticeScreen = ({ nav }) => {
+  const boot = React.useMemo(() => {
+    const t = readNwMeetingNoticeTemplates();
+    const first = t[0];
+    return { templates: t, selectedId: (first && first.id) || '', draftBody: (first && first.body) || '' };
+  }, []);
+  const [templates, setTemplates] = React.useState(boot.templates);
+  const [selectedId, setSelectedId] = React.useState(boot.selectedId);
+  const [draftBody, setDraftBody] = React.useState(boot.draftBody);
+
+  React.useEffect(() => {
+    const pull = () => setTemplates(readNwMeetingNoticeTemplates());
+    window.addEventListener('storage', pull);
+    window.addEventListener('nw-meeting-notice-templates-changed', pull);
+    let bc = null;
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        bc = new BroadcastChannel(NW_MEETING_NOTICE_TEMPLATES_BC);
+        bc.onmessage = pull;
+      }
+    } catch (e) {}
+    return () => {
+      window.removeEventListener('storage', pull);
+      window.removeEventListener('nw-meeting-notice-templates-changed', pull);
+      if (bc) try { bc.close(); } catch (e2) {}
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (!templates.length) {
+      setSelectedId('');
+      setDraftBody('');
+      return;
+    }
+    const cur = templates.find((x) => x.id === selectedId);
+    if (!cur) {
+      const first = templates[0];
+      setSelectedId(first.id);
+      setDraftBody(first.body || '');
+      return;
+    }
+    setDraftBody(cur.body || '');
+  }, [templates, selectedId]);
+
+  const meta = OFFICE_TOOL_COPY.meetingNotice;
+  const selectedTpl = templates.find((x) => x.id === selectedId);
+
+  const rowBase = {
+    borderRadius: 12,
+    padding: '12px 14px',
+    marginBottom: 10,
+    cursor: 'pointer',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+    WebkitTapHighlightColor: 'transparent',
+  };
+
+  const pickTemplate = (tpl) => setSelectedId(tpl.id);
+
+  return (
+    <div style={{ height: '100%', background: T.bg, display: 'flex', flexDirection: 'column' }}>
+      <NavBar title="会议通知生成" onBack={nav.goBack} />
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px 24px' }}>
+        <p style={{ fontSize: 12, color: T.textSecondary, lineHeight: 1.55, marginBottom: 10 }}>{meta.desc}</p>
+
+        <div style={{ fontSize: 11, fontWeight: 700, color: MN_NOTICE_ACCENT, marginBottom: 6 }}>通知正文编辑</div>
+        <Card style={{ padding: 12, marginBottom: 14 }}>
+          <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 8 }}>
+            当前模板：<strong style={{ color: T.textPrimary }}>{selectedTpl ? selectedTpl.name : '—'}</strong>
+            {' · '}将【】内占位替换为时间、地点、议题、联系人等
+          </div>
+          <textarea
+            value={draftBody}
+            onChange={(e) => setDraftBody(e.target.value)}
+            spellCheck={false}
+            style={{
+              width: '100%',
+              minHeight: 160,
+              padding: '10px 12px',
+              borderRadius: 10,
+              border: `1px solid ${T.border}`,
+              fontSize: 13,
+              lineHeight: 1.55,
+              resize: 'vertical',
+              boxSizing: 'border-box',
+              fontFamily: 'ui-monospace, Menlo, Consolas, monospace',
+              background: T.bg,
+              color: T.textPrimary,
+            }}
+            placeholder="请先选择下方会议通知模板"
+          />
+        </Card>
+
+        <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, marginBottom: 8, letterSpacing: '0.06em' }}>会议通知模板</div>
+        {templates.length === 0 ? (
+          <div style={{ fontSize: 12, color: T.textMuted }}>暂无模板，请在 PC 管理端「办公助手 → 会议通知模板」添加。</div>
+        ) : (
+          templates.map((tpl) => {
+            const on = tpl.id === selectedId;
+            return (
+              <div
+                key={tpl.id}
+                role="button"
+                tabIndex={0}
+                style={{
+                  ...rowBase,
+                  background: T.surface,
+                  border: on ? `2px solid ${MN_NOTICE_ACCENT}` : `1px solid ${T.border}`,
+                  padding: on ? '11px 13px' : '12px 14px',
+                }}
+                onClick={() => pickTemplate(tpl)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pickTemplate(tpl); } }}
+              >
+                <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "'Noto Serif SC', serif", color: T.textPrimary, marginBottom: 4 }}>{tpl.name}</div>
+                <div style={{ fontSize: 12, color: T.textSecondary, lineHeight: 1.55 }}>{tpl.desc || '（无说明）'}</div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// Screen: 会议纪要 · 参考通义千问「实时记录」式交互（演示）
+// ============================================
+const MM_LIVE_DEMO_SEGMENTS = [
+  { speaker: '发言人1', text: '今天的支部委员会，我们先过一下三季度学习计划的调整事项。' },
+  { speaker: '发言人2', text: '同意，另外建议把集中学习和自学的时间都写进计划表，方便请假党员补课。' },
+  { speaker: '发言人1', text: '可以。党小组层面要同步传达，尤其是外出党员这块，线上学习要确保可追溯。' },
+  { speaker: '发言人2', text: '那我把上次议定的两项整改跟进情况也顺便汇报一下，看是否纳入纪要。' },
+  { speaker: '发言人1', text: '纳入。请组织委员把今天确定的三个时间节点写进纪要，下周支委会对照落实。' },
+];
+
+const MM_LIVE_SUMMARY_BULLETS = [
+  '三季度学习计划需调整并明确集中学习与自学安排。',
+  '党小组需同步传达；外出党员线上学习须可追溯。',
+  '纳入上次议定整改跟进；组织委员落实纪要中的时间节点。',
+];
+const NW_MEETING_LIVE_HISTORY_KEY = 'nw_meeting_live_history_v1';
+const NW_MEETING_LIVE_DETAIL_ID_KEY = 'nw_meeting_live_detail_id_v1';
+
+function formatMmLiveTime(totalSec) {
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function nwMeetingLiveTitleFromSegments(segments) {
+  const t = segments && segments[0] && segments[0].text ? String(segments[0].text).replace(/\s+/g, ' ').trim() : '';
+  if (!t) return '';
+  return t.length > 26 ? `${t.slice(0, 26)}…` : t;
+}
+
+function nwMeetingLiveFallbackTitle(iso) {
+  try {
+    const d = new Date(iso);
+    return `实时记录 · ${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  } catch (e) {
+    return '实时记录';
+  }
+}
+
+function nwMeetingLiveNormalizeRecord(r, i) {
+  const id = r && r.id ? String(r.id) : `ml_${i}_${Date.now()}`;
+  const title = r && r.title != null ? String(r.title).trim() : '';
+  const createdAt = r && r.createdAt ? String(r.createdAt) : new Date().toISOString();
+  const durationSec = Math.max(0, Math.floor(Number(r && r.durationSec != null ? r.durationSec : 0) || 0));
+  const segments = Array.isArray(r && r.segments) ? r.segments.map((s) => ({
+    speaker: s && s.speaker != null ? String(s.speaker) : '发言人',
+    text: s && s.text != null ? String(s.text) : '',
+  })) : [];
+  let summaryBullets = Array.isArray(r && r.summaryBullets) ? r.summaryBullets.map((x) => String(x)) : [];
+  if (!summaryBullets.length) summaryBullets = MM_LIVE_SUMMARY_BULLETS.slice();
+  const audioRecorded = !!(r && r.audioRecorded);
+  return { id, title: title || nwMeetingLiveFallbackTitle(createdAt), createdAt, durationSec, segments, summaryBullets, audioRecorded };
+}
+
+function readNwMeetingLiveHistory() {
+  try {
+    const raw = localStorage.getItem(NW_MEETING_LIVE_HISTORY_KEY);
+    if (!raw) return [];
+    const p = JSON.parse(raw);
+    if (!Array.isArray(p)) return [];
+    return p.map(nwMeetingLiveNormalizeRecord);
+  } catch (e) {
+    return [];
+  }
+}
+
+function writeNwMeetingLiveHistory(arr) {
+  const clean = (Array.isArray(arr) ? arr : []).map(nwMeetingLiveNormalizeRecord);
+  try {
+    localStorage.setItem(NW_MEETING_LIVE_HISTORY_KEY, JSON.stringify(clean));
+  } catch (e) {}
+  try {
+    window.dispatchEvent(new Event('nw-meeting-live-history-changed'));
+  } catch (e2) {}
+}
+
+function appendNwMeetingLiveRecord(rec) {
+  const n = nwMeetingLiveNormalizeRecord(rec);
+  const list = readNwMeetingLiveHistory();
+  const next = [n, ...list].slice(0, 50);
+  writeNwMeetingLiveHistory(next);
+}
+
+const MeetingMinutesHistoryHub = ({ nav }) => {
+  const panBg = 'linear-gradient(180deg, #EEF2FF 0%, #F8FAFC 35%, #FAFAF9 100%)';
+  const [rows, setRows] = React.useState(() => readNwMeetingLiveHistory());
+  React.useEffect(() => {
+    const pull = () => setRows(readNwMeetingLiveHistory());
+    window.addEventListener('storage', pull);
+    window.addEventListener('nw-meeting-live-history-changed', pull);
+    return () => {
+      window.removeEventListener('storage', pull);
+      window.removeEventListener('nw-meeting-live-history-changed', pull);
+    };
+  }, []);
+
+  const openDetail = (id) => {
+    try { sessionStorage.setItem(NW_MEETING_LIVE_DETAIL_ID_KEY, id); } catch (e) {}
+    nav.navigateTo('meetingMinutesDetail');
+  };
+
+  const excerpt = (r) => {
+    if (r.summaryBullets && r.summaryBullets[0]) return r.summaryBullets[0];
+    const s = r.segments && r.segments[0] && r.segments[0].text;
+    return s ? String(s).slice(0, 48) + (String(s).length > 48 ? '…' : '') : '（无摘要预览）';
+  };
+
+  const fmtDate = (iso) => {
+    try {
+      const d = new Date(iso);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    } catch (e) {
+      return '—';
+    }
+  };
+
+  return (
+    <div style={{ height: '100%', background: panBg, display: 'flex', flexDirection: 'column' }}>
+      <NavBar title="会议纪要" onBack={nav.goBack} />
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px max(14px, env(safe-area-inset-bottom, 0px))' }}>
+        <p style={{ fontSize: 11, color: '#64748B', lineHeight: 1.55, marginBottom: 12 }}>
+          以下为已保存的<strong>实时记录</strong>（演示数据存于本机浏览器）。点击条目可查阅转写与智能纪要；新建请使用下方按钮。
+        </p>
+        <button
+          type="button"
+          onClick={() => nav.navigateTo('meetingMinutesRecorder')}
+          style={{
+            width: '100%',
+            padding: '13px 0',
+            marginBottom: 14,
+            borderRadius: 12,
+            border: 'none',
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: 'pointer',
+            color: '#fff',
+            background: 'linear-gradient(145deg,#8B5CF6,#6366F1 48%,#4F46E5)',
+            boxShadow: '0 10px 28px rgba(79,70,229,0.3)',
+          }}
+        >
+          开始新的实时记录
+        </button>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#6366F1', letterSpacing: '0.1em', marginBottom: 8 }}>历史记录</div>
+        {rows.length === 0 ? (
+          <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '28px 12px', background: 'rgba(255,255,255,0.75)', borderRadius: 14, border: '1px solid rgba(148,163,184,0.35)' }}>
+            暂无历史记录。完成一次「结束并生成纪要」后将自动出现在此列表。
+          </div>
+        ) : (
+          rows.map((r) => (
+            <div
+              key={r.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => openDetail(r.id)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(r.id); } }}
+              style={{
+                background: 'rgba(255,255,255,0.88)',
+                borderRadius: 14,
+                border: '1px solid rgba(148,163,184,0.35)',
+                padding: '12px 14px',
+                marginBottom: 10,
+                cursor: 'pointer',
+                WebkitTapHighlightColor: 'transparent',
+                boxShadow: '0 1px 3px rgba(15,23,42,0.06)',
+              }}
+            >
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#0F172A', marginBottom: 4, lineHeight: 1.35 }}>{r.title}</div>
+              <div style={{ fontSize: 11, color: '#64748B', marginBottom: 6 }}>
+                {fmtDate(r.createdAt)}
+                <span style={{ margin: '0 6px', opacity: 0.45 }}>|</span>
+                时长 {formatMmLiveTime(r.durationSec)}
+              </div>
+              <div style={{ fontSize: 12, color: '#475569', lineHeight: 1.55 }}>{excerpt(r)}</div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
+
+const MeetingMinutesRecorderScreen = ({ nav }) => {
+  const [phase, setPhase] = React.useState('idle');
+  const [sec, setSec] = React.useState(0);
+  const [segments, setSegments] = React.useState([]);
+  const demoNext = React.useRef(0);
+  const scrollerRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (phase !== 'recording') return undefined;
+    const id = window.setInterval(() => setSec((t) => t + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [phase]);
+
+  React.useEffect(() => {
+    if (phase !== 'recording') return undefined;
+    const id = window.setInterval(() => {
+      setSegments((prev) => {
+        const i = demoNext.current;
+        if (i >= MM_LIVE_DEMO_SEGMENTS.length) return prev;
+        demoNext.current = i + 1;
+        return prev.concat([MM_LIVE_DEMO_SEGMENTS[i]]);
+      });
+    }, 2600);
+    return () => window.clearInterval(id);
+  }, [phase]);
+
+  React.useEffect(() => {
+    const el = scrollerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [segments]);
+
+  const startRec = () => {
+    demoNext.current = 0;
+    setSec(0);
+    setSegments([]);
+    setPhase('recording');
+  };
+  const pauseRec = () => setPhase('paused');
+  const resumeRec = () => setPhase('recording');
+  const finishAndSave = () => {
+    const id = `ml_${Date.now()}`;
+    const createdAt = new Date().toISOString();
+    const title = nwMeetingLiveTitleFromSegments(segments) || nwMeetingLiveFallbackTitle(createdAt);
+    appendNwMeetingLiveRecord({
+      id,
+      title,
+      createdAt,
+      durationSec: sec,
+      segments: segments.slice(),
+      summaryBullets: MM_LIVE_SUMMARY_BULLETS.slice(),
+    });
+    try { sessionStorage.setItem(NW_MEETING_LIVE_DETAIL_ID_KEY, id); } catch (e) {}
+    nav.goBack();
+    window.setTimeout(() => { nav.navigateTo('meetingMinutesDetail'); }, 0);
+  };
+
+  const panBg = 'linear-gradient(180deg, #EEF2FF 0%, #F8FAFC 30%, #FAFAF9 100%)';
+  const spkHue = (name) => (name === '发言人2' ? '#0D9488' : '#5B21B6');
+
+  return (
+    <div style={{ height: '100%', background: panBg, display: 'flex', flexDirection: 'column' }}>
+      <NavBar title="实时记录" onBack={nav.goBack} />
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, padding: '0 14px' }}>
+        <p style={{ fontSize: 11, color: '#64748B', lineHeight: 1.55, marginTop: 10, marginBottom: 8 }}>
+          交互参照 <strong>通义千问 · 实时记录</strong>（语音转写 + 分段展示 + 会后摘要）；本页为静态演示，未调用麦克风与云端。结束并保存后将出现在「会议纪要」历史列表。涉密会议请勿录音。
+        </p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+          {['实时转写', '发言人分段', '会后摘要'].map((t) => (
+            <span key={t} style={{ fontSize: 10, fontWeight: 600, color: '#4338CA', background: 'rgba(99,102,241,0.12)', padding: '4px 10px', borderRadius: 999 }}>{t}</span>
+          ))}
+        </div>
+
+        <div style={{ flexShrink: 0, textAlign: 'center', padding: '4px 0 12px' }}>
+          {(phase === 'recording' || phase === 'paused') && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 8 }}>
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 99,
+                  background: phase === 'recording' ? '#EF4444' : '#F59E0B',
+                  animation: phase === 'recording' ? 'pulse 1.2s ease-in-out infinite' : 'none',
+                }}
+              />
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#1E293B' }}>{phase === 'recording' ? '正在聆听并实时转写…' : '已暂停'}</span>
+            </div>
+          )}
+          <div style={{ fontVariantNumeric: 'tabular-nums', fontSize: 34, fontWeight: 700, letterSpacing: '0.06em', color: '#0F172A', marginBottom: 6 }}>
+            {formatMmLiveTime(sec)}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 3, height: 44, marginBottom: 12, opacity: phase === 'recording' ? 1 : 0.32 }}>
+            {Array.from({ length: 28 }, (_, i) => (
+              <div
+                key={i}
+                className="mm-live-bar"
+                style={{
+                  animationPlayState: phase === 'recording' ? 'running' : 'paused',
+                  animationDelay: `${(i % 9) * 0.05}s`,
+                }}
+              />
+            ))}
+          </div>
+
+          <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+            {(phase === 'recording' || phase === 'paused') && (
+              <>
+                <div className="mm-live-ring" aria-hidden />
+                <div className="mm-live-ring mm-live-ring2" aria-hidden />
+              </>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                if (phase === 'idle') startRec();
+                else if (phase === 'recording') pauseRec();
+                else resumeRec();
+              }}
+              style={{
+                position: 'relative',
+                width: 88,
+                height: 88,
+                borderRadius: 999,
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff',
+                background:
+                  phase === 'paused'
+                    ? 'linear-gradient(145deg,#F59E0B,#D97706)'
+                    : 'linear-gradient(145deg,#8B5CF6,#6366F1 48%,#4F46E5)',
+                boxShadow:
+                  phase === 'idle'
+                    ? '0 12px 36px rgba(79,70,229,0.32)'
+                    : '0 10px 28px rgba(79,70,229,0.38)',
+              }}
+            >
+              <span style={{ display: 'flex', transform: 'scale(1.35)', transformOrigin: 'center' }}>
+                {phase === 'idle' ? (
+                  <Icons.Mic2 />
+                ) : phase === 'recording' ? (
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                    <rect x="7" y="5" width="4" height="14" rx="1" />
+                    <rect x="13" y="5" width="4" height="14" rx="1" />
+                  </svg>
+                ) : (
+                  <Icons.Mic2 />
+                )}
+              </span>
+            </button>
+          </div>
+          <div style={{ fontSize: 12, color: '#64748B', marginTop: 8 }}>
+            {phase === 'idle' && '点击按钮开始（演示）'}
+            {phase === 'recording' && '点击按钮暂停'}
+            {phase === 'paused' && '点击按钮继续录制'}
+          </div>
+        </div>
+
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#6366F1', letterSpacing: '0.12em', marginBottom: 6 }}>实时记录</div>
+        <div
+          ref={scrollerRef}
+          style={{
+            flex: 1,
+            minHeight: 100,
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            background: 'rgba(255,255,255,0.75)',
+            borderRadius: 14,
+            border: '1px solid rgba(148,163,184,0.35)',
+            padding: '12px 12px 14px',
+            marginBottom: 8,
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)',
+          }}
+        >
+          {segments.length === 0 ? (
+            <div style={{ fontSize: 13, color: '#94A3B8', lineHeight: 1.6, padding: '18px 4px', textAlign: 'center' }}>转写内容将逐条出现在此处…</div>
+          ) : null}
+          {segments.map((seg, idx) => (
+            <div key={idx} style={{ marginBottom: 12, paddingLeft: 10, borderLeft: `3px solid ${spkHue(seg.speaker)}` }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: spkHue(seg.speaker), marginBottom: 4 }}>{seg.speaker}</div>
+              <div style={{ fontSize: 14, color: '#1E293B', lineHeight: 1.65 }}>{seg.text}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ flexShrink: 0, paddingBottom: 'max(14px, env(safe-area-inset-bottom, 0px))', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {(phase === 'recording' || phase === 'paused') && (
+            <button
+              type="button"
+              onClick={finishAndSave}
+              style={{
+                width: '100%',
+                padding: '13px 0',
+                borderRadius: 12,
+                border: 'none',
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: 'pointer',
+                color: '#fff',
+                background: 'linear-gradient(145deg,#4F46E5,#4338CA)',
+                boxShadow: '0 8px 24px rgba(67,56,202,0.28)',
+              }}
+            >
+              结束并生成纪要
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const MeetingMinutesDetailScreen = ({ nav }) => {
+  const panBg = 'linear-gradient(180deg, #EEF2FF 0%, #F8FAFC 30%, #FAFAF9 100%)';
+  const spkHue = (name) => (name === '发言人2' ? '#0D9488' : '#5B21B6');
+  const [rec, setRec] = React.useState(null);
+
+  React.useEffect(() => {
+    let id = '';
+    try { id = sessionStorage.getItem(NW_MEETING_LIVE_DETAIL_ID_KEY) || ''; } catch (e) {}
+    const found = readNwMeetingLiveHistory().find((x) => x.id === id) || null;
+    setRec(found);
+  }, []);
+
+  const copySummary = () => {
+    if (!rec) return;
+    const head = `【${rec.title}】`;
+    const body = (rec.summaryBullets || []).map((x) => `· ${x}`).join('\n');
+    const t = `${head}\n${body}`;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(t).then(() => window.alert('已复制纪要要点')).catch(() => window.alert(t));
+    } else window.alert(t);
+  };
+
+  const removeRecord = () => {
+    if (!rec || !window.confirm('确定删除本条实时记录？')) return;
+    const next = readNwMeetingLiveHistory().filter((x) => x.id !== rec.id);
+    writeNwMeetingLiveHistory(next);
+    nav.goBack();
+  };
+
+  const fmtMeta = (r) => {
+    try {
+      const d = new Date(r.createdAt);
+      const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      return `${ds} · 时长 ${formatMmLiveTime(r.durationSec)}`;
+    } catch (e) {
+      return `时长 ${formatMmLiveTime(r.durationSec)}`;
+    }
+  };
+
+  if (!rec) {
+    return (
+      <div style={{ height: '100%', background: panBg, display: 'flex', flexDirection: 'column' }}>
+        <NavBar title="实时记录" onBack={nav.goBack} />
+        <div style={{ flex: 1, padding: '24px 16px', fontSize: 14, color: '#64748B', lineHeight: 1.65 }}>
+          未找到该条记录，可能已被删除或未从列表进入。请返回历史列表重试。
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ height: '100%', background: panBg, display: 'flex', flexDirection: 'column' }}>
+      <NavBar title="查阅记录" onBack={nav.goBack} />
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px max(14px, env(safe-area-inset-bottom, 0px))' }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: '#0F172A', marginBottom: 6, lineHeight: 1.35 }}>{rec.title}</div>
+        <div style={{ fontSize: 11, color: '#64748B', marginBottom: 12 }}>{fmtMeta(rec)}</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+          {['实时转写', '发言人分段', '会后摘要'].map((t) => (
+            <span key={t} style={{ fontSize: 10, fontWeight: 600, color: '#4338CA', background: 'rgba(99,102,241,0.12)', padding: '4px 10px', borderRadius: 999 }}>{t}</span>
+          ))}
+        </div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#6366F1', letterSpacing: '0.12em', marginBottom: 6 }}>实时记录</div>
+        <div
+          style={{
+            background: 'rgba(255,255,255,0.75)',
+            borderRadius: 14,
+            border: '1px solid rgba(148,163,184,0.35)',
+            padding: '12px 12px 14px',
+            marginBottom: 12,
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)',
+          }}
+        >
+          {(rec.segments || []).length === 0 ? (
+            <div style={{ fontSize: 13, color: '#94A3B8' }}>本条无转写分段（可能提前结束录制）。</div>
+          ) : (
+            (rec.segments || []).map((seg, idx) => (
+              <div key={idx} style={{ marginBottom: 12, paddingLeft: 10, borderLeft: `3px solid ${spkHue(seg.speaker)}` }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: spkHue(seg.speaker), marginBottom: 4 }}>{seg.speaker}</div>
+                <div style={{ fontSize: 14, color: '#1E293B', lineHeight: 1.65 }}>{seg.text}</div>
+              </div>
+            ))
+          )}
+          <div style={{ marginTop: 8, paddingTop: 14, borderTop: '1px dashed rgba(148,163,184,0.55)' }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>智能纪要（演示）</div>
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: '#334155', lineHeight: 1.75 }}>
+              {(rec.summaryBullets || []).map((line, i) => (
+                <li key={i}>{line}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={copySummary}
+          style={{
+            width: '100%',
+            padding: '12px 0',
+            borderRadius: 12,
+            border: '1px solid rgba(99,102,241,0.45)',
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: 'pointer',
+            color: '#4338CA',
+            background: '#fff',
+            marginBottom: 8,
+          }}
+        >
+          复制纪要要点
+        </button>
+        <button
+          type="button"
+          onClick={removeRecord}
+          style={{
+            width: '100%',
+            padding: '11px 0',
+            borderRadius: 12,
+            border: '1px solid rgba(248,113,113,0.45)',
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: 'pointer',
+            color: '#B91C1C',
+            background: 'rgba(254,242,242,0.6)',
+          }}
+        >
+          删除本条
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// Screen: 作业批改（参考豆包式：上传 → 批改中 → 分题结果）
+// ============================================
+function hwDemoReport(subject, stageLabel) {
+  const sub = subject === 'english' ? '英语' : subject === 'chinese' ? '语文' : '数学';
+  const items = subject === 'math'
+    ? [
+        { no: 1, status: 'ok', stem: '口算：72 − 28 = ?', yours: '44', right: '44', comment: '减法借位处理正确，书写清晰。', flaw: '', tip: '' },
+        { no: 2, status: 'partial', stem: '应用题：买 3 支笔共花 15 元，每支多少钱？', yours: '列式 15÷3=4（元）', right: '15÷3=5（元）', comment: '思路正确，但除法结果算错，建议验算一遍商与乘法逆运算。', flaw: '计算失误', tip: '可用「商 × 除数 = 被除数」快速自检。' },
+        { no: 3, status: 'wrong', stem: '简便计算：25×16', yours: '25×10+25×4=350', right: '25×4×4=400 或 25×8×2=400', comment: '拆数方式不简便且合并出错，未优先凑整。', flaw: '运算策略', tip: '优先把 16 拆成 4×4，先算 25×4 更稳。' },
+      ]
+    : subject === 'english'
+      ? [
+          { no: 1, status: 'ok', stem: '用所给词适当形式填空：She ___ (go) to school every day.', yours: 'goes', right: 'goes', comment: '第三人称单数一致，时态正确。', flaw: '', tip: '' },
+          { no: 2, status: 'partial', stem: '句型转换：He doesn\'t like apples. → 肯定句', yours: 'He like apples.', right: 'He likes apples.', comment: '否定改肯定需去掉 doesn\'t 并还原动词第三人称形式。', flaw: '主谓一致', tip: '先找主语人称，再决定动词是否加 -s。' },
+          { no: 3, status: 'wrong', stem: '翻译：「图书馆在教学楼后面」', yours: 'The library is behind of the classroom building.', right: 'The library is behind the classroom building.', comment: 'behind 为介词，一般不与 of 连用表方位。', flaw: '介词搭配', tip: '熟记 behind / in front of / next to 等固定搭配。' },
+        ]
+      : [
+          { no: 1, status: 'ok', stem: '默写：「春风又绿江南岸」上一句。', yours: '明月何时照我还', right: '京口瓜洲一水间…（课内版本以教材为准）', comment: '与下句衔接记忆准确。', flaw: '', tip: '' },
+          { no: 2, status: 'partial', stem: '概括本文主旨（不超过 40 字）', yours: '写了作者春游很开心。', right: '通过游踪与景物描写，表达对自然与生活的热爱。', comment: '有概括意识但偏「感受」、缺「写法与主题」层次。', flaw: '要点不全', tip: '可按「内容 + 情感 + 写法」三段各写一句再压缩。' },
+          { no: 3, status: 'wrong', stem: '修改病句：他的成绩不断正在提高。', yours: '他的成绩正在不断提高。', right: '他的成绩不断提高。', comment: '「不断」与「正在」语义重复，保留其一即可。', flaw: '成分赘余', tip: '读一遍，删掉读起来重复的时间/程度词。' },
+        ];
+  const ok = items.filter((x) => x.status === 'ok').length;
+  const partial = items.filter((x) => x.status === 'partial').length;
+  const wrong = items.filter((x) => x.status === 'wrong').length;
+  const score = subject === 'math' ? 84 : subject === 'english' ? 78 : 80;
+  return {
+    sub,
+    stageLabel,
+    score,
+    total: 100,
+    level: score >= 85 ? '优秀' : score >= 75 ? '良好' : '合格',
+    tags: [`${stageLabel}`, `${sub}`, ok ? `${ok} 题全对` : '', partial ? `${partial} 题待完善` : '', wrong ? `${wrong} 题需订正` : ''].filter(Boolean),
+    items,
+  };
+}
+
+const HomeworkGradingScreen = ({ nav }) => {
+  const bg = 'linear-gradient(180deg, #FFFBEB 0%, #FFF7ED 22%, #FAFAF9 100%)';
+  const amber = '#B45309';
+  const amberSoft = 'rgba(180,83,9,0.12)';
+  const [step, setStep] = React.useState('upload');
+  const [stage, setStage] = React.useState('upper');
+  const [subject, setSubject] = React.useState('math');
+  const [previewUrls, setPreviewUrls] = React.useState([]);
+  const [note, setNote] = React.useState('');
+  const [hintIdx, setHintIdx] = React.useState(0);
+  const fileRef = React.useRef(null);
+  const previewUrlsRef = React.useRef([]);
+  const [report, setReport] = React.useState(null);
+
+  const stageLabel = stage === 'lower' ? '小学低年级' : stage === 'junior' ? '初中' : '小学高年级';
+  const subjects = [
+    { id: 'chinese', label: '语文' },
+    { id: 'math', label: '数学' },
+    { id: 'english', label: '英语' },
+  ];
+  const stages = [
+    { id: 'lower', label: '小学低年级' },
+    { id: 'upper', label: '小学高年级' },
+    { id: 'junior', label: '初中' },
+  ];
+
+  React.useEffect(() => {
+    if (step !== 'analyzing') return undefined;
+    const tips = ['正在识别题目与手写作答…', '提取关键步骤与公式…', '对照教学要点批改中…', '生成评语与错题讲解…'];
+    const id = window.setInterval(() => setHintIdx((i) => (i + 1) % tips.length), 650);
+    const done = window.setTimeout(() => {
+      setReport(hwDemoReport(subject, stageLabel));
+      setStep('result');
+    }, 2800);
+    return () => {
+      window.clearInterval(id);
+      window.clearTimeout(done);
+    };
+  }, [step, subject, stageLabel]);
+
+  React.useEffect(() => {
+    previewUrlsRef.current = previewUrls;
+  }, [previewUrls]);
+  React.useEffect(() => () => {
+    previewUrlsRef.current.forEach((u) => { try { URL.revokeObjectURL(u); } catch (e) {} });
+  }, []);
+
+  const onPickFiles = (e) => {
+    const files = e.target.files;
+    if (!files || !files.length) return;
+    const urls = [];
+    for (let i = 0; i < Math.min(files.length, 4); i++) {
+      try { urls.push(URL.createObjectURL(files[i])); } catch (err) {}
+    }
+    setPreviewUrls((prev) => {
+      prev.forEach((u) => { try { URL.revokeObjectURL(u); } catch (e2) {} });
+      return urls;
+    });
+  };
+
+  const startGrade = () => {
+    setHintIdx(0);
+    setReport(null);
+    setStep('analyzing');
+  };
+
+  const resetFlow = () => {
+    setPreviewUrls((prev) => {
+      prev.forEach((u) => { try { URL.revokeObjectURL(u); } catch (e) {} });
+      return [];
+    });
+    setNote('');
+    setReport(null);
+    setStep('upload');
+    if (fileRef.current) fileRef.current.value = '';
+  };
+
+  const stepIndex = step === 'upload' ? 0 : step === 'analyzing' ? 1 : 2;
+  const stepTitles = ['上传作业', '智能批改', '批改结果'];
+
+  const chip = (on, onClick, children) => (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        padding: '6px 12px',
+        borderRadius: 999,
+        border: on ? `1px solid ${amber}` : `1px solid rgba(180,83,9,0.2)`,
+        background: on ? amberSoft : '#fff',
+        color: on ? amber : '#78716C',
+        fontSize: 12,
+        fontWeight: 600,
+        cursor: 'pointer',
+      }}
+    >
+      {children}
+    </button>
+  );
+
+  const statusLine = (st) => {
+    if (st === 'ok') return { label: '正确', c: '#059669', bg: '#ECFDF5' };
+    if (st === 'partial') return { label: '部分正确', c: '#B45309', bg: '#FFFBEB' };
+    return { label: '待订正', c: '#B91C1C', bg: '#FEF2F2' };
+  };
+
+  return (
+    <div style={{ height: '100%', background: bg, display: 'flex', flexDirection: 'column' }}>
+      <NavBar title="作业批改" onBack={nav.goBack} />
+      <div style={{ flex: 1, overflowY: 'auto', padding: '10px 14px max(14px, env(safe-area-inset-bottom, 0px))' }}>
+        <p style={{ fontSize: 11, color: '#78716C', lineHeight: 1.55, marginBottom: 12 }}>
+          流程参考 <strong>豆包</strong> 等「拍照 / 图 → OCR → 分题批改 + 评语 + 错题讲解」；以下为高保真演示，未接入真实模型。
+        </p>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, padding: '0 4px' }}>
+          {stepTitles.map((t, i) => (
+            <React.Fragment key={t}>
+              <div style={{ textAlign: 'center', flex: 1 }}>
+                <div
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 999,
+                    margin: '0 auto 4px',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: i <= stepIndex ? 'linear-gradient(145deg,#F59E0B,#D97706)' : '#E7E5E4',
+                    color: i <= stepIndex ? '#fff' : '#A8A29E',
+                  }}
+                >
+                  {i + 1}
+                </div>
+                <div style={{ fontSize: 10, fontWeight: 600, color: i === stepIndex ? amber : '#A8A29E' }}>{t}</div>
+              </div>
+              {i < 2 ? <div style={{ width: 18, height: 2, background: i < stepIndex ? '#FBBF24' : '#E7E5E4', alignSelf: 'flex-start', marginTop: 13 }} /> : null}
+            </React.Fragment>
+          ))}
+        </div>
+
+        {step === 'upload' && (
+          <>
+            <div style={{ fontSize: 11, fontWeight: 700, color: amber, marginBottom: 6, letterSpacing: '0.06em' }}>学段</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+              {stages.map((s) => (
+                <span key={s.id}>{chip(stage === s.id, () => setStage(s.id), s.label)}</span>
+              ))}
+            </div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: amber, marginBottom: 6, letterSpacing: '0.06em' }}>科目</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+              {subjects.map((s) => (
+                <span key={s.id}>{chip(subject === s.id, () => setSubject(s.id), s.label)}</span>
+              ))}
+            </div>
+
+            <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={onPickFiles} />
+            <button
+              type="button"
+              onClick={() => fileRef.current && fileRef.current.click()}
+              style={{
+                width: '100%',
+                minHeight: 120,
+                borderRadius: 16,
+                border: `2px dashed rgba(180,83,9,0.35)`,
+                background: 'rgba(255,255,255,0.85)',
+                cursor: 'pointer',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                marginBottom: 12,
+              }}
+            >
+              <div style={{ color: amber, display: 'flex', transform: 'scale(1.1)' }}><Icons.Camera /></div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#44403C' }}>拍照或从相册选择作业图</div>
+              <div style={{ fontSize: 11, color: '#A8A29E' }}>支持多张，最多 4 张（演示）</div>
+            </button>
+            {previewUrls.length > 0 && (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                {previewUrls.map((u) => (
+                  <img key={u} src={u} alt="" style={{ width: 76, height: 76, objectFit: 'cover', borderRadius: 10, border: '1px solid rgba(180,83,9,0.2)' }} />
+                ))}
+              </div>
+            )}
+
+            <div style={{ fontSize: 11, fontWeight: 700, color: amber, marginBottom: 6 }}>补充说明（选填）</div>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="可粘贴老师布置的文字题、或说明页码与题号…"
+              rows={3}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: 12,
+                border: '1px solid rgba(180,83,9,0.2)',
+                fontSize: 13,
+                marginBottom: 14,
+                resize: 'vertical',
+                boxSizing: 'border-box',
+                background: '#fff',
+                color: T.textPrimary,
+              }}
+            />
+
+            <button
+              type="button"
+              onClick={startGrade}
+              style={{
+                width: '100%',
+                padding: '14px 0',
+                borderRadius: 12,
+                border: 'none',
+                fontSize: 15,
+                fontWeight: 700,
+                cursor: 'pointer',
+                color: '#fff',
+                background: 'linear-gradient(145deg,#F59E0B,#D97706)',
+                boxShadow: '0 10px 28px rgba(217,119,6,0.28)',
+              }}
+            >
+              开始智能批改
+            </button>
+            <p style={{ fontSize: 10, color: '#A8A29E', marginTop: 10, textAlign: 'center' }}>不上传也可直接批改，将按所选学段与科目展示示例结果</p>
+          </>
+        )}
+
+        {step === 'analyzing' && (
+          <div style={{ textAlign: 'center', padding: '36px 12px 24px' }}>
+            <div className="hw-spin" style={{ marginBottom: 20 }} />
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#44403C', marginBottom: 8 }}>豆包式批改引擎（演示）</div>
+            <div style={{ fontSize: 13, color: '#78716C', minHeight: 44, lineHeight: 1.55 }}>
+              {['正在识别题目与手写作答…', '提取关键步骤与公式…', '对照教学要点批改中…', '生成评语与错题讲解…'][hintIdx]}
+            </div>
+          </div>
+        )}
+
+        {step === 'result' && report && (
+          <>
+            <div
+              style={{
+                background: '#fff',
+                borderRadius: 16,
+                border: '1px solid rgba(180,83,9,0.15)',
+                padding: 14,
+                marginBottom: 12,
+                boxShadow: '0 4px 20px rgba(180,83,9,0.08)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 10 }}>
+                <div>
+                  <div style={{ fontSize: 12, color: '#78716C', marginBottom: 4 }}>综合得分（演示）</div>
+                  <div style={{ fontSize: 32, fontWeight: 800, color: amber, fontVariantNumeric: 'tabular-nums' }}>
+                    {report.score}
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#A8A29E' }}> / {report.total}</span>
+                  </div>
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#44403C', padding: '6px 12px', borderRadius: 10, background: amberSoft }}>{report.level}</div>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {report.tags.map((t) => (
+                  <span key={t} style={{ fontSize: 10, fontWeight: 600, color: amber, background: amberSoft, padding: '4px 10px', borderRadius: 999 }}>{t}</span>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ fontSize: 11, fontWeight: 700, color: amber, letterSpacing: '0.08em', marginBottom: 8 }}>分题批改</div>
+            {report.items.map((it) => {
+              const st = statusLine(it.status);
+              return (
+                <div
+                  key={it.no}
+                  style={{
+                    background: '#fff',
+                    borderRadius: 14,
+                    border: '1px solid rgba(180,83,9,0.12)',
+                    padding: '12px 12px 12px 14px',
+                    marginBottom: 10,
+                    borderLeft: `4px solid ${st.c}`,
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#292524' }}>第 {it.no} 题</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: st.c, background: st.bg, padding: '3px 10px', borderRadius: 999 }}>{st.label}</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#57534E', lineHeight: 1.55, marginBottom: 8 }}><strong>题目：</strong>{it.stem}</div>
+                  <div style={{ fontSize: 12, color: '#44403C', lineHeight: 1.55, marginBottom: 6 }}><strong>你的作答：</strong>{it.yours}</div>
+                  {it.status !== 'ok' ? (
+                    <div style={{ fontSize: 12, color: '#059669', lineHeight: 1.55, marginBottom: 6 }}><strong>参考：</strong>{it.right}</div>
+                  ) : null}
+                  <div style={{ fontSize: 12, color: '#57534E', lineHeight: 1.6, marginBottom: it.flaw ? 6 : 0 }}><strong>评语：</strong>{it.comment}</div>
+                  {it.flaw ? (
+                    <div style={{ fontSize: 11, color: '#B45309', marginBottom: 4 }}>错误类型：{it.flaw}</div>
+                  ) : null}
+                  {it.tip ? (
+                    <div style={{ fontSize: 11, color: '#78716C', background: '#FAFAF9', padding: '8px 10px', borderRadius: 8, lineHeight: 1.55 }}><strong>提升建议：</strong>{it.tip}</div>
+                  ) : null}
+                </div>
+              );
+            })}
+
+            <button
+              type="button"
+              onClick={() => window.alert('正式版可接入大模型，针对错题继续追问讲解（演示）。')}
+              style={{
+                width: '100%',
+                padding: '12px 0',
+                marginTop: 4,
+                marginBottom: 8,
+                borderRadius: 12,
+                border: `1px solid rgba(180,83,9,0.35)`,
+                background: '#fff',
+                fontSize: 14,
+                fontWeight: 600,
+                color: amber,
+                cursor: 'pointer',
+              }}
+            >
+              追问错题（演示）
+            </button>
+            <button
+              type="button"
+              onClick={resetFlow}
+              style={{
+                width: '100%',
+                padding: '13px 0',
+                borderRadius: 12,
+                border: 'none',
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: 'pointer',
+                color: '#fff',
+                background: 'linear-gradient(145deg,#F59E0B,#D97706)',
+                boxShadow: '0 8px 22px rgba(217,119,6,0.22)',
+              }}
+            >
+              批改另一份作业
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const OfficeToolPlaceholderScreen = ({ nav }) => {
+  const toolId = (() => {
+    try { return sessionStorage.getItem(NW_OFFICE_TOOL_ID_KEY) || 'docWriting'; } catch (e) { return 'docWriting'; }
+  })();
+  const meta = OFFICE_TOOL_COPY[toolId] || OFFICE_TOOL_COPY.docWriting;
+  return (
+    <div style={{ height: '100%', background: T.bg, display: 'flex', flexDirection: 'column' }}>
+      <NavBar title={meta.title} onBack={nav.goBack} />
+      <div style={{ flex: 1, overflowY: 'auto', padding: '14px 14px 24px' }}>
+        <Card style={{ padding: 16, marginBottom: 12 }}>
+          <div style={{ fontSize: 13, color: T.textSecondary, lineHeight: 1.65 }}>{meta.desc}</div>
+        </Card>
+        <button
+          type="button"
+          onClick={() => alert('正式版将在此接入大模型 API 与单位模板库（原型占位）。')}
+          style={{ width: '100%', padding: '14px 0', background: T.primary, color: '#fff', border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+        >
+          开始体验（演示）
+        </button>
+      </div>
     </div>
   );
 };
@@ -3345,11 +5274,11 @@ const AdminExceptionsScreen = ({ nav }) => {
 };
 
 // ============================================
-// Screen: 党务小工具（九宫格入口，可扩展）
+// Screen: 办公助手（九宫格；PPT/表格在 PC 管理端）
 // ============================================
 const PartyToolsScreen = ({ nav }) => {
   const grid = { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: T.gridGap };
-  const cellActive = {
+  const cellBase = {
     aspectRatio: '1',
     borderRadius: 12,
     border: `1px solid ${T.border}`,
@@ -3364,31 +5293,53 @@ const PartyToolsScreen = ({ nav }) => {
     boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
     WebkitTapHighlightColor: 'transparent',
   };
-  const cellPlaceholder = {
-    ...cellActive,
-    cursor: 'default',
-    background: '#FAFAF9',
-    border: `1px dashed ${T.border}`,
-    boxShadow: 'none',
-    opacity: 0.92,
-  };
+  const iconBox = (bg, color) => ({
+    width: 36, height: 36, borderRadius: 10, background: bg, color,
+    display: 'flex', alignItems: 'center', justifyContent: 'center', transform: 'scale(0.92)',
+  });
+  const labelStyle = { fontSize: 11, fontWeight: 600, color: T.textPrimary, textAlign: 'center', lineHeight: 1.3 };
+  const cells = [
+    { key: 'doc', label: '公文写作', icon: <Icons.Doc />, bg: '#FFF0EE', c: T.primary, onClick: () => nav.navigateTo('docWriting') },
+    { key: 'audit', label: '资料校验', icon: <Icons.Audit />, bg: '#FFF0EE', c: T.primary, onClick: () => nav.navigateTo('archiveAudit') },
+    { key: 'typo', label: '错别字校验', icon: <Icons.TypeCheck />, bg: '#EFF6FF', c: '#1D4ED8', onClick: () => nwNavSetOfficeToolAndGo(nav, 'typoCheck') },
+    { key: 'minutes', label: '会议纪要', icon: <Icons.Mic2 />, bg: '#F5F3FF', c: '#5B21B6', onClick: () => nav.navigateTo('meetingMinutesLive') },
+    { key: 'qa', label: '智能问答', icon: <Icons.Chat />, bg: '#ECFDF5', c: T.success, onClick: () => nav.navigateTo('aiQA') },
+    { key: 'hw', label: '作业批改', icon: <Icons.NotebookPen />, bg: '#FFFBEB', c: '#B45309', onClick: () => nav.navigateTo('homeworkGrading') },
+    { key: 'notice', label: '会议通知生成', icon: <Icons.Send />, bg: '#F0FDFA', c: '#0F766E', onClick: () => nav.navigateTo('meetingNotice') },
+    {
+      key: 'more',
+      label: '敬请期待',
+      icon: <Icons.GridFour />,
+      bg: '#F3F4F6',
+      c: '#9CA3AF',
+      onClick: () => {},
+      disabled: true,
+    },
+  ];
   return (
     <div style={{ height: '100%', background: T.bg, display: 'flex', flexDirection: 'column' }}>
-      <NavBar title="党务小工具" onBack={nav.goBack} />
+      <NavBar title="办公助手" onBack={nav.goBack} />
       <div style={{ flex: 1, overflowY: 'auto', padding: '10px 14px 24px' }}>
         <Card style={{ marginBottom: 12, padding: 12 }}>
-          <div style={{ fontSize: 13, color: T.textSecondary, lineHeight: 1.65 }}>常用党务能力集中入口；九宫格预留扩展位，后续可继续增加小工具。</div>
+          <div style={{ fontSize: 13, color: T.textSecondary, lineHeight: 1.65 }}>
+            基于机关模板与大模型 API 的办公能力集中入口。PPT 制作、表格制作适合大屏编辑，仅在 <strong>PC 管理端 → 办公助手</strong> 提供（请用电脑登录管理端使用）。
+          </div>
         </Card>
         <div style={grid}>
-          <div role="button" tabIndex={0} onClick={() => nav.navigateTo('archiveAudit')} style={cellActive}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: '#FFF0EE', color: T.primary, display: 'flex', alignItems: 'center', justifyContent: 'center', transform: 'scale(0.92)' }}>
-              <Icons.Audit />
-            </div>
-            <div style={{ fontSize: 11, fontWeight: 600, color: T.textPrimary, textAlign: 'center', lineHeight: 1.3 }}>智能资料审核</div>
-          </div>
-          {Array.from({ length: 8 }, (_, i) => (
-            <div key={i} style={cellPlaceholder} aria-hidden>
-              <div style={{ fontSize: 10, color: T.textMuted, textAlign: 'center', lineHeight: 1.35 }}>敬请期待</div>
+          {cells.map((cell) => (
+            <div
+              key={cell.key}
+              role={cell.disabled ? undefined : 'button'}
+              tabIndex={cell.disabled ? undefined : 0}
+              onClick={cell.disabled ? undefined : cell.onClick}
+              onKeyDown={cell.disabled ? undefined : (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cell.onClick(); } }}
+              style={{
+                ...cellBase,
+                ...(cell.disabled ? { cursor: 'default', opacity: 0.75, background: '#FAFAF9', border: `1px dashed ${T.border}`, boxShadow: 'none' } : {}),
+              }}
+            >
+              <div style={iconBox(cell.bg, cell.c)}>{cell.icon}</div>
+              <div style={{ ...labelStyle, ...(cell.disabled ? { color: T.textMuted, fontWeight: 500 } : {}) }}>{cell.label}</div>
             </div>
           ))}
         </div>
@@ -3600,6 +5551,7 @@ function App() {
     switch (nav.screen) {
       case 'login': return <LoginScreen onLogin={handleLogin} role={nav.userRole} setRole={nav.setUserRole} />;
       case 'home': return <HomeScreen nav={nav} />;
+      case 'pioneerStoryDetail': return <PioneerStoryDetailScreen nav={nav} />;
       case 'profile': return <ProfileScreen nav={nav} role={nav.userRole} />;
       case 'activityHistory': return <ActivityHistoryScreen nav={nav} />;
       case 'checkin': return <CheckinScreen nav={nav} />;
@@ -3613,6 +5565,13 @@ function App() {
       case 'archiveAudit': return <ArchiveSmartAuditScreen nav={nav} />;
       case 'liveActivity': return <LiveActivityScreen nav={nav} />;
       case 'aiQA': return <AIQAScreen nav={nav} />;
+      case 'officeToolPlaceholder': return <OfficeToolPlaceholderScreen nav={nav} />;
+      case 'meetingMinutesLive': return <MeetingMinutesHistoryHub nav={nav} />;
+      case 'meetingMinutesRecorder': return <MeetingMinutesRecorderScreen nav={nav} />;
+      case 'meetingMinutesDetail': return <MeetingMinutesDetailScreen nav={nav} />;
+      case 'homeworkGrading': return <HomeworkGradingScreen nav={nav} />;
+      case 'meetingNotice': return <MeetingNoticeScreen nav={nav} />;
+      case 'docWriting': return <DocWritingScreen nav={nav} />;
       case 'career': return <CareerScreen nav={nav} />;
       case 'lifeServices': return <LifeServicesScreen nav={nav} />;
       case 'disposal': return <DisposalScreen nav={nav} />;

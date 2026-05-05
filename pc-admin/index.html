@@ -3,13 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>南湾红帆 · PC管理端</title>
+  <title>南湾党建 · PC管理端</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" crossorigin="anonymous"></script>
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     html,body,#root{height:100%;overflow:hidden}
@@ -18,6 +20,13 @@
     ::-webkit-scrollbar-thumb{background:#d0cdc8;border-radius:3px}
     ::-webkit-scrollbar-thumb:hover{background:#b0aca8}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+    @keyframes mmWaveBar{0%,100%{transform:scaleY(0.22)}50%{transform:scaleY(1)}}
+    .mm-live-bar{transform-origin:center bottom;animation:mmWaveBar 0.52s ease-in-out infinite;width:4px;height:32px;border-radius:99px;background:linear-gradient(180deg,#DDD6FE,#4F46E5);align-self:flex-end}
+    @keyframes mmRecRing{0%{transform:scale(0.92);opacity:.55}100%{transform:scale(1.42);opacity:0}}
+    .mm-live-ring{position:absolute;inset:-10px;border-radius:9999px;border:2px solid rgba(99,102,241,.5);pointer-events:none;animation:mmRecRing 1.75s ease-out infinite}
+    .mm-live-ring2{animation-delay:.85s;border-color:rgba(124,58,237,.35)}
+    @keyframes hwSpin{to{transform:rotate(360deg)}}
+    .hw-spin{width:42px;height:42px;border-radius:50%;border:3px solid rgba(180,83,9,0.18);border-top-color:#D97706;animation:hwSpin 0.72s linear infinite;margin:0 auto}
   </style>
 </head>
 <body>
@@ -246,6 +255,17 @@ const I = {
   ChevronRight: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 6l6 6-6 6"/></svg>,
   User: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0112 0v1"/></svg>,
   Logout: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
+  LayoutGrid: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>,
+  Slides: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h12M6 12h8"/></svg>,
+  Table2: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M3 5h18v14H3z"/><path d="M3 10h18M10 5v14"/></svg>,
+  FileDoc: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>,
+  Send: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>,
+  FilePdf: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h6"/><path d="M9 11h6"/></svg>,
+  FileExcel: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M3 5h18v14H3z"/><path d="M3 10h18M10 5v14M14 5v14M3 14h18"/><path d="M7 7h2v2H7z"/></svg>,
+  Mic: () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>,
+  Type: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg>,
+  ClipboardList: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><path d="M15 2H9a1 1 0 00-1 1v2a1 1 0 001 1h6a1 1 0 001-1V3a1 1 0 00-1-1z"/><path d="M9 12h6M9 16h6M9 8h2"/></svg>,
+  GraduationCap: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 2 3 3 6 3s6-1 6-3v-5"/></svg>,
 };
 
 // ============================================
@@ -255,9 +275,10 @@ const SIDEBAR_SECTIONS = [
   {
     key: 'wx-home',
     title: '首页',
-    hint: '南湾红帆 · AI画像 · 智能审核',
+    hint: '工作台 · 办公助手 · AI画像',
     items: [
       { id: 'dashboard', icon: I.Dashboard, label: '工作台' },
+      { id: 'officeAssistant', icon: I.LayoutGrid, label: '办公助手' },
       { id: 'aiProfile', icon: I.AI, label: 'AI 画像' },
       { id: 'aiPush', icon: I.Bell, label: '画像推送策略' },
       { id: 'audit', icon: I.Audit, label: '智能资料审核' },
@@ -305,13 +326,17 @@ const NW_LEARNING_RUNTIME_BC = 'nw-learning-runtime';
 const NW_ADMIN_ACTIVE_ORG_KEY = 'nw_admin_active_org_id';
 const NW_DATA_SHARE_POLICIES_KEY = 'nw_data_share_policies_v1';
 
+/** 产品品牌：侧栏、登录演示、办公助手互联示意等共用 */
+const NW_BRAND_LOGO_SRC = '../assets/nanwan-dangjian-logo.png';
+const NW_BRAND_NAME_DEFAULT = '南湾党建';
+
 /** 演示：多区多街道；南湾沿用 legacy localStorage 键以便与现有小程序页面对照 */
 const STREET_ORGS = [
   {
     id: 'org_lg_nanwan',
     district: '深圳市龙岗区',
     street: '南湾街道',
-    branding: '南湾红帆',
+    branding: '南湾党建',
     runtimeStorageKey: NW_LEARNING_RUNTIME_LEGACY_KEY,
     communities: [
       '南湾社区', '康乐社区', '丹竹头社区', '下李朗社区', '南岭村社区', '沙西社区',
@@ -322,7 +347,7 @@ const STREET_ORGS = [
     id: 'org_lg_bantian',
     district: '深圳市龙岗区',
     street: '坂田街道',
-    branding: '坂田红帆',
+    branding: '坂田党建',
     runtimeStorageKey: 'org_lg_bantian_nw_learning_runtime_config_v1',
     communities: ['坂田社区', '马安堂社区', '杨美社区', '五和社区', '大发埔社区', '岗头社区', '雪象社区', '南坑社区', '象角塘社区', '新雪社区'],
   },
@@ -330,7 +355,7 @@ const STREET_ORGS = [
     id: 'org_lh_guanlan',
     district: '深圳市龙华区',
     street: '观澜街道',
-    branding: '观澜红帆',
+    branding: '观澜党建',
     runtimeStorageKey: 'org_lh_guanlan_nw_learning_runtime_config_v1',
     communities: ['大水田社区', '君子布社区', '桂花社区', '库坑社区', '黎光社区', '新澜社区', '牛湖社区', '大富社区'],
   },
@@ -338,7 +363,7 @@ const STREET_ORGS = [
     id: 'org_ft_yuanling',
     district: '深圳市福田区',
     street: '园岭街道',
-    branding: '园岭红帆',
+    branding: '园岭党建',
     runtimeStorageKey: 'org_ft_yuanling_nw_learning_runtime_config_v1',
     communities: ['园东社区', '鹏建社区', '长城社区', '华红社区', '百花社区', '荔村社区'],
   },
@@ -381,7 +406,7 @@ function getNwPcLoginUrl() {
 
 /** 开户短信模板（与产品约定一致；演示中可 Toast 展示全文） */
 function formatNwPcRegisterSms({ branding, phone, password, pcLoginUrl }) {
-  const b = branding || '南湾红帆';
+  const b = branding || NW_BRAND_NAME_DEFAULT;
   return `你的${b}账号已注册，账号：${phone}，密码：${password}，请登录PC后自行修改，PC登录链接${pcLoginUrl}`;
 }
 
@@ -805,7 +830,7 @@ function DashboardPage({ setPage, setActivitySub }) {
         background: 'linear-gradient(90deg, #FFF5F5 0%, #FFFBEB 100%)', fontSize: 12, color: T.textSecondary, lineHeight: 1.65,
       }}>
         <strong style={{ color: T.textPrimary }}>路由说明（原型）：</strong>
-        小程序「党务智能问答」跳转深小服，<strong>无 PC 独立页</strong>；「在线课程一级平台外链、深小服短链」请在 <strong>学习 → 学习外链配置</strong>；「多场直播（链接/密码/宣传图/文案）」请在 <strong>学习 → 直播管理</strong> 维护（写入浏览器 localStorage，小程序原型同域打开可即时同步）；正式环境请改为接口下发。
+        小程序「智能问答」跳转配置的 H5，<strong>无 PC 独立页</strong>；<strong>PPT 制作 / 表格制作</strong>见侧栏 <strong>办公助手</strong>。「在线课程一级平台外链」请在 <strong>学习 → 学习外链配置</strong>；「多场直播」请在 <strong>学习 → 直播管理</strong> 维护（写入浏览器 localStorage，小程序原型同域打开可即时同步）；正式环境请改为接口下发。
         <span style={{ display: 'block', marginTop: 8 }}><strong style={{ color: T.textPrimary }}>账号与权限：</strong>PC/小程序均以<strong>党员管理</strong>中手机号为准；登录后能力范围由<strong>权限管理</strong>中五类<strong>系统身份</strong>及细项勾选控制（与操作日志「系统身份」列一致）。</span>
       </div>
 
@@ -815,6 +840,7 @@ function DashboardPage({ setPage, setActivitySub }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
             {[
               { icon: <I.Plus />, label: '新建活动', accent: '#1890FF', action: () => { setPage('activities'); setActivitySub('create'); } },
+              { icon: <I.LayoutGrid />, label: '办公助手', accent: '#6366F1', action: () => setPage('officeAssistant') },
               { icon: <I.Users />, label: '党员管理', accent: T.success, action: () => setPage('members') },
               { icon: <I.Calendar />, label: '活动管理', accent: T.warning, action: () => setPage('activities') },
               { icon: <I.Book />, label: '课程与往期', accent: '#722ED1', action: () => setPage('courses') },
@@ -2390,28 +2416,50 @@ function ActivityPhotosPage({ activity, onBack }) {
 }
 
 // ============================================
-// Page: Courses
+// Page: Courses（与小程序「往期课程」同源：nw_published_courses_v1）
 // ============================================
+const NW_PUBLISHED_COURSES_KEY = 'nw_published_courses_v1';
+
 const initialCoursesRows = [
-  { id: 'c1', name: '习近平新时代中国特色社会主义思想概论', type: '视频', required: '必修', duration: '45分钟', learners: 1286, rate: 92 },
-  { id: 'c2', name: '中国共产党纪律处分条例解读', type: '图文', required: '必修', duration: '30分钟', learners: 1150, rate: 78 },
-  { id: 'c3', name: '基层治理现代化案例分析', type: '视频', required: '选修', duration: '35分钟', learners: 680, rate: 45 },
-  { id: 'c4', name: '党的二十大精神专题学习', type: '视频', required: '必修', duration: '60分钟', learners: 980, rate: 65 },
+  { id: 'c1', name: '习近平新时代中国特色社会主义思想概论', type: '视频', required: '必修', duration: '45分钟', learners: 1286, rate: 92, publishedAt: '2026-03-01', category: 'political' },
+  { id: 'c2', name: '中国共产党纪律处分条例解读', type: '图文', required: '必修', duration: '30分钟', learners: 1150, rate: 78, publishedAt: '2026-02-20', category: 'political' },
+  { id: 'c3', name: '基层治理现代化案例分析', type: '视频', required: '选修', duration: '35分钟', learners: 680, rate: 45, publishedAt: '2026-02-15', category: 'grassroots' },
+  { id: 'c4', name: '党的二十大精神专题学习', type: '视频', required: '必修', duration: '60分钟', learners: 980, rate: 65, publishedAt: '2026-02-01', category: 'political' },
+  { id: 'c5', name: '发展党员工作流程图解（PPT）', type: 'PPT', required: '必修', duration: '约42页', learners: 428, rate: 52, publishedAt: '2026-02-10', category: 'grassroots', fileName: '发展党员工作流程图解.pptx' },
+  { id: 'c6', name: '党章党规党纪学习（音频导读）', type: '音频', required: '必修', duration: '22分钟', learners: 890, rate: 71, publishedAt: '2026-01-18', category: 'political' },
+  { id: 'c7', name: '党支部书记应知应会（音频课）', type: '音频', required: '选修', duration: '28分钟', learners: 312, rate: 38, publishedAt: '2026-01-28', category: 'grassroots' },
 ];
 
+function nwPcCoursesLoadFromStorage() {
+  try {
+    const raw = localStorage.getItem(NW_PUBLISHED_COURSES_KEY);
+    const arr = raw ? JSON.parse(raw) : null;
+    if (Array.isArray(arr) && arr.length) return arr;
+  } catch (e) {}
+  return initialCoursesRows;
+}
+
+function nwPcCoursesToday() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function CoursesPage() {
-  const [courses, setCourses] = React.useState(initialCoursesRows);
+  const [courses, setCourses] = React.useState(nwPcCoursesLoadFromStorage);
+  React.useEffect(() => {
+    try { localStorage.setItem(NW_PUBLISHED_COURSES_KEY, JSON.stringify(courses)); } catch (e) {}
+  }, [courses]);
   const [uploadOpen, setUploadOpen] = React.useState(false);
   const [statsOpen, setStatsOpen] = React.useState(false);
   const [editId, setEditId] = React.useState(null);
   const [form, setForm] = React.useState({ name: '', type: '视频', required: '必修', duration: '30分钟' });
   /** 上传弹窗内按类型的演示素材状态 */
   const [uploadDraft, setUploadDraft] = React.useState({
-    videoName: '', videoSize: '', coverName: '', audioName: '', articleBody: '', articleImgCount: 0,
+    videoName: '', videoSize: '', coverName: '', audioName: '', articleBody: '', articleImgCount: 0, pptName: '', pptSize: '',
   });
 
   const resetUploadDraft = () => setUploadDraft({
-    videoName: '', videoSize: '', coverName: '', audioName: '', articleBody: '', articleImgCount: 0,
+    videoName: '', videoSize: '', coverName: '', audioName: '', articleBody: '', articleImgCount: 0, pptName: '', pptSize: '',
   });
 
   const openUploadModal = () => {
@@ -2429,6 +2477,10 @@ function CoursesPage() {
       showPrototypeToast('请先点击上传区选择视频文件（演示）', 'error');
       return;
     }
+    if (form.type === 'PPT' && !uploadDraft.pptName) {
+      showPrototypeToast('请先点击上传区选择 PPT 文件（演示）', 'error');
+      return;
+    }
     if (form.type === '音频' && !uploadDraft.audioName) {
       showPrototypeToast('请先点击上传区选择音频文件（演示）', 'error');
       return;
@@ -2438,7 +2490,19 @@ function CoursesPage() {
       return;
     }
     const id = 'c' + Date.now();
-    setCourses(prev => [...prev, { id, name: form.name.trim(), type: form.type, required: form.required, duration: form.duration || '30分钟', learners: 0, rate: 0 }]);
+    const fileName = form.type === '视频' ? uploadDraft.videoName : form.type === 'PPT' ? uploadDraft.pptName : '';
+    setCourses((prev) => [...prev, {
+      id,
+      name: form.name.trim(),
+      type: form.type,
+      required: form.required,
+      duration: form.duration || '30分钟',
+      learners: 0,
+      rate: 0,
+      publishedAt: nwPcCoursesToday(),
+      category: 'political',
+      ...(fileName ? { fileName } : {}),
+    }]);
     setUploadOpen(false);
     setForm({ name: '', type: '视频', required: '必修', duration: '30分钟' });
     resetUploadDraft();
@@ -2465,7 +2529,7 @@ function CoursesPage() {
     <div>
       <PageHeader
         title="课程与往期"
-        subtitle="对齐小程序「学习」：一级平台外链由「学习 → 学习外链配置」写入本机；学员端直播卡片由「学习 → 直播管理」写入并同步 C 端；往期课程列表与学员「已学/未学」由本模块课程与统计驱动（正式对接 API 后同步）。"
+        subtitle="对齐小程序「学习」：一级平台外链由「学习 → 学习外链配置」写入本机；学员端直播卡片由「学习 → 直播管理」写入并同步 C 端。课程支持「视频、音频、PPT、图文」上传，发布后写入与小程序共用的 localStorage 键，学员在「往期课程」可查阅（演示同源；正式对接对象存储与转码服务）。"
         actions={<>
         <PrimaryBtn onClick={openUploadModal}><I.Upload /> 上传课程</PrimaryBtn>
         <SecondaryBtn onClick={() => { setUploadOpen(false); setStatsOpen(true); showPrototypeToast('已打开观看统计'); }}><I.Chart /> 观看统计</SecondaryBtn>
@@ -2532,6 +2596,7 @@ function CoursesPage() {
                   showPrototypeToast(`已切换为「${t}」上传流程`);
                 }}>
                   <option>视频</option>
+                  <option>PPT</option>
                   <option>图文</option>
                   <option>音频</option>
                 </SelectField>
@@ -2587,6 +2652,31 @@ function CoursesPage() {
                     <div style={{ padding: '10px 12px', fontSize: 11, color: T.textMuted, lineHeight: 1.6, border: `1px solid ${T.border}`, borderRadius: 8, background: T.surface }}>
                       上传后将自动：<strong style={{ color: T.textSecondary }}>解析时长</strong>、<strong style={{ color: T.textSecondary }}>生成多清晰度</strong>（原型说明）
                     </div>
+                  </div>
+                </div>
+              )}
+              {form.type === 'PPT' && (
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 10, fontFamily: "'Noto Serif SC', serif" }}>PPT 课件</p>
+                  <div
+                    onClick={() => {
+                      setUploadDraft((d) => ({ ...d, pptName: '党课课件·基层党组织建设.pptx', pptSize: '8.2 MB' }));
+                      showPrototypeToast('已选择 PPT（演示）；正式环境将转码为在线放映与缩略图');
+                    }}
+                    style={{
+                      border: `2px dashed ${uploadDraft.pptName ? T.success : T.border}`, borderRadius: 10, padding: '28px 16px', textAlign: 'center', cursor: 'pointer',
+                      background: uploadDraft.pptName ? '#EFF6FF' : T.surface, marginBottom: 10,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8, color: uploadDraft.pptName ? '#1D4ED8' : T.textMuted }}><I.Slides /></div>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary }}>{uploadDraft.pptName ? '已选择演示文稿' : '点击或拖拽上传 PPT'}</p>
+                    <p style={{ fontSize: 12, color: T.textMuted, marginTop: 4 }}>支持 .ppt / .pptx，单文件 ≤ 200MB；手机端将提供在线查阅（与视频课一致入口）</p>
+                    {uploadDraft.pptName && (
+                      <p style={{ fontSize: 12, color: T.textSecondary, marginTop: 8, fontFamily: 'monospace' }}>{uploadDraft.pptName} · {uploadDraft.pptSize}</p>
+                    )}
+                  </div>
+                  <div style={{ padding: '10px 12px', fontSize: 11, color: T.textMuted, lineHeight: 1.6, border: `1px solid ${T.border}`, borderRadius: 8, background: T.surface }}>
+                    上传后系统将<strong style={{ color: T.textSecondary }}>生成缩略图预览</strong>并支持<strong style={{ color: T.textSecondary }}>小程序内全屏滑动查阅</strong>（原型中与视频共用「课程详情」流；正式环境接文档服务）。
                   </div>
                 </div>
               )}
@@ -2666,6 +2756,7 @@ function CoursesPage() {
                 <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 6 }}>类型</label>
                 <SelectField style={{ width: '100%' }} value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
                   <option>视频</option>
+                  <option>PPT</option>
                   <option>图文</option>
                   <option>音频</option>
                 </SelectField>
@@ -4638,6 +4729,2243 @@ function AIProfileAdminPage({ focusMemberId, onFocusMember, onClearFocus }) {
 }
 
 // ============================================
+// 公文写作模板 · 与小程序 readNwOfficeDocTemplates 共用 NW_OFFICE_DOC_TEMPLATES_KEY
+// ============================================
+const NW_OFFICE_DOC_TEMPLATES_KEY = 'nw_office_doc_templates_v1';
+const NW_OFFICE_DOC_TEMPLATES_BC = 'nw-office-doc-templates';
+
+function nwOfficeDocTemplatesDefault() {
+  return [
+    {
+      id: 'tpl_notice', name: '通知', desc: '会议、事项、任免等告知性文书',
+      body: '【发文机关全称】（章）\n【成文日期】\n\n关于召开【会议名称】的通知\n\n【主送机关或范围】：\n\n根据【政策依据或工作背景】，定于【会议日期】【会议时段】在【会议地点】召开【会议名称】，请【参会人员要求】准时参加。\n\n联系人：【姓名】　电话：【手机或座机】\n\n特此通知。',
+    },
+    {
+      id: 'tpl_circular', name: '通报', desc: '表扬或批评典型事例',
+      body: '【发文机关全称】\n【成文日期】\n\n关于【通报事由】的通报\n\n【主送范围】：\n\n【事件经过与调查核实情况概述】。根据【制度依据】，经研究，决定【处理意见或表扬决定】。\n\n望【对象】引以为戒（或：望全体学习先进）。\n\n【发文机关】（章）',
+    },
+    {
+      id: 'tpl_report', name: '报告', desc: '向上级汇报工作、反映情况',
+      body: '【发文机关全称】\n【成文日期】\n\n关于【报告主题】的报告\n\n【上级机关全称】：\n\n一、工作进展情况\n【阶段成效与数据】\n\n二、存在问题与原因分析\n【问题描述】\n\n三、下一步工作打算\n【措施与时限】\n\n专此报告，请审阅。',
+    },
+    {
+      id: 'tpl_minutes', name: '纪要', desc: '支委会、办公会等会议记录',
+      body: '【会议名称】纪要\n\n时间：【年月日时段】\n地点：【会议室名称】\n主持人：【职务姓名】\n出席：【名单】\n列席：【名单】\n缺席：【名单及原因】\n\n会议内容：\n一、【议题一】：【讨论要点与议定事项】\n二、【议题二】：【讨论要点与议定事项】\n\n会议要求：【落实责任与时限】\n记录人：【姓名】',
+    },
+    {
+      id: 'tpl_request', name: '请示', desc: '请求指示或批准',
+      body: '【发文机关全称】\n【成文日期】\n\n关于【请示事项】的请示\n\n【上级机关全称】：\n\n【请示缘由与必要性】。\n\n拟采取【方案或措施】，需请贵单位【批示事项：如批准/明确口径/协调资源】。\n\n妥否，请批示。\n\n附件：【附件名称列表】',
+    },
+    {
+      id: 'tpl_reply', name: '批复', desc: '答复下级请示',
+      body: '【发文机关全称】\n【成文日期】\n\n关于【请示标题摘引】的批复\n\n【请示单位全称】：\n\n你单位《【请示文件名】》（【文号】）收悉。经研究，批复如下：\n\n一、【批复意见一】\n二、【批复意见二】\n\n此复。\n\n【发文机关】（章）',
+    },
+    {
+      id: 'tpl_letter', name: '函', desc: '平行或不相隶属单位间商洽工作',
+      body: '【发文机关全称】\n【成文日期】\n\n关于【商洽事项】的函\n\n【主送机关全称】：\n\n【发函缘由】。现就【具体事项】函告如下：\n\n一、【事项说明】\n二、【请求配合或反馈时限】\n\n特此函达，请予支持为盼。\n\n【发文机关】（章）',
+    },
+    {
+      id: 'tpl_decision', name: '决定', desc: '对重要事项作出决策和部署',
+      body: '【发文机关全称】\n【成文日期】\n\n关于【决定事项】的决定\n\n【主送范围】：\n\n为【目的依据】，经研究，决定如下：\n\n一、【决定条款一】\n二、【决定条款二】\n\n本决定自【施行日期】起执行。\n\n【发文机关】（章）',
+    },
+    {
+      id: 'tpl_order', name: '命令（令）', desc: '公布行政法规或嘉奖有关人员',
+      body: '【机关全称】令\n第【序号】号\n\n【命令依据】。现命令：\n\n【命令具体内容】。\n\n【机关首长职务姓名】\n【成文日期】',
+    },
+    {
+      id: 'tpl_opinion', name: '意见', desc: '对重要问题提出见解和处理办法',
+      body: '【发文机关全称】\n【成文日期】\n\n关于【工作主题】的实施意见\n\n【主送范围】：\n\n为【指导思想与目标】，提出如下意见：\n\n一、总体要求\n【原则与指标】\n二、重点任务\n【分工与措施】\n三、保障机制\n【督查与考核】\n\n请结合实际认真贯彻执行。\n\n【发文机关】（章）',
+    },
+  ];
+}
+
+function nwOfficeDocNormalizeItem(t, i) {
+  const id = t && t.id ? String(t.id) : 'tpl_' + String(i + 1);
+  const name = t && t.name ? String(t.name).trim() : '未命名模板';
+  const desc = t && t.desc != null ? String(t.desc) : '';
+  const body = t && t.body != null ? String(t.body) : '';
+  return { id, name, desc, body };
+}
+
+function nwOfficeDocReadTemplates() {
+  const defList = nwOfficeDocTemplatesDefault();
+  const defById = new Map(defList.map((d) => [d.id, d]));
+  try {
+    const raw = localStorage.getItem(NW_OFFICE_DOC_TEMPLATES_KEY);
+    if (!raw) return defList;
+    const p = JSON.parse(raw);
+    if (!Array.isArray(p) || p.length === 0) return defList;
+    return p.map((t, idx) => {
+      const n = nwOfficeDocNormalizeItem(t, idx);
+      const fb = defById.get(n.id);
+      if ((!n.body || !String(n.body).trim()) && fb && fb.body) return { ...n, body: fb.body };
+      if (!n.body || !String(n.body).trim()) {
+        return { ...n, body: `【${n.name}】\n\n请将【关键要素一】【关键要素二】等替换为实际内容后提交生成。\n\n【发文机关】\n【日期】` };
+      }
+      return n;
+    });
+  } catch (e) {
+    return defList;
+  }
+}
+
+function nwOfficeDocWriteTemplates(arr) {
+  const clean = (Array.isArray(arr) ? arr : []).map(nwOfficeDocNormalizeItem);
+  try {
+    localStorage.setItem(NW_OFFICE_DOC_TEMPLATES_KEY, JSON.stringify(clean));
+  } catch (e) {
+    showPrototypeToast('无法写入本地存储', 'error');
+    return;
+  }
+  try {
+    if (typeof BroadcastChannel !== 'undefined') {
+      const bc = new BroadcastChannel(NW_OFFICE_DOC_TEMPLATES_BC);
+      bc.postMessage({ t: 'doc_templates' });
+      bc.close();
+    }
+  } catch (e2) {}
+  try {
+    window.dispatchEvent(new Event('nw-office-doc-templates-changed'));
+  } catch (e3) {}
+}
+
+function OfficeDocWritingPage() {
+  const [rows, setRows] = React.useState(() => nwOfficeDocReadTemplates());
+  const [docTplAddOpen, setDocTplAddOpen] = React.useState(false);
+  const [docTplAddForm, setDocTplAddForm] = React.useState({ name: '', desc: '', body: '' });
+  const docTplAutosaveSkip = React.useRef(true);
+  React.useEffect(() => {
+    const pull = () => setRows(nwOfficeDocReadTemplates());
+    window.addEventListener('storage', pull);
+    window.addEventListener('nw-office-doc-templates-changed', pull);
+    let bc = null;
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        bc = new BroadcastChannel(NW_OFFICE_DOC_TEMPLATES_BC);
+        bc.onmessage = () => pull();
+      }
+    } catch (e) {}
+    return () => {
+      window.removeEventListener('storage', pull);
+      window.removeEventListener('nw-office-doc-templates-changed', pull);
+      if (bc) try { bc.close(); } catch (e2) {}
+    };
+  }, []);
+  React.useEffect(() => {
+    if (docTplAutosaveSkip.current) {
+      docTplAutosaveSkip.current = false;
+      return undefined;
+    }
+    const t = window.setTimeout(() => {
+      nwOfficeDocWriteTemplates(rows);
+    }, 500);
+    return () => window.clearTimeout(t);
+  }, [rows]);
+  const openDocTplAddModal = () => {
+    setDocTplAddForm({
+      name: '新模板',
+      desc: '',
+      body: '【新模板】\n\n请将【关键要素一】【关键要素二】等替换为实际内容后提交生成。\n\n【发文机关】\n【日期】',
+    });
+    setDocTplAddOpen(true);
+  };
+  const closeDocTplAddModal = () => setDocTplAddOpen(false);
+  const submitDocTplAddModal = () => {
+    const id = 'tpl_' + Date.now();
+    const name = (docTplAddForm.name || '').trim() || '新模板';
+    const next = rows.concat([{ id, name, desc: docTplAddForm.desc != null ? String(docTplAddForm.desc) : '', body: docTplAddForm.body != null ? String(docTplAddForm.body) : '' }]);
+    setRows(next);
+    nwOfficeDocWriteTemplates(next);
+    setDocTplAddOpen(false);
+    showPrototypeToast('新模板已保存（已写入 localStorage，小程序将同步）');
+  };
+  const rowStyle = { background: T.surface, borderRadius: T.cardRadius, border: `1px solid ${T.border}`, padding: 14, marginBottom: 12, boxShadow: T.cardShadow };
+  return (
+    <div>
+      <PageHeader
+        title="公文写作模板"
+        subtitle="在此维护文种名称、说明与模板正文（【】为占位）；编辑后约半秒自动写入 localStorage（键 nw_office_doc_templates_v1），与小程序「公文写作」同源。请用侧栏返回办公助手。正式环境请改为接口。"
+        actions={<SecondaryBtn onClick={openDocTplAddModal}><I.Plus /> 新增模板</SecondaryBtn>}
+      />
+      <div style={{ maxWidth: 720 }}>
+        {rows.map((r, i) => (
+          <div key={r.id} style={rowStyle}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
+              <span style={{ fontSize: 11, color: T.textMuted }}>ID: {r.id}</span>
+              <SecondaryBtn onClick={() => setRows((prev) => prev.filter((_, j) => j !== i))}><I.Trash /> 删除</SecondaryBtn>
+            </div>
+            <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>模板名称</label>
+            <input
+              value={r.name}
+              onChange={(e) => {
+                const v = e.target.value;
+                setRows((prev) => prev.map((x, j) => (j === i ? { ...x, name: v } : x)));
+              }}
+              style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, marginBottom: 10, boxSizing: 'border-box', background: T.bg }}
+            />
+            <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>说明（选填）</label>
+            <textarea
+              value={r.desc}
+              onChange={(e) => {
+                const v = e.target.value;
+                setRows((prev) => prev.map((x, j) => (j === i ? { ...x, desc: v } : x)));
+              }}
+              rows={2}
+              style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, resize: 'vertical', boxSizing: 'border-box', background: T.bg, fontFamily: 'inherit', marginBottom: 10 }}
+            />
+            <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>模板正文（小程序「关键内容替换」预填；用【】标记待替换项）</label>
+            <textarea
+              value={r.body || ''}
+              onChange={(e) => {
+                const v = e.target.value;
+                setRows((prev) => prev.map((x, j) => (j === i ? { ...x, body: v } : x)));
+              }}
+              rows={10}
+              spellCheck={false}
+              style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, lineHeight: 1.55, resize: 'vertical', boxSizing: 'border-box', background: T.bg, fontFamily: 'ui-monospace, Menlo, Consolas, monospace' }}
+            />
+          </div>
+        ))}
+      </div>
+      {docTplAddOpen && (
+        <div
+          role="presentation"
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 5000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+          onClick={closeDocTplAddModal}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="doc-tpl-add-title"
+            style={{ width: '100%', maxWidth: 560, maxHeight: '90vh', overflow: 'auto', background: T.surface, borderRadius: T.cardRadius, border: `1px solid ${T.border}`, boxShadow: '0 20px 50px rgba(0,0,0,0.15)', padding: 20 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h3 id="doc-tpl-add-title" style={{ fontSize: 17, fontWeight: 700, fontFamily: "'Noto Serif SC', serif", margin: 0 }}>新增公文写作模板</h3>
+              <button type="button" onClick={closeDocTplAddModal} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: T.textMuted, lineHeight: 1 }} aria-label="关闭">×</button>
+            </div>
+            <p style={{ fontSize: 12, color: T.textMuted, marginBottom: 14, lineHeight: 1.55 }}>填写后点击「确定并保存」将立即写入列表并保存到本地；小程序「公文写作」将同步拉取。</p>
+            <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>模板名称</label>
+            <input
+              value={docTplAddForm.name}
+              onChange={(e) => setDocTplAddForm((f) => ({ ...f, name: e.target.value }))}
+              style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, marginBottom: 10, boxSizing: 'border-box', background: T.bg }}
+            />
+            <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>说明（选填）</label>
+            <textarea
+              value={docTplAddForm.desc}
+              onChange={(e) => setDocTplAddForm((f) => ({ ...f, desc: e.target.value }))}
+              rows={2}
+              style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, resize: 'vertical', boxSizing: 'border-box', background: T.bg, fontFamily: 'inherit', marginBottom: 10 }}
+            />
+            <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>模板正文（用【】标记待替换项）</label>
+            <textarea
+              value={docTplAddForm.body}
+              onChange={(e) => setDocTplAddForm((f) => ({ ...f, body: e.target.value }))}
+              rows={10}
+              spellCheck={false}
+              style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, lineHeight: 1.55, resize: 'vertical', boxSizing: 'border-box', background: T.bg, fontFamily: 'ui-monospace, Menlo, Consolas, monospace' }}
+            />
+            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+              <PrimaryBtn style={{ flex: 1, justifyContent: 'center' }} onClick={submitDocTplAddModal}><I.Check /> 确定并保存</PrimaryBtn>
+              <SecondaryBtn style={{ flex: 1, justifyContent: 'center' }} onClick={closeDocTplAddModal}>取消</SecondaryBtn>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================
+// 会议通知模板 · 与小程序 readNwMeetingNoticeTemplates 共用 NW_MEETING_NOTICE_TEMPLATES_KEY
+// ============================================
+const NW_MEETING_NOTICE_TEMPLATES_KEY = 'nw_meeting_notice_templates_v1';
+const NW_MEETING_NOTICE_TEMPLATES_BC = 'nw-meeting-notice-templates';
+
+function nwMeetingNoticeTemplatesDefault() {
+  return [
+    {
+      id: 'mnt_branch_general',
+      name: '支部党员大会会议通知',
+      desc: '传达学习、审议表决、换届推荐等',
+      body: '【发文单位】\n【成文日期】\n\n关于召开【会议名称】的通知\n\n各位党员：\n根据【制度依据或工作安排】，定于【会议日期】【会议时间】在【会议地点】召开【会议名称】。主要议题：【议题一】、【议题二】。\n请妥善安排工作准时出席；确需请假的，请提前向【联系人职务姓名】书面说明。\n\n联系人：【姓名】　电话：【联系电话】\n\n特此通知。',
+    },
+    {
+      id: 'mnt_branch_committee',
+      name: '支委会议通知',
+      desc: '支委会内部议事、酝酿事项',
+      body: '【发文单位】\n【成文日期】\n\n支委会议通知\n\n各位支委：\n定于【会议日期】【会议时间】在【会议地点】召开支委会，研究【议题摘要】。请准时参加。\n\n联系人：【姓名】　【电话】\n\n【党组织名称】',
+    },
+    {
+      id: 'mnt_theme_day',
+      name: '主题党日活动通知',
+      desc: '集结、着装、携带材料与纪律要求',
+      body: '【组织名称】\n【成文日期】\n\n关于开展「【活动主题】」主题党日活动的通知\n\n【对象范围】：\n定于【活动日期】【集合时间】在【集合地点】集合，统一开展【活动形式与内容概要】。\n请着【着装要求】，携带【学习资料或证件】，服从现场工作人员指挥。\n\n联系人：【姓名】　【电话】\n\n特此通知。',
+    },
+  ];
+}
+
+function nwMeetingNoticeNormalizeItem(t, i) {
+  const id = t && t.id ? String(t.id) : 'mnt_' + String(i + 1);
+  const name = t && t.name ? String(t.name).trim() : '未命名模板';
+  const desc = t && t.desc != null ? String(t.desc) : '';
+  const body = t && t.body != null ? String(t.body) : '';
+  return { id, name, desc, body };
+}
+
+function nwMeetingNoticeReadTemplates() {
+  const defList = nwMeetingNoticeTemplatesDefault();
+  const defById = new Map(defList.map((d) => [d.id, d]));
+  try {
+    const raw = localStorage.getItem(NW_MEETING_NOTICE_TEMPLATES_KEY);
+    if (!raw) return defList;
+    const p = JSON.parse(raw);
+    if (!Array.isArray(p) || p.length === 0) return defList;
+    return p.map((t, idx) => {
+      const n = nwMeetingNoticeNormalizeItem(t, idx);
+      const fb = defById.get(n.id);
+      if ((!n.body || !String(n.body).trim()) && fb && fb.body) return { ...n, body: fb.body };
+      if (!n.body || !String(n.body).trim()) {
+        return { ...n, body: `【${n.name}】\n\n请将【会议时间】【会议地点】【议题】等【】内占位替换为实际内容。\n\n【发文单位】\n【日期】` };
+      }
+      return n;
+    });
+  } catch (e) {
+    return defList;
+  }
+}
+
+function nwMeetingNoticeWriteTemplates(arr) {
+  const clean = (Array.isArray(arr) ? arr : []).map(nwMeetingNoticeNormalizeItem);
+  try {
+    localStorage.setItem(NW_MEETING_NOTICE_TEMPLATES_KEY, JSON.stringify(clean));
+  } catch (e) {
+    showPrototypeToast('无法写入本地存储', 'error');
+    return;
+  }
+  try {
+    if (typeof BroadcastChannel !== 'undefined') {
+      const bc = new BroadcastChannel(NW_MEETING_NOTICE_TEMPLATES_BC);
+      bc.postMessage({ t: 'meeting_notice_templates' });
+      bc.close();
+    }
+  } catch (e2) {}
+  try {
+    window.dispatchEvent(new Event('nw-meeting-notice-templates-changed'));
+  } catch (e3) {}
+}
+
+function OfficeMeetingNoticeTemplatesPage({ setPage }) {
+  const [rows, setRows] = React.useState(() => nwMeetingNoticeReadTemplates());
+  const [mnTplAddOpen, setMnTplAddOpen] = React.useState(false);
+  const [mnTplAddForm, setMnTplAddForm] = React.useState({ name: '', desc: '', body: '' });
+  const mnTplAutosaveSkip = React.useRef(true);
+  React.useEffect(() => {
+    const pull = () => setRows(nwMeetingNoticeReadTemplates());
+    window.addEventListener('storage', pull);
+    window.addEventListener('nw-meeting-notice-templates-changed', pull);
+    let bc = null;
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        bc = new BroadcastChannel(NW_MEETING_NOTICE_TEMPLATES_BC);
+        bc.onmessage = () => pull();
+      }
+    } catch (e) {}
+    return () => {
+      window.removeEventListener('storage', pull);
+      window.removeEventListener('nw-meeting-notice-templates-changed', pull);
+      if (bc) try { bc.close(); } catch (e2) {}
+    };
+  }, []);
+  React.useEffect(() => {
+    if (mnTplAutosaveSkip.current) {
+      mnTplAutosaveSkip.current = false;
+      return undefined;
+    }
+    const t = window.setTimeout(() => {
+      nwMeetingNoticeWriteTemplates(rows);
+    }, 500);
+    return () => window.clearTimeout(t);
+  }, [rows]);
+  const openMnTplAddModal = () => {
+    setMnTplAddForm({
+      name: '新会议通知模板',
+      desc: '',
+      body: '【新模板】\n\n请将【会议时间】【会议地点】【议题】等【】内占位替换为实际内容。\n\n【发文单位】\n【日期】',
+    });
+    setMnTplAddOpen(true);
+  };
+  const closeMnTplAddModal = () => setMnTplAddOpen(false);
+  const submitMnTplAddModal = () => {
+    const id = 'mnt_' + Date.now();
+    const name = (mnTplAddForm.name || '').trim() || '新会议通知模板';
+    const next = rows.concat([{ id, name, desc: mnTplAddForm.desc != null ? String(mnTplAddForm.desc) : '', body: mnTplAddForm.body != null ? String(mnTplAddForm.body) : '' }]);
+    setRows(next);
+    nwMeetingNoticeWriteTemplates(next);
+    setMnTplAddOpen(false);
+    showPrototypeToast('新模板已保存（已写入 localStorage）');
+  };
+  const rowStyle = { background: T.surface, borderRadius: T.cardRadius, border: `1px solid ${T.border}`, padding: 14, marginBottom: 12, boxShadow: T.cardShadow };
+  return (
+    <div>
+      <PageHeader
+        title="会议通知模板"
+        subtitle="在此维护会议通知名称、说明与正文（【】为占位）；编辑后约半秒自动写入 localStorage（键 nw_meeting_notice_templates_v1），与小程序及本端「会议通知生成」同源。请用侧栏返回办公助手。正式环境请改为接口。"
+        actions={(
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <SecondaryBtn onClick={openMnTplAddModal}><I.Plus /> 新增模板</SecondaryBtn>
+            <SecondaryBtn onClick={() => setPage('officeMeetingNoticeCompose')}>去使用模板生成</SecondaryBtn>
+          </div>
+        )}
+      />
+      <div style={{ maxWidth: 720 }}>
+        {rows.map((r, i) => (
+          <div key={r.id} style={rowStyle}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
+              <span style={{ fontSize: 11, color: T.textMuted }}>ID: {r.id}</span>
+              <SecondaryBtn onClick={() => setRows((prev) => prev.filter((_, j) => j !== i))}><I.Trash /> 删除</SecondaryBtn>
+            </div>
+            <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>模板名称</label>
+            <input
+              value={r.name}
+              onChange={(e) => {
+                const v = e.target.value;
+                setRows((prev) => prev.map((x, j) => (j === i ? { ...x, name: v } : x)));
+              }}
+              style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, marginBottom: 10, boxSizing: 'border-box', background: T.bg }}
+            />
+            <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>说明（选填）</label>
+            <textarea
+              value={r.desc}
+              onChange={(e) => {
+                const v = e.target.value;
+                setRows((prev) => prev.map((x, j) => (j === i ? { ...x, desc: v } : x)));
+              }}
+              rows={2}
+              style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, resize: 'vertical', boxSizing: 'border-box', background: T.bg, fontFamily: 'inherit', marginBottom: 10 }}
+            />
+            <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>模板正文（用【】标记待替换项）</label>
+            <textarea
+              value={r.body || ''}
+              onChange={(e) => {
+                const v = e.target.value;
+                setRows((prev) => prev.map((x, j) => (j === i ? { ...x, body: v } : x)));
+              }}
+              rows={10}
+              spellCheck={false}
+              style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, lineHeight: 1.55, resize: 'vertical', boxSizing: 'border-box', background: T.bg, fontFamily: 'ui-monospace, Menlo, Consolas, monospace' }}
+            />
+          </div>
+        ))}
+      </div>
+      {mnTplAddOpen && (
+        <div
+          role="presentation"
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 5000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+          onClick={closeMnTplAddModal}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mn-tpl-add-title"
+            style={{ width: '100%', maxWidth: 560, maxHeight: '90vh', overflow: 'auto', background: T.surface, borderRadius: T.cardRadius, border: `1px solid ${T.border}`, boxShadow: '0 20px 50px rgba(0,0,0,0.15)', padding: 20 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h3 id="mn-tpl-add-title" style={{ fontSize: 17, fontWeight: 700, fontFamily: "'Noto Serif SC', serif", margin: 0 }}>新增会议通知模板</h3>
+              <button type="button" onClick={closeMnTplAddModal} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: T.textMuted, lineHeight: 1 }} aria-label="关闭">×</button>
+            </div>
+            <p style={{ fontSize: 12, color: T.textMuted, marginBottom: 14, lineHeight: 1.55 }}>填写后点击「确定并保存」将立即写入列表并保存；小程序与 PC「会议通知生成」将同步。</p>
+            <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>模板名称</label>
+            <input
+              value={mnTplAddForm.name}
+              onChange={(e) => setMnTplAddForm((f) => ({ ...f, name: e.target.value }))}
+              style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, marginBottom: 10, boxSizing: 'border-box', background: T.bg }}
+            />
+            <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>说明（选填）</label>
+            <textarea
+              value={mnTplAddForm.desc}
+              onChange={(e) => setMnTplAddForm((f) => ({ ...f, desc: e.target.value }))}
+              rows={2}
+              style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, resize: 'vertical', boxSizing: 'border-box', background: T.bg, fontFamily: 'inherit', marginBottom: 10 }}
+            />
+            <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>模板正文（用【】标记待替换项）</label>
+            <textarea
+              value={mnTplAddForm.body}
+              onChange={(e) => setMnTplAddForm((f) => ({ ...f, body: e.target.value }))}
+              rows={10}
+              spellCheck={false}
+              style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, lineHeight: 1.55, resize: 'vertical', boxSizing: 'border-box', background: T.bg, fontFamily: 'ui-monospace, Menlo, Consolas, monospace' }}
+            />
+            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+              <PrimaryBtn style={{ flex: 1, justifyContent: 'center' }} onClick={submitMnTplAddModal}><I.Check /> 确定并保存</PrimaryBtn>
+              <SecondaryBtn style={{ flex: 1, justifyContent: 'center' }} onClick={closeMnTplAddModal}>取消</SecondaryBtn>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OfficeMeetingNoticeComposePage({ setPage }) {
+  const [templates, setTemplates] = React.useState(() => nwMeetingNoticeReadTemplates());
+  const [selectedId, setSelectedId] = React.useState(() => {
+    const t = nwMeetingNoticeReadTemplates();
+    return (t[0] && t[0].id) || '';
+  });
+  const [draftBody, setDraftBody] = React.useState(() => {
+    const t = nwMeetingNoticeReadTemplates();
+    return (t[0] && t[0].body) || '';
+  });
+
+  React.useEffect(() => {
+    const pull = () => setTemplates(nwMeetingNoticeReadTemplates());
+    window.addEventListener('storage', pull);
+    window.addEventListener('nw-meeting-notice-templates-changed', pull);
+    let bc = null;
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        bc = new BroadcastChannel(NW_MEETING_NOTICE_TEMPLATES_BC);
+        bc.onmessage = () => pull();
+      }
+    } catch (e) {}
+    return () => {
+      window.removeEventListener('storage', pull);
+      window.removeEventListener('nw-meeting-notice-templates-changed', pull);
+      if (bc) try { bc.close(); } catch (e2) {}
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (!templates.length) {
+      setSelectedId('');
+      setDraftBody('');
+      return;
+    }
+    const cur = templates.find((x) => x.id === selectedId);
+    if (!cur) {
+      const first = templates[0];
+      setSelectedId(first.id);
+      setDraftBody(first.body || '');
+      return;
+    }
+    setDraftBody(cur.body || '');
+  }, [templates, selectedId]);
+
+  const selectedTpl = templates.find((x) => x.id === selectedId);
+
+  const copyAll = () => {
+    const t = draftBody || '';
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(t).then(() => showPrototypeToast('已复制全文到剪贴板')).catch(() => showPrototypeToast('复制失败，请手动选择文本', 'error'));
+    } else showPrototypeToast('当前环境不支持剪贴板 API', 'error');
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+        <SecondaryBtn onClick={() => setPage('officeAssistant')}>返回办公助手</SecondaryBtn>
+        <SecondaryBtn onClick={() => setPage('officeMeetingNoticeTemplates')}><I.Edit /> 管理模板</SecondaryBtn>
+        <PrimaryBtn onClick={copyAll}><I.Check /> 复制全文</PrimaryBtn>
+      </div>
+      <PageHeader
+        title="会议通知生成"
+        subtitle="选择会议通知模板后编辑正文（替换【】占位）；数据键 nw_meeting_notice_templates_v1，与小程序 H5 同源。"
+      />
+      <div style={{ maxWidth: 720 }}>
+        <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 6 }}>选择模板</label>
+        <select
+          value={selectedId}
+          onChange={(e) => setSelectedId(e.target.value)}
+          style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, marginBottom: 12, boxSizing: 'border-box', background: T.surface }}
+        >
+          {templates.map((tpl) => (
+            <option key={tpl.id} value={tpl.id}>{tpl.name}</option>
+          ))}
+        </select>
+        {selectedTpl ? (
+          <p style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.6, marginBottom: 10 }}>{selectedTpl.desc || '（无说明）'}</p>
+        ) : null}
+        <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 6 }}>通知正文</label>
+        <textarea
+          value={draftBody}
+          onChange={(e) => setDraftBody(e.target.value)}
+          spellCheck={false}
+          rows={16}
+          style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, lineHeight: 1.55, resize: 'vertical', boxSizing: 'border-box', background: T.bg, fontFamily: 'ui-monospace, Menlo, Consolas, monospace' }}
+          placeholder="请先选择模板或在「会议通知模板」页维护列表"
+        />
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// Page: Office Assistant（PC）— 含小程序对齐能力 + PC 习惯扩展入口
+// ============================================
+function OfficeAssistantPage({ setPage }) {
+  const cardBase = {
+    background: T.surface,
+    borderRadius: T.cardRadius,
+    padding: 24,
+    border: `1px solid ${T.border}`,
+    boxShadow: T.cardShadow,
+    cursor: 'pointer',
+    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+  };
+  return (
+    <div>
+      <PageHeader
+        title="办公助手"
+        subtitle="对齐小程序办公能力并补充 PC 常用入口：不依赖小程序的党务工作者可直接在此完成写作、校验、纪要、问答与批改等（部分为演示稿，正式环境接接口与大模型）。"
+      />
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16, maxWidth: 1320 }}>
+        <div
+          onClick={() => setPage('officeDocWriting')}
+          style={cardBase}
+          onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.boxShadow = T.cardShadow; }}
+        >
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(145deg,#FFF0EE,#FFE4E6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.primary, marginBottom: 12 }}>
+            <I.FileDoc />
+          </div>
+          <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8, fontFamily: "'Noto Serif SC', serif" }}>公文写作</h3>
+          <p style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.65 }}>维护各文种模板正文（【】占位）；保存后与小程序「公文写作」同源。</p>
+        </div>
+        <div
+          onClick={() => setPage('officeMeetingNoticeTemplates')}
+          style={cardBase}
+          onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.boxShadow = T.cardShadow; }}
+        >
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(145deg,#F0FDFA,#CCFBF1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0F766E', marginBottom: 12 }}>
+            <I.Bell />
+          </div>
+          <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8, fontFamily: "'Noto Serif SC', serif" }}>会议通知模板</h3>
+          <p style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.65 }}>新增、编辑会议类通知模板；保存后小程序「会议通知生成」与本页「会议通知生成」共用列表。</p>
+        </div>
+        <div
+          onClick={() => setPage('officeMeetingNoticeCompose')}
+          style={cardBase}
+          onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.boxShadow = T.cardShadow; }}
+        >
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(145deg,#ECFDF5,#D1FAE5)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#047857', marginBottom: 12 }}>
+            <I.Calendar />
+          </div>
+          <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8, fontFamily: "'Noto Serif SC', serif" }}>会议通知生成</h3>
+          <p style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.65 }}>在 PC 上选择模板、替换【】占位，一键复制全文；与 H5 使用同一套模板数据。</p>
+        </div>
+        <div
+          onClick={() => setPage('officePptStudio')}
+          style={cardBase}
+          onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.boxShadow = T.cardShadow; }}
+        >
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(145deg,#EFF6FF,#DBEAFE)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1D4ED8', marginBottom: 12 }}>
+            <I.Slides />
+          </div>
+          <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8, fontFamily: "'Noto Serif SC', serif" }}>PPT 制作</h3>
+          <p style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.65 }}>按政务汇报、党课课件等场景选用模板，生成大纲与分页文案；手机端仅保留占位，正式编辑在 PC 完成。</p>
+        </div>
+        <div
+          onClick={() => setPage('officeTableStudio')}
+          style={cardBase}
+          onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.boxShadow = T.cardShadow; }}
+        >
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(145deg,#F1F5F9,#E2E8F0)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569', marginBottom: 12 }}>
+            <I.Table2 />
+          </div>
+          <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8, fontFamily: "'Noto Serif SC', serif" }}>表格制作</h3>
+          <p style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.65 }}>适合活动签到汇总、学习统计等表格初稿；复杂公式与合并单元格在 Excel / WPS 中处理。</p>
+        </div>
+        <div
+          onClick={() => setPage('audit')}
+          style={cardBase}
+          onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.boxShadow = T.cardShadow; }}
+        >
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(145deg,#FFFBEB,#FEF3C7)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#B45309', marginBottom: 12 }}>
+            <I.Audit />
+          </div>
+          <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8, fontFamily: "'Noto Serif SC', serif" }}>资料审核</h3>
+          <p style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.65 }}>进入 PC「智能资料审核」队列：按资料门类校核（档案资料、书刊、信息档案等），与小程序「资料校验」同类流程，便于大屏处理。</p>
+        </div>
+        <div
+          onClick={() => setPage('officeTypoCheck')}
+          style={cardBase}
+          onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.boxShadow = T.cardShadow; }}
+        >
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(145deg,#FAF5FF,#F3E8FF)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#7E22CE', marginBottom: 12 }}>
+            <I.Type />
+          </div>
+          <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8, fontFamily: "'Noto Serif SC', serif" }}>错别字校验</h3>
+          <p style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.65 }}>粘贴正文快速做常见错别字、的/地/得与标点规范提示（演示）；正式环境可接专用校对模型。</p>
+        </div>
+        <div
+          onClick={() => setPage('officeMeetingMinutes')}
+          style={cardBase}
+          onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.boxShadow = T.cardShadow; }}
+        >
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(145deg,#ECFEFF,#CFFAFE)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0E7490', marginBottom: 12 }}>
+            <I.ClipboardList />
+          </div>
+          <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8, fontFamily: "'Noto Serif SC', serif" }}>会议纪要</h3>
+          <p style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.65 }}>与小程序一致：实时录音 + 转写分段 + 会后摘要；历史存本机并与 H5 同源键。涉密会议请勿录音。</p>
+        </div>
+        <div
+          onClick={() => setPage('officeSmartQaPc')}
+          style={cardBase}
+          onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.boxShadow = T.cardShadow; }}
+        >
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(145deg,#EEF2FF,#E0E7FF)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4338CA', marginBottom: 12 }}>
+            <I.MessageCircle />
+          </div>
+          <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8, fontFamily: "'Noto Serif SC', serif" }}>智能问答</h3>
+          <p style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.65 }}>与小程序一致：优先学习外链里的 https，否则 DinTal 默认 H5；进入页自动尝试打开新窗口，#小程序 / 公众号链与 H5 同源提示。</p>
+        </div>
+        <div
+          onClick={() => setPage('officeHomeworkGrading')}
+          style={cardBase}
+          onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.boxShadow = T.cardShadow; }}
+        >
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(145deg,#FDF2F8,#FCE7F3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#BE185D', marginBottom: 12 }}>
+            <I.GraduationCap />
+          </div>
+          <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8, fontFamily: "'Noto Serif SC', serif" }}>作业批改</h3>
+          <p style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.65 }}>与小程序一致：上传作业图 → 豆包式演示批改 → 分题得分与评语；不上传也可直接看示例结果。</p>
+        </div>
+      </div>
+      <p style={{ fontSize: 12, color: T.textMuted, marginTop: 18, lineHeight: 1.65, maxWidth: 1320 }}>
+        小程序 <code style={{ fontSize: 11, background: T.bg, padding: '2px 6px', borderRadius: 4 }}>prototype/mobile_v2.html</code> 办公助手：九宫格与 PC 可不完全一致；公文写作 / 会议通知数据与本地存储键对齐。智能问答 H5 请在 <strong>学习 → 学习外链配置</strong> 维护深小服地址。
+      </p>
+    </div>
+  );
+}
+
+// ============================================
+// 办公助手 · PC 扩展页（错别字 / 纪要 / 问答 / 批改）
+// ============================================
+function OfficeTypoCheckPage({ setPage }) {
+  const [draft, setDraft] = React.useState('');
+  const [result, setResult] = React.useState('');
+  const runDemo = () => {
+    const t = draft.trim();
+    if (!t) {
+      showPrototypeToast('请先粘贴待校验文本', 'error');
+      return;
+    }
+    const hints = [];
+    if (/的的|在在|了了/.test(t)) hints.push('· 疑似重复用词，请人工通读。');
+    if (/[的地得]{2,}/.test(t)) hints.push('· 出现的/地/得连用，请拆分并核对语法。');
+    if (!/[，。；：、]$/.test(t) && t.length > 80) hints.push('· 长句未以常见句末标点结束，请检查是否缺句号。');
+    if (!hints.length) hints.push('· 未发现明显高风险模式（演示规则有限，正式环境请接专业校对）。');
+    setResult(['【演示校验结果】', '', ...hints, '', '【说明】以上为前端占位规则，非大模型全文审校。'].join('\n'));
+    showPrototypeToast('演示校验完成');
+  };
+  return (
+    <div>
+      <PageHeader
+        title="错别字校验"
+        subtitle="面向习惯在 PC 上改稿的用户：粘贴通知、方案、简报等正文，先做一轮常见模式提示（演示）。"
+        actions={<SecondaryBtn onClick={() => setPage('officeAssistant')}>返回办公助手</SecondaryBtn>}
+      />
+      <div style={{ maxWidth: 720 }}>
+        <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 6 }}>待校验正文</label>
+        <textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          rows={12}
+          placeholder="将 Word / WPS 中的正文粘贴到此处…"
+          style={{ width: '100%', padding: '12px 14px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, lineHeight: 1.6, resize: 'vertical', boxSizing: 'border-box', background: T.bg, fontFamily: 'inherit' }}
+        />
+        <div style={{ marginTop: 12, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <PrimaryBtn onClick={runDemo}><I.Search /> 演示校验</PrimaryBtn>
+          <SecondaryBtn onClick={() => { setDraft(''); setResult(''); }}>清空</SecondaryBtn>
+        </div>
+        {result ? (
+          <div style={{ marginTop: 16, padding: 14, borderRadius: T.cardRadius, border: `1px solid ${T.border}`, background: T.surface, boxShadow: T.cardShadow, fontSize: 13, lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>{result}</div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+// ---------- 会议纪要：与 prototype/mobile_v2.html 同源 localStorage ----------
+const NW_MEETING_LIVE_HISTORY_KEY = 'nw_meeting_live_history_v1';
+const MM_LIVE_DEMO_SEGMENTS = [
+  { speaker: '发言人1', text: '今天的支部委员会，我们先过一下三季度学习计划的调整事项。' },
+  { speaker: '发言人2', text: '同意，另外建议把集中学习和自学的时间都写进计划表，方便请假党员补课。' },
+  { speaker: '发言人1', text: '可以。党小组层面要同步传达，尤其是外出党员这块，线上学习要确保可追溯。' },
+  { speaker: '发言人2', text: '那我把上次议定的两项整改跟进情况也顺便汇报一下，看是否纳入纪要。' },
+  { speaker: '发言人1', text: '纳入。请组织委员把今天确定的三个时间节点写进纪要，下周支委会对照落实。' },
+];
+const MM_LIVE_SUMMARY_BULLETS = [
+  '三季度学习计划需调整并明确集中学习与自学安排。',
+  '党小组需同步传达；外出党员线上学习须可追溯。',
+  '纳入上次议定整改跟进；组织委员落实纪要中的时间节点。',
+];
+
+function nwPcFormatMmLiveTime(totalSec) {
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function nwMeetingLiveTitleFromSegments(segments) {
+  const t = segments && segments[0] && segments[0].text ? String(segments[0].text).replace(/\s+/g, ' ').trim() : '';
+  if (!t) return '';
+  return t.length > 26 ? `${t.slice(0, 26)}…` : t;
+}
+
+function nwMeetingLiveFallbackTitle(iso) {
+  try {
+    const d = new Date(iso);
+    return `实时记录 · ${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  } catch (e) {
+    return '实时记录';
+  }
+}
+
+function nwMeetingLiveNormalizeRecord(r, i) {
+  const id = r && r.id ? String(r.id) : `ml_${i}_${Date.now()}`;
+  const title = r && r.title != null ? String(r.title).trim() : '';
+  const createdAt = r && r.createdAt ? String(r.createdAt) : new Date().toISOString();
+  const durationSec = Math.max(0, Math.floor(Number(r && r.durationSec != null ? r.durationSec : 0) || 0));
+  const segments = Array.isArray(r && r.segments) ? r.segments.map((s) => ({
+    speaker: s && s.speaker != null ? String(s.speaker) : '发言人',
+    text: s && s.text != null ? String(s.text) : '',
+  })) : [];
+  let summaryBullets = Array.isArray(r && r.summaryBullets) ? r.summaryBullets.map((x) => String(x)) : [];
+  if (!summaryBullets.length) summaryBullets = MM_LIVE_SUMMARY_BULLETS.slice();
+  const audioRecorded = !!(r && r.audioRecorded);
+  return { id, title: title || nwMeetingLiveFallbackTitle(createdAt), createdAt, durationSec, segments, summaryBullets, audioRecorded };
+}
+
+function readNwMeetingLiveHistory() {
+  try {
+    const raw = localStorage.getItem(NW_MEETING_LIVE_HISTORY_KEY);
+    if (!raw) return [];
+    const p = JSON.parse(raw);
+    if (!Array.isArray(p)) return [];
+    return p.map(nwMeetingLiveNormalizeRecord);
+  } catch (e) {
+    return [];
+  }
+}
+
+function writeNwMeetingLiveHistory(arr) {
+  const clean = (Array.isArray(arr) ? arr : []).map(nwMeetingLiveNormalizeRecord);
+  try {
+    localStorage.setItem(NW_MEETING_LIVE_HISTORY_KEY, JSON.stringify(clean));
+  } catch (e) {}
+  try {
+    window.dispatchEvent(new Event('nw-meeting-live-history-changed'));
+  } catch (e2) {}
+}
+
+function appendNwMeetingLiveRecord(rec) {
+  const n = nwMeetingLiveNormalizeRecord(rec);
+  const list = readNwMeetingLiveHistory();
+  const next = [n, ...list].slice(0, 50);
+  writeNwMeetingLiveHistory(next);
+}
+
+function nwPcPickAudioMimeType() {
+  if (typeof MediaRecorder === 'undefined' || !MediaRecorder.isTypeSupported) return '';
+  const c = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
+  for (let i = 0; i < c.length; i++) {
+    if (MediaRecorder.isTypeSupported(c[i])) return c[i];
+  }
+  return '';
+}
+
+function OfficeMeetingMinutesPage({ setPage }) {
+  const [modeTab, setModeTab] = React.useState('live');
+  const [liveView, setLiveView] = React.useState('hub');
+  const [detailId, setDetailId] = React.useState('');
+  const [rows, setRows] = React.useState(() => readNwMeetingLiveHistory());
+
+  const [raw, setRaw] = React.useState('');
+  const [out, setOut] = React.useState('');
+
+  const [phase, setPhase] = React.useState('idle');
+  const [sec, setSec] = React.useState(0);
+  const [segments, setSegments] = React.useState([]);
+  const [micHint, setMicHint] = React.useState('');
+  const [audioOk, setAudioOk] = React.useState(false);
+
+  const streamRef = React.useRef(null);
+  const mrRef = React.useRef(null);
+  const chunksRef = React.useRef([]);
+  const demoNextRef = React.useRef(0);
+  const demoTimerRef = React.useRef(null);
+  const secTimerRef = React.useRef(null);
+  const scrollerRef = React.useRef(null);
+
+  React.useEffect(() => {
+    const pull = () => setRows(readNwMeetingLiveHistory());
+    window.addEventListener('storage', pull);
+    window.addEventListener('nw-meeting-live-history-changed', pull);
+    return () => {
+      window.removeEventListener('storage', pull);
+      window.removeEventListener('nw-meeting-live-history-changed', pull);
+    };
+  }, []);
+
+  React.useEffect(() => {
+    const el = scrollerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [segments]);
+
+  const stopMediaPipeline = React.useCallback(() => {
+    if (demoTimerRef.current) {
+      try { window.clearInterval(demoTimerRef.current); } catch (e0) {}
+      demoTimerRef.current = null;
+    }
+    if (secTimerRef.current) {
+      try { window.clearInterval(secTimerRef.current); } catch (e1) {}
+      secTimerRef.current = null;
+    }
+    try {
+      if (mrRef.current && mrRef.current.state !== 'inactive') mrRef.current.stop();
+    } catch (e2) {}
+    mrRef.current = null;
+    try {
+      const st = streamRef.current;
+      if (st && st.getTracks) st.getTracks().forEach((t) => { try { t.stop(); } catch (e3) {} });
+    } catch (e4) {}
+    streamRef.current = null;
+    chunksRef.current = [];
+  }, []);
+
+  React.useEffect(() => () => stopMediaPipeline(), [stopMediaPipeline]);
+
+  const startRecordingPipeline = async () => {
+    demoNextRef.current = 0;
+    setSec(0);
+    setSegments([]);
+    setMicHint('');
+    setAudioOk(false);
+    chunksRef.current = [];
+    let stream = null;
+    let mr = null;
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('当前浏览器不支持麦克风采集');
+      }
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      const mime = nwPcPickAudioMimeType();
+      mr = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+      mrRef.current = mr;
+      mr.ondataavailable = (ev) => {
+        if (ev.data && ev.data.size > 0) chunksRef.current.push(ev.data);
+      };
+      mr.start(1000);
+      setAudioOk(true);
+      setMicHint('麦克风已开启：正在本机录音（演示不上传云端）。下方转写流与小程序一致，为演示数据，接入 ASR 后将替换为真实结果。');
+    } catch (err) {
+      setMicHint(`未能开启麦克风（${(err && err.message) ? err.message : '权限被拒绝'}）。将仅使用与小程序相同的演示转写流；涉密会议请勿使用。`);
+      showPrototypeToast('未获得麦克风权限，已切换为演示转写', 'error');
+    }
+
+    setPhase('recording');
+    secTimerRef.current = window.setInterval(() => setSec((t) => t + 1), 1000);
+    demoTimerRef.current = window.setInterval(() => {
+      setSegments((prev) => {
+        const i = demoNextRef.current;
+        if (i >= MM_LIVE_DEMO_SEGMENTS.length) return prev;
+        demoNextRef.current = i + 1;
+        return prev.concat([MM_LIVE_DEMO_SEGMENTS[i]]);
+      });
+    }, 2600);
+  };
+
+  const pauseRec = () => {
+    setPhase('paused');
+    if (demoTimerRef.current) {
+      try { window.clearInterval(demoTimerRef.current); } catch (e0) {}
+      demoTimerRef.current = null;
+    }
+    if (secTimerRef.current) {
+      try { window.clearInterval(secTimerRef.current); } catch (e1) {}
+      secTimerRef.current = null;
+    }
+    try {
+      const m = mrRef.current;
+      if (m && m.state === 'recording' && typeof m.pause === 'function') m.pause();
+    } catch (e2) {}
+  };
+
+  const resumeRec = () => {
+    setPhase('recording');
+    secTimerRef.current = window.setInterval(() => setSec((t) => t + 1), 1000);
+    demoTimerRef.current = window.setInterval(() => {
+      setSegments((prev) => {
+        const i = demoNextRef.current;
+        if (i >= MM_LIVE_DEMO_SEGMENTS.length) return prev;
+        demoNextRef.current = i + 1;
+        return prev.concat([MM_LIVE_DEMO_SEGMENTS[i]]);
+      });
+    }, 2600);
+    try {
+      const m = mrRef.current;
+      if (m && m.state === 'paused' && typeof m.resume === 'function') m.resume();
+      else if (m && m.state === 'inactive' && !streamRef.current) {
+        /* 已停止无法恢复 */
+      }
+    } catch (e0) {}
+  };
+
+  const finishAndSave = () => {
+    const id = `ml_${Date.now()}`;
+    const createdAt = new Date().toISOString();
+    const finalSegs = segments.slice();
+    const finalTitle = nwMeetingLiveTitleFromSegments(finalSegs) || nwMeetingLiveFallbackTitle(createdAt);
+    const finalSec = sec;
+
+    if (demoTimerRef.current) {
+      try { window.clearInterval(demoTimerRef.current); } catch (e0) {}
+      demoTimerRef.current = null;
+    }
+    if (secTimerRef.current) {
+      try { window.clearInterval(secTimerRef.current); } catch (e1) {}
+      secTimerRef.current = null;
+    }
+
+    const doneSave = (hadAudio) => {
+      appendNwMeetingLiveRecord({
+        id,
+        title: finalTitle,
+        createdAt,
+        durationSec: finalSec,
+        segments: finalSegs,
+        summaryBullets: MM_LIVE_SUMMARY_BULLETS.slice(),
+        audioRecorded: !!hadAudio,
+      });
+      setPhase('idle');
+      setSec(0);
+      setSegments([]);
+      setDetailId(id);
+      setLiveView('detail');
+      setRows(readNwMeetingLiveHistory());
+      try {
+        const st = streamRef.current;
+        if (st && st.getTracks) st.getTracks().forEach((t) => { try { t.stop(); } catch (e2) {} });
+      } catch (e3) {}
+      streamRef.current = null;
+      mrRef.current = null;
+      chunksRef.current = [];
+      showPrototypeToast('已保存，与小程序「会议纪要」历史同源');
+    };
+
+    const mr = mrRef.current;
+    if (mr && mr.state !== 'inactive') {
+      try {
+        mr.onstop = () => { doneSave(chunksRef.current.length > 0); };
+        mr.stop();
+      } catch (e4) {
+        doneSave(false);
+      }
+    } else {
+      doneSave(false);
+    }
+  };
+
+  const openDetail = (id) => {
+    setDetailId(id);
+    setLiveView('detail');
+  };
+
+  const detailRec = rows.find((x) => x.id === detailId) || null;
+
+  const removeDetail = () => {
+    if (!detailRec || !window.confirm('确定删除本条实时记录？')) return;
+    const next = readNwMeetingLiveHistory().filter((x) => x.id !== detailRec.id);
+    writeNwMeetingLiveHistory(next);
+    setRows(next);
+    setLiveView('hub');
+    showPrototypeToast('已删除');
+  };
+
+  const copySummary = () => {
+    if (!detailRec) return;
+    const head = `【${detailRec.title}】`;
+    const body = (detailRec.summaryBullets || []).map((x) => `· ${x}`).join('\n');
+    const t = `${head}\n${body}`;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(t).then(() => showPrototypeToast('已复制纪要要点')).catch(() => showPrototypeToast('复制失败', 'error'));
+    } else showPrototypeToast('当前环境不支持剪贴板', 'error');
+  };
+
+  const genPaste = () => {
+    const t = raw.trim();
+    if (!t) {
+      showPrototypeToast('请先粘贴会议记录或语音转写稿', 'error');
+      return;
+    }
+    setOut([
+      '【××党支部支委会纪要（演示稿）】',
+      '时间：（请补全）　地点：（请补全）　主持人：（请补全）　记录人：（请补全）',
+      '',
+      '一、会议议题',
+      '1. 传达学习上级党组织近期工作部署精神。',
+      '2. 研究本支部近期重点工作及责任分工。',
+      '',
+      '二、发言与讨论摘要',
+      '· 与会同志围绕原文要点开展讨论，认为要结合社区治理实际抓好落实。',
+      '· 对「' + t.slice(0, 40).replace(/\n/g, ' ') + (t.length > 40 ? '…' : '') + '」等具体事项进行了研究。',
+      '',
+      '三、会议决议',
+      '1. 原则同意上述工作安排，由支部书记牵头细化时间表。',
+      '2. 相关材料于会后 3 个工作日内报送街道党建办备案。',
+      '',
+      '四、待办事项',
+      '| 事项 | 责任人 | 完成时限 |',
+      '| --- | --- | --- |',
+      '| 补充完善活动方案 | （待指定） | 本周五前 |',
+      '',
+      '（以上为根据粘贴内容自动套壳的演示结构，正式环境接大模型与单位纪要模板。）',
+    ].join('\n'));
+    showPrototypeToast('已生成纪要演示稿');
+  };
+
+  const spkHue = (name) => (name === '发言人2' ? '#0D9488' : '#5B21B6');
+  const panBg = 'linear-gradient(180deg, #EEF2FF 0%, #F8FAFC 35%, #FAFAF9 100%)';
+
+  const tabBar = (
+    <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+      <SecondaryBtn onClick={() => { setModeTab('live'); setLiveView('hub'); stopMediaPipeline(); setPhase('idle'); }} style={modeTab === 'live' ? { borderColor: T.primary, color: T.primary, fontWeight: 600 } : {}}>实时记录（对齐小程序）</SecondaryBtn>
+      <SecondaryBtn onClick={() => { setModeTab('paste'); stopMediaPipeline(); setPhase('idle'); }} style={modeTab === 'paste' ? { borderColor: T.primary, color: T.primary, fontWeight: 600 } : {}}>粘贴整理</SecondaryBtn>
+    </div>
+  );
+
+  return (
+    <div>
+      <PageHeader
+        title="会议纪要"
+        subtitle="与小程序「会议纪要」一致：实时录音 + 发言人分段转写（演示流）+ 会后摘要；历史列表键 nw_meeting_live_history_v1 与 H5 共享。涉密会议请勿录音。"
+        actions={(
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {modeTab === 'live' && liveView !== 'hub' ? (
+              <SecondaryBtn onClick={() => { stopMediaPipeline(); setPhase('idle'); setSec(0); setSegments([]); setMicHint(''); setAudioOk(false); setLiveView('hub'); }}>返回列表</SecondaryBtn>
+            ) : null}
+            <SecondaryBtn onClick={() => setPage('officeAssistant')}>返回办公助手</SecondaryBtn>
+          </div>
+        )}
+      />
+
+      {tabBar}
+
+      {modeTab === 'paste' ? (
+        <div style={{ maxWidth: 720 }}>
+          <p style={{ fontSize: 12, color: T.textMuted, marginBottom: 12, lineHeight: 1.65 }}>无麦克风环境可将速记稿粘贴于此，生成纪要壳子（演示）。</p>
+          <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 6 }}>原始记录 / 转写稿</label>
+          <textarea
+            value={raw}
+            onChange={(e) => setRaw(e.target.value)}
+            rows={10}
+            placeholder="粘贴会议内容…"
+            style={{ width: '100%', padding: '12px 14px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, lineHeight: 1.55, resize: 'vertical', boxSizing: 'border-box', background: T.bg, fontFamily: 'inherit' }}
+          />
+          <div style={{ marginTop: 12 }}>
+            <PrimaryBtn onClick={genPaste}><I.Check /> 生成纪要演示稿</PrimaryBtn>
+          </div>
+          {out ? (
+            <>
+              <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginTop: 18, marginBottom: 6 }}>生成结果</label>
+              <textarea readOnly value={out} rows={18} style={{ width: '100%', padding: '12px 14px', borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, lineHeight: 1.55, boxSizing: 'border-box', background: T.surface, fontFamily: 'ui-monospace, Menlo, Consolas, monospace' }} />
+            </>
+          ) : null}
+        </div>
+      ) : null}
+
+      {modeTab === 'live' && liveView === 'hub' ? (
+        <div style={{ maxWidth: 720, background: panBg, borderRadius: T.cardRadius, padding: 18, border: `1px solid ${T.border}` }}>
+          <p style={{ fontSize: 12, color: T.textSecondary, lineHeight: 1.65, marginBottom: 14 }}>以下为已保存的<strong>实时记录</strong>（与小程序同源 localStorage）。点击条目可查阅；新建请使用下方按钮。</p>
+          <PrimaryBtn onClick={() => { setLiveView('recorder'); }} style={{ width: '100%', justifyContent: 'center', marginBottom: 16, background: 'linear-gradient(145deg,#8B5CF6,#6366F1 48%,#4F46E5)', border: 'none' }}>
+            <I.Mic /> 开始新的实时记录（录音）
+          </PrimaryBtn>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#6366F1', marginBottom: 8 }}>历史记录</div>
+          {rows.length === 0 ? (
+            <div style={{ fontSize: 13, color: T.textMuted, textAlign: 'center', padding: '24px 12px', background: T.surface, borderRadius: 12, border: `1px dashed ${T.border}` }}>
+              暂无历史记录。完成一次「结束并生成纪要」后将出现在此列表，并与手机端 H5 同步（同域同键）。
+            </div>
+          ) : (
+            rows.map((r) => (
+              <div
+                key={r.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => openDetail(r.id)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(r.id); } }}
+                style={{
+                  background: T.surface,
+                  borderRadius: 12,
+                  border: `1px solid ${T.border}`,
+                  padding: '12px 14px',
+                  marginBottom: 10,
+                  cursor: 'pointer',
+                  boxShadow: T.cardShadow,
+                }}
+              >
+                <div style={{ fontSize: 15, fontWeight: 700, color: T.textPrimary, marginBottom: 4 }}>{r.title}</div>
+                <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 6 }}>
+                  {(() => { try { const d = new Date(r.createdAt); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; } catch (e) { return '—'; } })()}
+                  <span style={{ margin: '0 6px', opacity: 0.45 }}>|</span>
+                  时长 {nwPcFormatMmLiveTime(r.durationSec)}
+                  {r.audioRecorded ? <span style={{ marginLeft: 8, color: T.success, fontWeight: 600 }}>· 含本机录音</span> : null}
+                </div>
+                <div style={{ fontSize: 12, color: T.textSecondary, lineHeight: 1.55 }}>{(r.summaryBullets && r.summaryBullets[0]) || (r.segments && r.segments[0] && r.segments[0].text) || '（无摘要预览）'}</div>
+              </div>
+            ))
+          )}
+        </div>
+      ) : null}
+
+      {modeTab === 'live' && liveView === 'recorder' ? (
+        <div style={{ maxWidth: 720, background: panBg, borderRadius: T.cardRadius, padding: 18, border: `1px solid ${T.border}` }}>
+          {micHint ? <p style={{ fontSize: 12, color: T.textSecondary, lineHeight: 1.65, marginBottom: 12 }}>{micHint}</p> : null}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+            {['实时转写', '发言人分段', '会后摘要'].map((t) => (
+              <span key={t} style={{ fontSize: 10, fontWeight: 600, color: '#4338CA', background: 'rgba(99,102,241,0.12)', padding: '4px 10px', borderRadius: 999 }}>{t}</span>
+            ))}
+          </div>
+          <div style={{ textAlign: 'center', padding: '8px 0 12px' }}>
+            {(phase === 'recording' || phase === 'paused') && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 99, background: phase === 'recording' ? '#EF4444' : '#F59E0B', animation: phase === 'recording' ? 'pulse 1.2s ease-in-out infinite' : 'none' }} />
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#1E293B' }}>{phase === 'recording' ? '正在聆听并实时转写…' : '已暂停'}</span>
+              </div>
+            )}
+            <div style={{ fontVariantNumeric: 'tabular-nums', fontSize: 32, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>{nwPcFormatMmLiveTime(sec)}</div>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 3, height: 44, marginBottom: 14, opacity: phase === 'recording' ? 1 : 0.35 }}>
+              {Array.from({ length: 28 }, (_, i) => (
+                <div key={i} className="mm-live-bar" style={{ animationPlayState: phase === 'recording' ? 'running' : 'paused', animationDelay: `${(i % 9) * 0.05}s` }} />
+              ))}
+            </div>
+            <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+              {(phase === 'recording' || phase === 'paused') && (
+                <>
+                  <div className="mm-live-ring" aria-hidden />
+                  <div className="mm-live-ring mm-live-ring2" aria-hidden />
+                </>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  if (phase === 'idle') startRecordingPipeline();
+                  else if (phase === 'recording') pauseRec();
+                  else resumeRec();
+                }}
+                style={{
+                  position: 'relative',
+                  width: 88,
+                  height: 88,
+                  borderRadius: 999,
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#fff',
+                  background: phase === 'paused' ? 'linear-gradient(145deg,#F59E0B,#D97706)' : 'linear-gradient(145deg,#8B5CF6,#6366F1 48%,#4F46E5)',
+                  boxShadow: '0 12px 36px rgba(79,70,229,0.28)',
+                }}
+              >
+                {phase === 'idle' ? <I.Mic /> : phase === 'recording' ? (
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                    <rect x="7" y="5" width="4" height="14" rx="1" />
+                    <rect x="13" y="5" width="4" height="14" rx="1" />
+                  </svg>
+                ) : <I.Mic />}
+              </button>
+            </div>
+            <div style={{ fontSize: 12, color: T.textMuted, marginTop: 8 }}>
+              {phase === 'idle' && '点击开始：将请求麦克风权限'}
+              {phase === 'recording' && '点击暂停；转写条为演示数据（与小程序一致）'}
+              {phase === 'paused' && '点击继续'}
+            </div>
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#6366F1', marginBottom: 6 }}>实时记录</div>
+          <div
+            ref={scrollerRef}
+            style={{
+              maxHeight: 280,
+              overflowY: 'auto',
+              background: 'rgba(255,255,255,0.85)',
+              borderRadius: 12,
+              border: `1px solid ${T.border}`,
+              padding: '12px',
+              marginBottom: 12,
+            }}
+          >
+            {segments.length === 0 ? (
+              <div style={{ fontSize: 13, color: T.textMuted, textAlign: 'center', padding: '16px 8px' }}>转写内容将逐条出现在此处…</div>
+            ) : null}
+            {segments.map((seg, idx) => (
+              <div key={idx} style={{ marginBottom: 12, paddingLeft: 10, borderLeft: `3px solid ${spkHue(seg.speaker)}` }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: spkHue(seg.speaker), marginBottom: 4 }}>{seg.speaker}</div>
+                <div style={{ fontSize: 14, color: '#1E293B', lineHeight: 1.65 }}>{seg.text}</div>
+              </div>
+            ))}
+          </div>
+          {(phase === 'recording' || phase === 'paused') && (
+            <PrimaryBtn onClick={finishAndSave} style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(145deg,#4F46E5,#4338CA)', border: 'none' }}>
+              <I.Check /> 结束并生成纪要
+            </PrimaryBtn>
+          )}
+        </div>
+      ) : null}
+
+      {modeTab === 'live' && liveView === 'detail' && detailRec ? (
+        <div style={{ maxWidth: 720, background: panBg, borderRadius: T.cardRadius, padding: 18, border: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 17, fontWeight: 700, color: T.textPrimary, marginBottom: 6, fontFamily: "'Noto Serif SC', serif" }}>{detailRec.title}</div>
+          <div style={{ fontSize: 12, color: T.textMuted, marginBottom: 12 }}>
+            {(() => { try { const d = new Date(detailRec.createdAt); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; } catch (e) { return ''; } })()}
+            <span style={{ margin: '0 6px' }}>·</span>
+            时长 {nwPcFormatMmLiveTime(detailRec.durationSec)}
+            {detailRec.audioRecorded ? <span style={{ marginLeft: 8, color: T.success, fontWeight: 600 }}>本机已录音（演示未保留音频文件）</span> : null}
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#6366F1', marginBottom: 6 }}>实时记录</div>
+          <div style={{ background: T.surface, borderRadius: 12, border: `1px solid ${T.border}`, padding: 14, marginBottom: 14 }}>
+            {(detailRec.segments || []).map((seg, idx) => (
+              <div key={idx} style={{ marginBottom: 12, paddingLeft: 10, borderLeft: `3px solid ${spkHue(seg.speaker)}` }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: spkHue(seg.speaker), marginBottom: 4 }}>{seg.speaker}</div>
+                <div style={{ fontSize: 14, color: '#1E293B', lineHeight: 1.65 }}>{seg.text}</div>
+              </div>
+            ))}
+            <div style={{ marginTop: 10, paddingTop: 12, borderTop: `1px dashed ${T.border}` }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>智能纪要（演示）</div>
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: T.textSecondary, lineHeight: 1.75 }}>
+                {(detailRec.summaryBullets || []).map((line, i) => (
+                  <li key={i}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          <SecondaryBtn onClick={copySummary} style={{ width: '100%', justifyContent: 'center', marginBottom: 8 }}><I.Check /> 复制纪要要点</SecondaryBtn>
+          <SecondaryBtn onClick={removeDetail} style={{ width: '100%', justifyContent: 'center', color: T.primary, borderColor: '#FECACA' }}><I.Trash /> 删除本条</SecondaryBtn>
+        </div>
+      ) : null}
+
+      {modeTab === 'live' && liveView === 'detail' && !detailRec ? (
+        <div style={{ padding: 20, color: T.textMuted }}>未找到该记录，请返回列表。</div>
+      ) : null}
+    </div>
+  );
+}
+
+/** 与 prototype/mobile_v2 getAiQaExternalH5Url 一致：https 配置优先，否则 DinTal 默认 H5 */
+function nwPcGetAiQaExternalH5Url() {
+  const link = String((readNwLearningRuntimeMerged().shenXiaoFuMiniLink || '')).trim();
+  if (/^https?:\/\//i.test(link)) return link;
+  return 'https://apps.jinrirencai.com/vision-chat/index.html#/chat/ff908081965601960191460192688000';
+}
+
+/** 与小程序 openExternalOrMiniProgramLink 对齐（PC 新窗口 / 微信内整页跳转） */
+function nwPcOpenExternalOrMiniProgramLink(url, titleForAlert) {
+  if (!url || typeof url !== 'string' || !url.trim()) {
+    showPrototypeToast((titleForAlert || '该入口') + '尚未配置链接', 'error');
+    return;
+  }
+  url = url.trim();
+  if (url.indexOf('#小程序://') === 0) {
+    showPrototypeToast(
+      '「' + (titleForAlert || '党务智能问答') + '」为 #小程序:// 短链。请在「学习 → 学习外链配置」改为 https；或与管理员对接接入方式。',
+      'error'
+    );
+    return;
+  }
+  if (/^https?:\/\/mp\.weixin\.qq\.com\//i.test(url)) {
+    const ua = (navigator.userAgent || '').toLowerCase();
+    const withHash = /#wechat_redirect/i.test(url) ? url : (url.replace(/#.*$/, '') + '#wechat_redirect');
+    if (/micromessenger/.test(ua)) {
+      window.location.href = withHash;
+      return;
+    }
+    showPrototypeToast('该入口为微信平台链接，请在手机微信中打开本页后再试；链接已尝试复制到剪贴板。', 'error');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(withHash).then(() => {}).catch(() => {});
+    }
+    return;
+  }
+  try {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  } catch (e) {
+    try { window.location.href = url; } catch (e2) {}
+  }
+}
+
+function nwPcOpenAiQaLikeMobile() {
+  const raw = String((readNwLearningRuntimeMerged().shenXiaoFuMiniLink || '')).trim();
+  if (raw.indexOf('#小程序://') === 0) {
+    showPrototypeToast('配置为小程序短链：已按小程序逻辑使用默认 DinTal H5 地址打开（与 getAiQaExternalH5Url 一致）。', 'error');
+  }
+  nwPcOpenExternalOrMiniProgramLink(nwPcGetAiQaExternalH5Url(), '党务智能问答');
+}
+
+/** 智能问答：与小程序 AIQAScreen 同源（resolve URL + 自动尝试打开 + 手动兜底） */
+function OfficeSmartQaPcPage({ setPage }) {
+  const [rawConfig, setRawConfig] = React.useState(() => String((readNwLearningRuntimeMerged().shenXiaoFuMiniLink || '')).trim());
+  const effectiveUrl = nwPcGetAiQaExternalH5Url();
+
+  React.useEffect(() => {
+    const pull = () => setRawConfig(String((readNwLearningRuntimeMerged().shenXiaoFuMiniLink || '')).trim());
+    window.addEventListener('storage', pull);
+    let bc = null;
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        bc = new BroadcastChannel(getNwLearningRuntimeBC());
+        bc.onmessage = () => pull();
+      }
+    } catch (e0) {}
+    return () => {
+      window.removeEventListener('storage', pull);
+      if (bc) try { bc.close(); } catch (e1) {}
+    };
+  }, []);
+
+  React.useEffect(() => {
+    const tid = window.setTimeout(() => {
+      try {
+        nwPcOpenExternalOrMiniProgramLink(nwPcGetAiQaExternalH5Url(), '党务智能问答');
+      } catch (e) {}
+    }, 280);
+    return () => window.clearTimeout(tid);
+  }, []);
+
+  return (
+    <div style={{ minHeight: 360, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <PageHeader
+        title="智能问答"
+        subtitle="与小程序「办公助手 → 智能问答」一致：第三方 DinTal H5；优先「学习外链配置」中的 https，否则与小程序共用默认地址。本页不整页跳转，以免离开管理端。"
+        actions={(
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <SecondaryBtn onClick={() => setPage('wxRuntimeConfig')}>去配置链接</SecondaryBtn>
+            <SecondaryBtn onClick={() => setPage('officeAssistant')}>返回办公助手</SecondaryBtn>
+          </div>
+        )}
+      />
+      <div style={{ maxWidth: 400, textAlign: 'center', marginTop: 8 }}>
+        <div style={{ fontSize: 14, color: T.textSecondary, lineHeight: 1.65, marginBottom: 12 }}>正在打开「DinTal AI客服」…（若浏览器拦截弹窗，请点下方按钮）</div>
+        <div style={{ fontSize: 11, color: T.textMuted, wordBreak: 'break-all', marginBottom: 16, padding: '10px 12px', borderRadius: 8, background: T.bg, border: `1px solid ${T.border}`, textAlign: 'left' }}>
+          <div style={{ fontWeight: 600, color: T.textSecondary, marginBottom: 4 }}>实际打开地址（与小程序 getAiQaExternalH5Url 解析结果一致）</div>
+          {effectiveUrl}
+        </div>
+        <div style={{ fontSize: 11, color: T.textMuted, wordBreak: 'break-all', marginBottom: 16, padding: '10px 12px', borderRadius: 8, background: '#FFFBEB', border: '1px solid #FDE68A', textAlign: 'left' }}>
+          <div style={{ fontWeight: 600, color: '#92400E', marginBottom: 4 }}>当前配置原文（学习外链 · 深小服）</div>
+          {rawConfig || '（空则走默认 DinTal）'}
+        </div>
+        <PrimaryBtn onClick={() => { nwPcOpenAiQaLikeMobile(); showPrototypeToast('已请求打开问答页'); }}><I.MessageCircle /> 若未自动跳转，点此打开</PrimaryBtn>
+        <p style={{ fontSize: 12, color: T.textMuted, marginTop: 16, lineHeight: 1.6 }}>审计与留痕：「操作日志 → 问答日志」（演示数据）。</p>
+      </div>
+    </div>
+  );
+}
+
+/** 作业批改：与 prototype/mobile_v2 HomeworkGradingScreen 同源演示（hwDemoReport + 三步骤 UI） */
+function nwPcHwDemoReport(subject, stageLabel) {
+  const sub = subject === 'english' ? '英语' : subject === 'chinese' ? '语文' : '数学';
+  const items = subject === 'math'
+    ? [
+        { no: 1, status: 'ok', stem: '口算：72 − 28 = ?', yours: '44', right: '44', comment: '减法借位处理正确，书写清晰。', flaw: '', tip: '' },
+        { no: 2, status: 'partial', stem: '应用题：买 3 支笔共花 15 元，每支多少钱？', yours: '列式 15÷3=4（元）', right: '15÷3=5（元）', comment: '思路正确，但除法结果算错，建议验算一遍商与乘法逆运算。', flaw: '计算失误', tip: '可用「商 × 除数 = 被除数」快速自检。' },
+        { no: 3, status: 'wrong', stem: '简便计算：25×16', yours: '25×10+25×4=350', right: '25×4×4=400 或 25×8×2=400', comment: '拆数方式不简便且合并出错，未优先凑整。', flaw: '运算策略', tip: '优先把 16 拆成 4×4，先算 25×4 更稳。' },
+      ]
+    : subject === 'english'
+      ? [
+          { no: 1, status: 'ok', stem: '用所给词适当形式填空：She ___ (go) to school every day.', yours: 'goes', right: 'goes', comment: '第三人称单数一致，时态正确。', flaw: '', tip: '' },
+          { no: 2, status: 'partial', stem: '句型转换：He doesn\'t like apples. → 肯定句', yours: 'He like apples.', right: 'He likes apples.', comment: '否定改肯定需去掉 doesn\'t 并还原动词第三人称形式。', flaw: '主谓一致', tip: '先找主语人称，再决定动词是否加 -s。' },
+          { no: 3, status: 'wrong', stem: '翻译：「图书馆在教学楼后面」', yours: 'The library is behind of the classroom building.', right: 'The library is behind the classroom building.', comment: 'behind 为介词，一般不与 of 连用表方位。', flaw: '介词搭配', tip: '熟记 behind / in front of / next to 等固定搭配。' },
+        ]
+      : [
+          { no: 1, status: 'ok', stem: '默写：「春风又绿江南岸」上一句。', yours: '明月何时照我还', right: '京口瓜洲一水间…（课内版本以教材为准）', comment: '与下句衔接记忆准确。', flaw: '', tip: '' },
+          { no: 2, status: 'partial', stem: '概括本文主旨（不超过 40 字）', yours: '写了作者春游很开心。', right: '通过游踪与景物描写，表达对自然与生活的热爱。', comment: '有概括意识但偏「感受」、缺「写法与主题」层次。', flaw: '要点不全', tip: '可按「内容 + 情感 + 写法」三段各写一句再压缩。' },
+          { no: 3, status: 'wrong', stem: '修改病句：他的成绩不断正在提高。', yours: '他的成绩正在不断提高。', right: '他的成绩不断提高。', comment: '「不断」与「正在」语义重复，保留其一即可。', flaw: '成分赘余', tip: '读一遍，删掉读起来重复的时间/程度词。' },
+        ];
+  const ok = items.filter((x) => x.status === 'ok').length;
+  const partial = items.filter((x) => x.status === 'partial').length;
+  const wrong = items.filter((x) => x.status === 'wrong').length;
+  const score = subject === 'math' ? 84 : subject === 'english' ? 78 : 80;
+  return {
+    sub,
+    stageLabel,
+    score,
+    total: 100,
+    level: score >= 85 ? '优秀' : score >= 75 ? '良好' : '合格',
+    tags: [`${stageLabel}`, `${sub}`, ok ? `${ok} 题全对` : '', partial ? `${partial} 题待完善` : '', wrong ? `${wrong} 题需订正` : ''].filter(Boolean),
+    items,
+  };
+}
+
+function OfficeHomeworkGradingPage({ setPage }) {
+  const bg = 'linear-gradient(180deg, #FFFBEB 0%, #FFF7ED 22%, #FAFAF9 100%)';
+  const amber = '#B45309';
+  const amberSoft = 'rgba(180,83,9,0.12)';
+  const [step, setStep] = React.useState('upload');
+  const [stage, setStage] = React.useState('upper');
+  const [subject, setSubject] = React.useState('math');
+  const [previewUrls, setPreviewUrls] = React.useState([]);
+  const [note, setNote] = React.useState('');
+  const [hintIdx, setHintIdx] = React.useState(0);
+  const fileRef = React.useRef(null);
+  const previewUrlsRef = React.useRef([]);
+  const [report, setReport] = React.useState(null);
+
+  const stageLabel = stage === 'lower' ? '小学低年级' : stage === 'junior' ? '初中' : '小学高年级';
+  const subjects = [
+    { id: 'chinese', label: '语文' },
+    { id: 'math', label: '数学' },
+    { id: 'english', label: '英语' },
+  ];
+  const stages = [
+    { id: 'lower', label: '小学低年级' },
+    { id: 'upper', label: '小学高年级' },
+    { id: 'junior', label: '初中' },
+  ];
+
+  React.useEffect(() => {
+    if (step !== 'analyzing') return undefined;
+    const tips = ['正在识别题目与手写作答…', '提取关键步骤与公式…', '对照教学要点批改中…', '生成评语与错题讲解…'];
+    const id = window.setInterval(() => setHintIdx((i) => (i + 1) % tips.length), 650);
+    const done = window.setTimeout(() => {
+      setReport(nwPcHwDemoReport(subject, stageLabel));
+      setStep('result');
+    }, 2800);
+    return () => {
+      window.clearInterval(id);
+      window.clearTimeout(done);
+    };
+  }, [step, subject, stageLabel]);
+
+  React.useEffect(() => {
+    previewUrlsRef.current = previewUrls;
+  }, [previewUrls]);
+  React.useEffect(() => () => {
+    previewUrlsRef.current.forEach((u) => { try { URL.revokeObjectURL(u); } catch (e) {} });
+  }, []);
+
+  const onPickFiles = (e) => {
+    const files = e.target.files;
+    if (!files || !files.length) return;
+    const urls = [];
+    for (let i = 0; i < Math.min(files.length, 4); i++) {
+      try { urls.push(URL.createObjectURL(files[i])); } catch (err) {}
+    }
+    setPreviewUrls((prev) => {
+      prev.forEach((u) => { try { URL.revokeObjectURL(u); } catch (e2) {} });
+      return urls;
+    });
+  };
+
+  const startGrade = () => {
+    setHintIdx(0);
+    setReport(null);
+    setStep('analyzing');
+  };
+
+  const resetFlow = () => {
+    setPreviewUrls((prev) => {
+      prev.forEach((u) => { try { URL.revokeObjectURL(u); } catch (e) {} });
+      return [];
+    });
+    setNote('');
+    setReport(null);
+    setStep('upload');
+    if (fileRef.current) fileRef.current.value = '';
+  };
+
+  const stepIndex = step === 'upload' ? 0 : step === 'analyzing' ? 1 : 2;
+  const stepTitles = ['上传作业', '智能批改', '批改结果'];
+
+  const chip = (on, onClick, children) => (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        padding: '6px 12px',
+        borderRadius: 999,
+        border: on ? `1px solid ${amber}` : '1px solid rgba(180,83,9,0.2)',
+        background: on ? amberSoft : '#fff',
+        color: on ? amber : '#78716C',
+        fontSize: 12,
+        fontWeight: 600,
+        cursor: 'pointer',
+      }}
+    >
+      {children}
+    </button>
+  );
+
+  const statusLine = (st) => {
+    if (st === 'ok') return { label: '正确', c: '#059669', bg: '#ECFDF5' };
+    if (st === 'partial') return { label: '部分正确', c: '#B45309', bg: '#FFFBEB' };
+    return { label: '待订正', c: '#B91C1C', bg: '#FEF2F2' };
+  };
+
+  return (
+    <div style={{ background: bg, borderRadius: T.cardRadius, border: `1px solid ${T.border}`, overflow: 'hidden' }}>
+      <PageHeader
+        title="作业批改"
+        subtitle="与小程序「办公助手 → 作业批改」一致：参考豆包「拍照 / 图 → OCR → 分题批改 + 评语」演示流；未接真实模型。"
+        actions={<SecondaryBtn onClick={() => setPage('officeAssistant')}>返回办公助手</SecondaryBtn>}
+      />
+      <div style={{ maxWidth: 720, padding: '4px 20px 24px' }}>
+        <p style={{ fontSize: 12, color: '#78716C', lineHeight: 1.55, marginBottom: 14 }}>
+          流程参考 <strong>豆包</strong> 等「拍照 / 图 → OCR → 分题批改 + 评语 + 错题讲解」；以下为高保真演示，未接入真实模型。
+        </p>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, padding: '0 4px' }}>
+          {stepTitles.map((t, i) => (
+            <React.Fragment key={t}>
+              <div style={{ textAlign: 'center', flex: 1 }}>
+                <div
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 999,
+                    margin: '0 auto 4px',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: i <= stepIndex ? 'linear-gradient(145deg,#F59E0B,#D97706)' : '#E7E5E4',
+                    color: i <= stepIndex ? '#fff' : '#A8A29E',
+                  }}
+                >
+                  {i + 1}
+                </div>
+                <div style={{ fontSize: 10, fontWeight: 600, color: i === stepIndex ? amber : '#A8A29E' }}>{t}</div>
+              </div>
+              {i < 2 ? <div style={{ width: 18, height: 2, background: i < stepIndex ? '#FBBF24' : '#E7E5E4', alignSelf: 'flex-start', marginTop: 13 }} /> : null}
+            </React.Fragment>
+          ))}
+        </div>
+
+        {step === 'upload' && (
+          <>
+            <div style={{ fontSize: 11, fontWeight: 700, color: amber, marginBottom: 6, letterSpacing: '0.06em' }}>学段</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+              {stages.map((s) => (
+                <span key={s.id}>{chip(stage === s.id, () => setStage(s.id), s.label)}</span>
+              ))}
+            </div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: amber, marginBottom: 6, letterSpacing: '0.06em' }}>科目</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+              {subjects.map((s) => (
+                <span key={s.id}>{chip(subject === s.id, () => setSubject(s.id), s.label)}</span>
+              ))}
+            </div>
+
+            <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={onPickFiles} />
+            <button
+              type="button"
+              onClick={() => fileRef.current && fileRef.current.click()}
+              style={{
+                width: '100%',
+                minHeight: 120,
+                borderRadius: 16,
+                border: '2px dashed rgba(180,83,9,0.35)',
+                background: 'rgba(255,255,255,0.85)',
+                cursor: 'pointer',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                marginBottom: 12,
+              }}
+            >
+              <div style={{ color: amber, display: 'flex', transform: 'scale(1.15)' }}><I.Camera /></div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#44403C' }}>拍照或从相册选择作业图</div>
+              <div style={{ fontSize: 11, color: '#A8A29E' }}>支持多张，最多 4 张（演示）</div>
+            </button>
+            {previewUrls.length > 0 && (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                {previewUrls.map((u) => (
+                  <img key={u} src={u} alt="" style={{ width: 76, height: 76, objectFit: 'cover', borderRadius: 10, border: '1px solid rgba(180,83,9,0.2)' }} />
+                ))}
+              </div>
+            )}
+
+            <div style={{ fontSize: 11, fontWeight: 700, color: amber, marginBottom: 6 }}>补充说明（选填）</div>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="可粘贴老师布置的文字题、或说明页码与题号…"
+              rows={3}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: 12,
+                border: '1px solid rgba(180,83,9,0.2)',
+                fontSize: 13,
+                marginBottom: 14,
+                resize: 'vertical',
+                boxSizing: 'border-box',
+                background: '#fff',
+                color: T.textPrimary,
+                fontFamily: 'inherit',
+              }}
+            />
+
+            <PrimaryBtn onClick={startGrade} style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(145deg,#F59E0B,#D97706)', border: 'none' }}>
+              开始智能批改
+            </PrimaryBtn>
+            <p style={{ fontSize: 10, color: '#A8A29E', marginTop: 10, textAlign: 'center' }}>不上传也可直接批改，将按所选学段与科目展示示例结果（与小程序一致）</p>
+          </>
+        )}
+
+        {step === 'analyzing' && (
+          <div style={{ textAlign: 'center', padding: '36px 12px 24px' }}>
+            <div className="hw-spin" style={{ marginBottom: 20 }} />
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#44403C', marginBottom: 8 }}>豆包式批改引擎（演示）</div>
+            <div style={{ fontSize: 13, color: '#78716C', minHeight: 44, lineHeight: 1.55 }}>
+              {['正在识别题目与手写作答…', '提取关键步骤与公式…', '对照教学要点批改中…', '生成评语与错题讲解…'][hintIdx]}
+            </div>
+          </div>
+        )}
+
+        {step === 'result' && report && (
+          <>
+            <div
+              style={{
+                background: '#fff',
+                borderRadius: 16,
+                border: '1px solid rgba(180,83,9,0.15)',
+                padding: 14,
+                marginBottom: 12,
+                boxShadow: '0 4px 20px rgba(180,83,9,0.08)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 10 }}>
+                <div>
+                  <div style={{ fontSize: 12, color: '#78716C', marginBottom: 4 }}>综合得分（演示）</div>
+                  <div style={{ fontSize: 32, fontWeight: 800, color: amber, fontVariantNumeric: 'tabular-nums' }}>
+                    {report.score}
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#A8A29E' }}> / {report.total}</span>
+                  </div>
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#44403C', padding: '6px 12px', borderRadius: 10, background: amberSoft }}>{report.level}</div>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {report.tags.map((t) => (
+                  <span key={t} style={{ fontSize: 10, fontWeight: 600, color: amber, background: amberSoft, padding: '4px 10px', borderRadius: 999 }}>{t}</span>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ fontSize: 11, fontWeight: 700, color: amber, letterSpacing: '0.08em', marginBottom: 8 }}>分题批改</div>
+            {report.items.map((it) => {
+              const st = statusLine(it.status);
+              return (
+                <div
+                  key={it.no}
+                  style={{
+                    background: '#fff',
+                    borderRadius: 14,
+                    border: '1px solid rgba(180,83,9,0.12)',
+                    padding: '12px 12px 12px 14px',
+                    marginBottom: 10,
+                    borderLeft: `4px solid ${st.c}`,
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#292524' }}>第 {it.no} 题</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: st.c, background: st.bg, padding: '3px 10px', borderRadius: 999 }}>{st.label}</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#57534E', lineHeight: 1.55, marginBottom: 8 }}><strong>题目：</strong>{it.stem}</div>
+                  <div style={{ fontSize: 12, color: '#44403C', lineHeight: 1.55, marginBottom: 6 }}><strong>你的作答：</strong>{it.yours}</div>
+                  {it.status !== 'ok' ? (
+                    <div style={{ fontSize: 12, color: '#059669', lineHeight: 1.55, marginBottom: 6 }}><strong>参考：</strong>{it.right}</div>
+                  ) : null}
+                  <div style={{ fontSize: 12, color: '#57534E', lineHeight: 1.6, marginBottom: it.flaw ? 6 : 0 }}><strong>评语：</strong>{it.comment}</div>
+                  {it.flaw ? (
+                    <div style={{ fontSize: 11, color: '#B45309', marginBottom: 4 }}>错误类型：{it.flaw}</div>
+                  ) : null}
+                  {it.tip ? (
+                    <div style={{ fontSize: 11, color: '#78716C', background: '#FAFAF9', padding: '8px 10px', borderRadius: 8, lineHeight: 1.55 }}><strong>提升建议：</strong>{it.tip}</div>
+                  ) : null}
+                </div>
+              );
+            })}
+
+            <SecondaryBtn
+              onClick={() => showPrototypeToast('正式版可接入大模型，针对错题继续追问讲解（演示）。')}
+              style={{ width: '100%', justifyContent: 'center', marginTop: 4, marginBottom: 8, borderColor: 'rgba(180,83,9,0.35)', color: amber }}
+            >
+              追问错题（演示）
+            </SecondaryBtn>
+            <PrimaryBtn onClick={resetFlow} style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(145deg,#F59E0B,#D97706)', border: 'none' }}>
+              批改另一份作业
+            </PrimaryBtn>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** 办公助手 · PPT / 表格：演示用延迟与占位回复（正式环境接大模型与导出服务） */
+function nwOfficeAiSleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function nwOfficeAiId() {
+  return 'm_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+}
+
+/** 将纯文本草稿转为带层级的 HTML，供 PDF 导出（与对话卡片结构一致） */
+function nwOfficeAiPlainToPdfHtml(plain) {
+  const esc = (s) => String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  const lines = String(plain || '').split('\n');
+  const parts = [];
+  lines.forEach((line) => {
+    const raw = line;
+    const t = esc(raw);
+    if (!raw.trim()) {
+      parts.push('<div style="height:6px"></div>');
+      return;
+    }
+    if (/^【[^】]+】/.test(raw)) {
+      parts.push('<p style="margin:12px 0 6px;font-weight:700;font-size:12.5pt;color:#111827;font-family:\'Noto Serif SC\',serif">' + t + '</p>');
+      return;
+    }
+    if (/^\|/.test(raw)) {
+      parts.push('<p style="margin:1px 0;font-size:9.25pt;line-height:1.45;font-family:ui-monospace,Menlo,Consolas,monospace;color:#1f2937">' + t + '</p>');
+      return;
+    }
+    if (/^\d+\./.test(raw) || /^[·•]\s/.test(raw)) {
+      parts.push('<p style="margin:2px 0 2px 14px;font-size:10.5pt;line-height:1.55;color:#374151">' + t + '</p>');
+      return;
+    }
+    parts.push('<p style="margin:4px 0;font-size:10.5pt;line-height:1.6;color:#1f2937">' + t + '</p>');
+  });
+  return parts.join('');
+}
+
+function nwOfficeAiEscHtml(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/** Excel 工作表名：非法字符剔除 + 最长 31（按 Unicode 字符计） */
+function nwOfficeAiSheetNameSafe(name) {
+  const cleaned = String(name || '表格').replace(/[\\/*?:\[\]]/g, '').replace(/\s+/g, ' ').trim();
+  const arr = Array.from(cleaned || '表格');
+  const s = arr.slice(0, 31).join('');
+  return s || '表格';
+}
+
+function nwOfficeAiSplitMdPipeRow(line) {
+  const t = String(line || '').trim();
+  if (!t.startsWith('|')) return null;
+  const parts = t.split('|').map((c) => c.trim());
+  const cells = parts.filter((cell, i) => !(cell === '' && (i === 0 || i === parts.length - 1)));
+  return cells.length ? cells : null;
+}
+
+function nwOfficeAiIsMdSeparatorCells(cells) {
+  if (!cells || !cells.length) return false;
+  return cells.every((c) => /^:?-{2,}:?$/.test(String(c).replace(/\s/g, '')));
+}
+
+/** 从助手正文中抽取 Markdown 表格为二维数组（跳过分隔行） */
+function nwOfficeAiParseMarkdownTableAoa(text) {
+  const lines = String(text || '').split('\n');
+  const rows = [];
+  for (let i = 0; i < lines.length; i++) {
+    const cells = nwOfficeAiSplitMdPipeRow(lines[i]);
+    if (!cells) continue;
+    if (nwOfficeAiIsMdSeparatorCells(cells)) continue;
+    rows.push(cells);
+  }
+  return rows;
+}
+
+/** 解析【表名】xxx 作为建议工作表名 */
+function nwOfficeAiExtractTableTitleFromBody(text) {
+  const m = String(text || '').match(/【表名】\s*(.+)/);
+  return (m && m[1]) ? m[1].trim() : '';
+}
+
+/** 使用 SheetJS 生成 .xlsx：「表格」工作表为解析结果，「说明与全文」为逐行文本 */
+function nwOfficeAiDownloadExcel({ bodyPlain, modeLabel }) {
+  if (typeof XLSX === 'undefined' || !XLSX.utils || !XLSX.utils.book_new) {
+    throw new Error('SheetJS（xlsx）未加载');
+  }
+  const body = String(bodyPlain || '');
+  const aoa = nwOfficeAiParseMarkdownTableAoa(body);
+  const titleHint = nwOfficeAiExtractTableTitleFromBody(body);
+  const wb = XLSX.utils.book_new();
+
+  let tableSheetName = nwOfficeAiSheetNameSafe(titleHint || '表格');
+  if (aoa.length) {
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    XLSX.utils.book_append_sheet(wb, ws, tableSheetName);
+  } else {
+    tableSheetName = nwOfficeAiSheetNameSafe('表格');
+    const ws0 = XLSX.utils.aoa_to_sheet([['（未识别到以 | 开头的表行）'], [''], ['可将左侧对话中的表格复制到 Excel，或检查正文是否含 Markdown 表格']]);
+    XLSX.utils.book_append_sheet(wb, ws0, tableSheetName);
+  }
+
+  let noteSheetName = nwOfficeAiSheetNameSafe('全文备份');
+  if (noteSheetName === tableSheetName) noteSheetName = nwOfficeAiSheetNameSafe('正文全文');
+  const noteLines = body.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
+  const noteAoa = (noteLines.length ? noteLines : ['（空）']).map((l) => [l]);
+  const wsNote = XLSX.utils.aoa_to_sheet(noteAoa);
+  XLSX.utils.book_append_sheet(wb, wsNote, noteSheetName);
+
+  const now = new Date();
+  const brandTag = (typeof getActiveStreetOrg === 'function' ? getActiveStreetOrg() : STREET_ORGS[0]).branding;
+  let filename = brandTag + '-' + String(modeLabel || '表格制作').replace(/\s+/g, '') + '-' + now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0') + '.xlsx';
+  filename = filename.replace(/[/\\?%*:|"<>]/g, '-');
+  XLSX.writeFile(wb, filename);
+}
+
+/** 使用 html2pdf 将版式 HTML 转为 A4 PDF 下载（依赖页面已加载 html2pdf.js） */
+function nwOfficeAiDownloadPdf({ title, modeLabel, bodyPlain }) {
+  return new Promise((resolve, reject) => {
+    if (typeof html2pdf === 'undefined') {
+      reject(new Error('html2pdf 未加载'));
+      return;
+    }
+    const now = new Date();
+    const dateStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0')
+      + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+    const safeName = String(modeLabel || '导出').replace(/\s+/g, '');
+    const brandTag = (typeof getActiveStreetOrg === 'function' ? getActiveStreetOrg() : STREET_ORGS[0]).branding;
+    let filename = brandTag + '-' + safeName + '-' + now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0') + '.pdf';
+    filename = filename.replace(/[/\\?%*:|"<>]/g, '-');
+
+    const wrap = document.createElement('div');
+    wrap.setAttribute('data-nw-pdf-export', '1');
+    wrap.style.cssText = [
+      'position:fixed', 'left:-12000px', 'top:0', 'width:190mm', 'padding:18mm 16mm',
+      'background:#ffffff', 'box-sizing:border-box', 'font-family:\'Noto Serif SC\',\'Microsoft YaHei\',sans-serif',
+      'color:#1a1a1a', '-webkit-font-smoothing:antialiased',
+    ].join(';');
+
+    const headTitle = nwOfficeAiEscHtml(title || (typeof getActiveStreetOrg === 'function' ? getActiveStreetOrg() : STREET_ORGS[0]).branding);
+    const headSub = nwOfficeAiEscHtml(modeLabel || '') + ' · ' + nwOfficeAiEscHtml(dateStr) + ' · 演示导出';
+
+    wrap.innerHTML = ''
+      + '<div style="height:3px;background:linear-gradient(90deg,#D44040,#B83232);border-radius:2px;margin-bottom:14px"></div>'
+      + '<div style="font-size:11pt;font-weight:700;color:#111827;margin-bottom:4px">' + headTitle + '</div>'
+      + '<div style="font-size:9.5pt;color:#6b7280;margin-bottom:16px">' + headSub + '</div>'
+      + '<div style="border-top:1px solid #e5e7eb;padding-top:14px">'
+      + nwOfficeAiPlainToPdfHtml(bodyPlain)
+      + '</div>'
+      + '<div style="margin-top:20px;padding-top:10px;border-top:1px solid #f3f4f6;font-size:8.5pt;color:#9ca3af">' + nwOfficeAiEscHtml((typeof getActiveStreetOrg === 'function' ? getActiveStreetOrg() : STREET_ORGS[0]).branding) + ' · PC 管理端 · 办公助手（内容由演示逻辑生成，正式环境以接口为准）</div>';
+
+    document.body.appendChild(wrap);
+
+    const opt = {
+      margin: [10, 10, 10, 10],
+      filename,
+      image: { type: 'jpeg', quality: 0.95 },
+      html2canvas: { scale: 2, useCORS: true, logging: false, letterRendering: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'legacy'] },
+    };
+
+    const done = () => {
+      try { document.body.removeChild(wrap); } catch (e0) {}
+    };
+
+    try {
+      html2pdf().set(opt).from(wrap).save().then(() => {
+        done();
+        resolve(filename);
+      }).catch((err) => {
+        done();
+        reject(err);
+      });
+    } catch (e) {
+      done();
+      reject(e);
+    }
+  });
+}
+
+function buildOfficePptDemoReply(userText) {
+  const t = (userText || '').trim();
+  const low = t.toLowerCase();
+  const scene = (/党课|二十大|全会|学习|教育/.test(t)) ? '党课课件 / 专题学习' : (/汇报|总结|季度|年度|工作/.test(t)) ? '政务工作汇报' : '政务汇报或党课课件（通用）';
+  const pages = (/20\s*页|二十页|约\s*20/.test(t)) ? 20 : (/15|十五/.test(t)) ? 15 : 12;
+  return [
+    '【生成说明】当前为前端演示：模拟豆包 / 通义千问式「对话 → 结构化草稿」。正式环境将调用单位部署的大模型与版式模板库，并记录审计日志。',
+    '',
+    '【选用场景】' + scene,
+    '',
+    '【整体大纲】',
+    '1. 封面与议程：主题、汇报单位、日期',
+    '2. 背景与依据：政策要点、上级要求（可配单位红头口径）',
+    '3. 主要工作与数据：分模块展示关键指标与案例（配图表占位）',
+    '4. 问题与改进：短板分析、整改举措',
+    '5. 下一步计划：时间表、责任分工',
+    '6. 结语与附录：联系人、材料索引',
+    '',
+    '【分页要点（节选）】',
+    '· 第 1 页：标题「' + (t.slice(0, 28) || '（请根据您的主题填写）') + '」+ 副标题 + 汇报人/单位',
+    '· 第 2 页：本章要点三条，对应大纲 2～3',
+    '· 第 3～' + Math.min(6, pages - 2) + ' 页：每页 1 个议题，标题 + 3 条要点 + 1 处「数据/图示待补」',
+    '· … 建议总页数约 ' + pages + ' 页，版式统一用单位母版。',
+    '',
+    '【导出与精修】在 PowerPoint / WPS 中新建文件 → 按页粘贴要点 → 套用单位模板与配色 → 插入真实数据与摄影图后再定稿。',
+  ].join('\n');
+}
+
+function buildOfficeTableDemoReply(userText) {
+  const t = (userText || '').trim();
+  const isSign = /签到|报名|活动/.test(t);
+  const isStudy = /学习|学时|课程|积分/.test(t);
+  const title = isSign ? '活动签到汇总表（草稿）' : isStudy ? '党员学习情况统计表（草稿）' : '业务统计表（草稿）';
+  const colA = isSign ? '姓名' : isStudy ? '姓名' : '项目';
+  const colB = isSign ? '支部' : isStudy ? '支部' : '指标值';
+  const colC = isSign ? '签到时间' : isStudy ? '本月学时' : '备注';
+  const colD = isSign ? '备注' : isStudy ? '必修完成' : '负责人';
+  return [
+    '【生成说明】演示稿：根据描述生成表头与示例行。正式环境可由大模型结合指标口径生成，再导出 .xlsx；合并单元格与公式请在 Excel / WPS 中校对。',
+    '',
+    '【表名】' + title,
+    '',
+    '| ' + colA + ' | ' + colB + ' | ' + colC + ' | ' + colD + ' |',
+    '| --- | --- | --- | --- |',
+    '| 张三 | 示例支部一 | ' + (isSign ? '09:02' : isStudy ? '6.5' : '—') + ' | ' + (isSign ? '本人' : isStudy ? '是' : '—') + ' |',
+    '| 李四 | 示例支部二 | ' + (isSign ? '09:15' : isStudy ? '4.0' : '—') + ' | ' + (isSign ? '代签需核实' : isStudy ? '否' : '—') + ' |',
+    '| … | … | … | … |',
+    '',
+    '【字段建议】若需上报区级口径，可增加「证件后四位」「数据来源」列；敏感字段请按最小必要原则脱敏展示。',
+  ].join('\n');
+}
+
+/** 参考通用 AI 助手：上屏对话 + 底部输入 + 快捷建议；PPT / 表格两种模式 */
+function OfficeAiWorkbenchPage({ setPage, mode }) {
+  const isPpt = mode === 'ppt';
+  const title = isPpt ? 'PPT 制作' : '表格制作';
+  const subtitle = isPpt
+    ? '用自然语言描述主题、受众与页数；演示环境返回大纲与分页要点草稿。正式对接大模型后流式输出，再在 PowerPoint / WPS 中排版。'
+    : '描述表格用途、列名与统计口径；演示环境返回 Markdown 表格草稿，可用「生成 Excel」导出 .xlsx。复杂公式与合并单元格请在 Excel / WPS 中处理。';
+  const suggestions = isPpt
+    ? [
+        '党课课件：面向社区党员讲解二十届四中全会精神，约15页，语气庄重',
+        '季度汇报：街道党建办重点工作完成情况与下一步计划，偏数据展示',
+        '专题学习：组织生活会前集中学习材料，含议程与讨论题',
+      ]
+    : [
+        '主题党日活动签到表：姓名、支部、签到时间、备注',
+        '党员本月学习学时汇总：按支部统计必修完成率',
+        '志愿服务时长登记：日期、服务内容、时长、证明人',
+      ];
+  const placeholder = isPpt
+    ? '例如：需要一份面向机关干部的党风廉政建设专题汇报，约12页，突出制度执行与案例…'
+    : '例如：做一张各支部主题党日参会率周报表，列支部、应到、实到、备注…';
+
+  const [messages, setMessages] = React.useState([]);
+  const [input, setInput] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+  const [exportBusyId, setExportBusyId] = React.useState(null);
+  const listRef = React.useRef(null);
+
+  React.useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [messages, busy]);
+
+  const pushAssistantStream = React.useCallback(async (fullText) => {
+    const id = nwOfficeAiId();
+    setMessages((prev) => [...prev, { id, role: 'assistant', content: '' }]);
+    const step = 14;
+    for (let i = 0; i <= fullText.length; i += step) {
+      const slice = fullText.slice(0, Math.min(fullText.length, i + step));
+      setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, content: slice } : m)));
+      await nwOfficeAiSleep(28);
+    }
+  }, []);
+
+  const runSend = React.useCallback(async (raw) => {
+    const text = (raw != null ? String(raw) : input).trim();
+    if (!text || busy) return;
+    setInput('');
+    setMessages((prev) => [...prev, { id: nwOfficeAiId(), role: 'user', content: text }]);
+    setBusy(true);
+    await nwOfficeAiSleep(450);
+    const full = isPpt ? buildOfficePptDemoReply(text) : buildOfficeTableDemoReply(text);
+    await pushAssistantStream(full);
+    setBusy(false);
+    showPrototypeToast(isPpt ? '已生成演示大纲（未调用真实模型）' : '已生成演示表格稿（未调用真实模型）');
+  }, [busy, input, isPpt, pushAssistantStream]);
+
+  const newSession = () => {
+    if (busy) return;
+    setMessages([]);
+    setInput('');
+    showPrototypeToast('已新建对话');
+  };
+
+  const copyBubble = (txt) => {
+    const t = txt || '';
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(t).then(() => showPrototypeToast('已复制到剪贴板')).catch(() => showPrototypeToast('复制失败', 'error'));
+    } else showPrototypeToast('当前环境不支持剪贴板', 'error');
+  };
+
+  const downloadAttachmentForMessage = async (m) => {
+    const body = (m && m.content) ? String(m.content) : '';
+    if (!body || exportBusyId) return;
+    setExportBusyId(m.id);
+    try {
+      if (isPpt) {
+        await nwOfficeAiDownloadPdf({
+          title: '办公助手 · PPT 大纲草稿',
+          modeLabel: 'PPT 制作',
+          bodyPlain: body,
+        });
+        showPrototypeToast('PDF 已生成并开始下载');
+      } else {
+        nwOfficeAiDownloadExcel({ bodyPlain: body, modeLabel: '表格制作' });
+        showPrototypeToast('Excel 已生成并开始下载');
+      }
+    } catch (e) {
+      const msg = (e && e.message) ? e.message : String(e);
+      showPrototypeToast((isPpt ? 'PDF' : 'Excel') + ' 导出失败：' + msg, 'error');
+    } finally {
+      setExportBusyId(null);
+    }
+  };
+
+  const bubbleUser = {
+    alignSelf: 'flex-end', maxWidth: '88%', padding: '12px 14px', borderRadius: '14px 14px 4px 14px',
+    background: 'linear-gradient(135deg, #EEF2FF, #E0E7FF)', border: '1px solid #C7D2FE', fontSize: 14, lineHeight: 1.55, color: T.textPrimary,
+  };
+  const bubbleAi = {
+    alignSelf: 'flex-start', maxWidth: '100%', padding: '14px 16px', borderRadius: '14px 14px 14px 4px',
+    background: T.surface, border: `1px solid ${T.border}`, fontSize: 13, lineHeight: 1.65, color: T.textPrimary,
+    boxShadow: T.cardShadow, fontFamily: "ui-monospace, Menlo, Consolas, monospace", whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0, minHeight: 'min(720px, calc(100vh - 200px))' }}>
+      <PageHeader
+        title={title}
+        subtitle={subtitle}
+        actions={(
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <SecondaryBtn onClick={() => setPage('officeAssistant')}>返回办公助手</SecondaryBtn>
+            <SecondaryBtn onClick={newSession} disabled={busy}>新建对话</SecondaryBtn>
+          </div>
+        )}
+      />
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, background: T.surface, borderRadius: T.cardRadius, border: `1px solid ${T.border}`, boxShadow: T.cardShadow, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 16px', borderBottom: `1px solid ${T.border}`, background: '#FAFAF9' }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: T.textSecondary, marginBottom: 8 }}>试试这样说</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {suggestions.map((s) => (
+              <button
+                key={s}
+                type="button"
+                disabled={busy}
+                onClick={() => runSend(s)}
+                style={{
+                  fontSize: 12, padding: '8px 12px', borderRadius: 999, border: `1px solid ${T.border}`, background: '#fff',
+                  color: T.textPrimary, cursor: busy ? 'not-allowed' : 'pointer', textAlign: 'left', maxWidth: '100%',
+                }}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12, background: '#F9F8F6' }}>
+          {messages.length === 0 && !busy ? (
+            <div style={{ margin: 'auto', textAlign: 'center', maxWidth: 400, padding: 24, color: T.textMuted, fontSize: 13, lineHeight: 1.7 }}>
+              <div style={{ width: 48, height: 48, margin: '0 auto 12px', borderRadius: 14, background: 'linear-gradient(145deg,#EFF6FF,#DBEAFE)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1D4ED8' }}>
+                {isPpt ? <I.Slides /> : <I.Table2 />}
+              </div>
+              在下方输入需求，或点击上方<strong>快捷建议</strong>；生成后可<strong>复制本段</strong>，{isPpt ? (
+                <>再点<strong>生成 PDF</strong>（A4 版式）便于归档；</>
+              ) : (
+                <>再点<strong>生成 Excel</strong>下载 .xlsx（解析 Markdown 表到数据表，并附「全文备份」工作表）；</>
+              )}
+              再到 WPS / Microsoft Office 中精排公式与样式。
+            </div>
+          ) : null}
+          {messages.map((m) => (
+            <div key={m.id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={m.role === 'user' ? bubbleUser : bubbleAi}>{m.content || (m.role === 'assistant' && busy ? '…' : '')}</div>
+              {m.role === 'assistant' && m.content ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                  <SecondaryBtn style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => copyBubble(m.content)}><I.Check /> 复制本段</SecondaryBtn>
+                  <SecondaryBtn
+                    style={{ padding: '6px 12px', fontSize: 12 }}
+                    disabled={!!exportBusyId}
+                    onClick={() => downloadAttachmentForMessage(m)}
+                  >
+                    {isPpt ? <I.FilePdf /> : <I.FileExcel />}
+                    {exportBusyId === m.id
+                      ? (isPpt ? '正在生成 PDF…' : '正在生成 Excel…')
+                      : (isPpt ? '生成 PDF' : '生成 Excel')}
+                  </SecondaryBtn>
+                </div>
+              ) : null}
+            </div>
+          ))}
+          {busy && messages.length > 0 && messages[messages.length - 1].role === 'user' ? (
+            <div style={{ alignSelf: 'flex-start', padding: '10px 14px', borderRadius: 12, background: T.surface, border: `1px solid ${T.border}`, fontSize: 13, color: T.textMuted }}>
+              <span style={{ display: 'inline-block', animation: 'pulse 1.2s ease-in-out infinite' }}>正在组织内容…</span>
+            </div>
+          ) : null}
+        </div>
+
+        <div style={{ padding: 12, borderTop: `1px solid ${T.border}`, background: T.surface }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                  e.preventDefault();
+                  runSend();
+                }
+              }}
+              disabled={busy}
+              rows={3}
+              placeholder={placeholder}
+              style={{
+                flex: 1, resize: 'none', padding: '12px 14px', borderRadius: 12, border: `1px solid ${T.border}`, fontSize: 14, lineHeight: 1.5,
+                fontFamily: 'inherit', outline: 'none', background: T.bg, minHeight: 72, boxSizing: 'border-box',
+              }}
+            />
+            <PrimaryBtn onClick={() => runSend()} disabled={busy || !input.trim()} style={{ height: 44, padding: '0 18px', flexShrink: 0 }}>
+              <I.Send /> 发送
+            </PrimaryBtn>
+          </div>
+          <p style={{ fontSize: 11, color: T.textMuted, marginTop: 8 }}>Enter 换行；Ctrl / ⌘ + Enter 发送。演示回复为本地模板，非真实大模型输出。</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
 // Page: Audit
 // ============================================
 function AuditPage() {
@@ -4698,7 +7026,7 @@ function AuditPage() {
 
   return (
     <div>
-      <PageHeader title="档案智能审核" subtitle="对齐小程序「首页 → 智能资料审核」：按资料门类校核（党员档案资料、书刊、信息档案等，非人员档案维度）。" actions={<SecondaryBtn onClick={() => showPrototypeToast('审核任务队列已刷新（演示）')}>刷新任务</SecondaryBtn>} />
+      <PageHeader title="档案智能审核" subtitle="对齐小程序「办公助手 → 资料校验（智能资料审核）」：按资料门类校核（党员档案资料、书刊、信息档案等，非人员档案维度）。" actions={<SecondaryBtn onClick={() => showPrototypeToast('审核任务队列已刷新（演示）')}>刷新任务</SecondaryBtn>} />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
         {[
           { label: '待审核资料包', value: '23', color: T.warning },
@@ -5225,7 +7553,7 @@ function WxRuntimeConfigPage({ adminOrgKey }) {
 // ============================================
 // Page: Roles — PC / 小程序（APP）权限配置（一级分组 → 二级菜单 → 子页面/按钮，多选）
 // ============================================
-/** 每项：menuId + 二级子模块 submenus[] + 按钮 buttons[]，各自独立复选框 */
+/** 每项：menuId + 子模块 submenus[] + 按钮 buttons[]。`menuId` 与侧栏 `SIDEBAR_SECTIONS` 的 `item.id` 对齐：dashboard/officeAssistant/aiProfile/aiPush/audit → pc_menu_*；courses/wxRuntimeConfig/live/stats；services；members/memberDisposal/dataShare/activities/roles/logs/qaLogs。另含无侧栏项的 `pc_menu_gate`（PC 登录入口）。 */
 const ROLES_PC_PERM_TREE = [
   {
     group: '首页',
@@ -5244,24 +7572,60 @@ const ROLES_PC_PERM_TREE = [
         ],
       },
       {
+        menuId: 'pc_menu_office', menuLabel: '办公助手',
+        submenus: [
+          { id: 'pc_sub_office_doc', label: '公文写作模板' },
+          { id: 'pc_sub_office_notice_tpl', label: '会议通知模板' },
+          { id: 'pc_sub_office_notice_compose', label: '会议通知生成' },
+          { id: 'pc_sub_office_ppt', label: 'PPT 制作' },
+          { id: 'pc_sub_office_table', label: '表格制作' },
+          { id: 'pc_sub_office_typo', label: '错别字校验' },
+          { id: 'pc_sub_office_mm', label: '会议纪要（实时记录 / 查阅历史）' },
+          { id: 'pc_sub_office_qa', label: '智能问答（外链 H5）' },
+          { id: 'pc_sub_office_hw', label: '作业批改' },
+          { id: 'pc_sub_office_audit_entry', label: '资料审核入口（与「智能资料审核」队列同源）' },
+        ],
+        buttons: [
+          { id: 'pc_btn_office_doc_autosave', label: '公文写作模板：编辑后自动保存（约500ms）' },
+          { id: 'pc_btn_office_notice_autosave', label: '会议通知模板：编辑后自动保存（约500ms）' },
+          { id: 'pc_btn_office_notice_copy', label: '会议通知生成：一键复制全文' },
+          { id: 'pc_btn_office_ppt_gen', label: 'PPT 制作：生成大纲与分页文案' },
+          { id: 'pc_btn_office_table_ai', label: '表格制作：对话生成 Markdown 表' },
+          { id: 'pc_btn_office_table_xlsx', label: '表格制作：导出 Excel（SheetJS）' },
+          { id: 'pc_btn_office_table_pdf', label: '表格制作：导出 PDF（html2pdf）' },
+          { id: 'pc_btn_office_typo_run', label: '错别字校验：运行演示规则' },
+          { id: 'pc_btn_office_mm_mic', label: '会议纪要：请求麦克风 / 演示转写' },
+          { id: 'pc_btn_office_mm_export', label: '会议纪要：导出或复制纪要文本' },
+          { id: 'pc_btn_office_qa_window', label: '智能问答：打开外链新窗口' },
+          { id: 'pc_btn_office_hw_run', label: '作业批改：演示批改与得分' },
+        ],
+      },
+      {
         menuId: 'pc_menu_ai', menuLabel: 'AI 画像',
         submenus: [
           { id: 'pc_sub_ai_branch', label: '支部整体画像' },
           { id: 'pc_sub_ai_member', label: '个人画像检索' },
           { id: 'pc_sub_ai_focus', label: '重点关注名单' },
-          { id: 'pc_sub_ai_push', label: '画像推送策略（定时/订阅/二次推送）' },
-          { id: 'pc_sub_ai_push_tpl', label: '画像推送模版（订阅文案与占位符）' },
           { id: 'pc_sub_ai_live_summary', label: '个人画像·直播学习总结（按场次）' },
         ],
         buttons: [
           { id: 'pc_btn_ai_export', label: '导出画像报表' },
           { id: 'pc_btn_ai_refresh', label: '刷新画像数据' },
-          { id: 'pc_btn_ai_push_save', label: '保存推送策略' },
-          { id: 'pc_btn_ai_push_export_log', label: '导出推送策略与运行日志' },
-          { id: 'pc_btn_ai_push_tpl_save', label: '保存推送模版' },
-          { id: 'pc_btn_ai_push_tpl_preview', label: '预览模版占位符替换' },
-          { id: 'pc_btn_ai_push_tpl_reset', label: '恢复单类推送模版默认' },
-          { id: 'pc_btn_ai_push_tpl_export_json', label: '导出推送模版 JSON' },
+        ],
+      },
+      {
+        menuId: 'pc_menu_aiPush', menuLabel: '画像推送策略',
+        submenus: [
+          { id: 'pc_sub_aipush_schedule', label: '定时/订阅/二次推送规则（侧栏页 AIPushStrategyPage）' },
+          { id: 'pc_sub_aipush_templates', label: '推送模版与占位符' },
+        ],
+        buttons: [
+          { id: 'pc_btn_aipush_save', label: '保存推送策略' },
+          { id: 'pc_btn_aipush_export_log', label: '导出推送策略与运行日志' },
+          { id: 'pc_btn_aipush_tpl_save', label: '保存推送模版' },
+          { id: 'pc_btn_aipush_tpl_preview', label: '预览模版占位符替换' },
+          { id: 'pc_btn_aipush_tpl_reset', label: '恢复单类推送模版默认' },
+          { id: 'pc_btn_aipush_tpl_export_json', label: '导出推送模版 JSON' },
         ],
       },
       {
@@ -5292,13 +7656,17 @@ const ROLES_PC_PERM_TREE = [
       {
         menuId: 'pc_menu_courses', menuLabel: '课程与往期',
         submenus: [
-          { id: 'pc_sub_course_on', label: '上架课程管理' },
-          { id: 'pc_sub_course_past', label: '往期课程列表' },
+          { id: 'pc_sub_course_on', label: '上架课程管理（表格）' },
+          { id: 'pc_sub_course_past', label: '往期课程列表（与小程序 nw_published_courses_v1 同源）' },
+          { id: 'pc_sub_course_upload', label: '上传课程（视频/音频/PPT/图文）' },
+          { id: 'pc_sub_course_stats', label: '观看统计弹窗' },
         ],
         buttons: [
           { id: 'pc_btn_course_add', label: '新建课程' },
           { id: 'pc_btn_course_del', label: '删除课程' },
           { id: 'pc_btn_course_stat', label: '导出学习统计' },
+          { id: 'pc_btn_course_upload_confirm', label: '确认上传（演示）' },
+          { id: 'pc_btn_course_edit', label: '编辑课程' },
         ],
       },
       {
@@ -5462,6 +7830,7 @@ const ROLES_PC_PERM_TREE = [
   },
 ];
 
+/** 小程序权限树：`menuId` / `submenus.id` 与 `prototype/mobile_v2.html` 路由（navigateTo / switch(screen)）逐项对齐；仅 PC 的项不在此树。 */
 const ROLES_APP_PERM_TREE = [
   {
     group: '账号',
@@ -5485,9 +7854,14 @@ const ROLES_APP_PERM_TREE = [
         menuId: 'app_menu_home', menuLabel: '底部导航 · 首页',
         submenus: [
           { id: 'app_sub_home_ai', label: 'AI 画像卡片/入口' },
-          { id: 'app_sub_home_audit', label: '智能审核入口' },
+          { id: 'app_sub_home_ai_screen', label: '全屏 AI 画像页（路由 aiProfile）' },
+          { id: 'app_sub_home_pioneer', label: '先锋榜样详情（路由 pioneerStoryDetail）' },
+          { id: 'app_sub_home_office', label: '办公助手入口（进入九宫格 partyTools）' },
+          { id: 'app_sub_home_audit', label: '智能审核入口（→ archiveAudit）' },
           { id: 'app_sub_home_qa', label: '党务问答（深小服）' },
           { id: 'app_sub_home_year', label: '年份/活动年订阅' },
+          { id: 'app_sub_home_activity_hist', label: '活动参加记录/历史（路由 activityHistory）' },
+          { id: 'app_sub_home_checkin', label: '活动签到页（路由 checkin）' },
           { id: 'app_sub_home_push_hint', label: '画像推送策略/模版说明（演示闭环）' },
         ],
         buttons: [
@@ -5496,12 +7870,35 @@ const ROLES_APP_PERM_TREE = [
         ],
       },
       {
+        menuId: 'app_menu_office', menuLabel: '办公助手（九宫格）',
+        submenus: [
+          { id: 'app_sub_office_doc', label: '公文写作（路由 docWriting）' },
+          { id: 'app_sub_office_audit', label: '资料校验（拍摄/相册/文件 → archiveAudit）' },
+          { id: 'app_sub_office_typo', label: '错别字校验' },
+          { id: 'app_sub_office_mm_hub', label: '会议纪要入口/历史列表（meetingMinutesLive）' },
+          { id: 'app_sub_office_mm_rec', label: '会议纪要实时录音（meetingMinutesRecorder）' },
+          { id: 'app_sub_office_mm_detail', label: '会议纪要详情（meetingMinutesDetail）' },
+          { id: 'app_sub_office_qa', label: '智能问答（外链 H5 → aiQA）' },
+          { id: 'app_sub_office_hw', label: '作业批改（homeworkGrading）' },
+          { id: 'app_sub_office_notice', label: '会议通知生成（meetingNotice）' },
+          { id: 'app_sub_office_placeholder', label: '办公工具占位页（officeToolPlaceholder）' },
+        ],
+        buttons: [
+          { id: 'app_btn_office_mm_mic', label: '会议纪要：麦克风与转写' },
+          { id: 'app_btn_office_hw_pick', label: '作业批改：选择作业图片' },
+          { id: 'app_btn_office_notice_tpl_sync', label: '会议通知：读取与 PC 同源模板' },
+        ],
+      },
+      {
         menuId: 'app_menu_learn', menuLabel: '底部导航 · 学习',
         submenus: [
-          { id: 'app_sub_learn_vod', label: '录播课程' },
+          { id: 'app_sub_learn_vod', label: '录播课程（学习页 learning）' },
+          { id: 'app_sub_learn_past', label: '往期课程列表（pastCourses）' },
+          { id: 'app_sub_learn_course_detail', label: '课程详情（courseDetail）' },
           { id: 'app_sub_learn_live', label: '直播场次' },
+          { id: 'app_sub_learn_live_activity', label: '直播活动详情（liveActivity）' },
           { id: 'app_sub_learn_ext', label: '外链平台（共产党员网等）' },
-          { id: 'app_sub_learn_platform_stats', label: '外链停留/次数明细（自查）' },
+          { id: 'app_sub_learn_platform_stats', label: '外链停留/次数明细（learningPlatformStats）' },
         ],
         buttons: [
           { id: 'app_btn_learn_fav', label: '收藏课程' },
@@ -5510,7 +7907,11 @@ const ROLES_APP_PERM_TREE = [
       },
       {
         menuId: 'app_menu_service', menuLabel: '底部导航 · 服务',
-        submenus: [{ id: 'app_sub_svc_grid', label: '生活服务入口网格' }],
+        submenus: [
+          { id: 'app_sub_svc_grid', label: '生活服务入口网格' },
+          { id: 'app_sub_svc_career', label: '工作创业服务（career）' },
+          { id: 'app_sub_svc_life_share', label: '党群共享生活服务（lifeServices）' },
+        ],
         buttons: [
           { id: 'app_btn_svc_copy', label: '复制链接' },
         ],
@@ -5521,6 +7922,8 @@ const ROLES_APP_PERM_TREE = [
           { id: 'app_sub_prof_qr', label: '党员码展示' },
           { id: 'app_sub_prof_info', label: '个人信息字段' },
           { id: 'app_sub_prof_act', label: '活动参加记录' },
+          { id: 'app_sub_prof_disposal', label: '不合格党员处置指引（disposal）' },
+          { id: 'app_sub_prof_admin_home', label: '管理员能力入口（首页管理员卡片）' },
           { id: 'app_sub_prof_ai_live', label: 'AI 画像·直播学习总结（按场次）' },
           { id: 'app_sub_prof_ai_push', label: 'AI 画像·推送订阅与二次提醒（演示）' },
         ],
@@ -5563,6 +7966,18 @@ const ROLES_APP_PERM_TREE = [
         buttons: [
           { id: 'app_btn_ad_qr', label: '生成签到码/二维码' },
           { id: 'app_btn_ad_close', label: '结束活动' },
+        ],
+      },
+      {
+        menuId: 'app_menu_admin_tools', menuLabel: '管理员端 · 签到管理/统计/名单/异常',
+        submenus: [
+          { id: 'app_sub_ad_tools_checkin', label: '活动签到管理（adminCheckinMgmt）' },
+          { id: 'app_sub_ad_tools_stats', label: '签到统计（adminStats）' },
+          { id: 'app_sub_ad_tools_members', label: '党员列表（adminMemberList）' },
+          { id: 'app_sub_ad_tools_exceptions', label: '异常记录（adminExceptions）' },
+        ],
+        buttons: [
+          { id: 'app_btn_ad_tools_export', label: '导出统计或名单（演示）' },
         ],
       },
     ],
@@ -5720,31 +8135,31 @@ function RolesPage() {
     {
       label: '书记',
       users: 14,
-      menus: '工作台、党员管理、活动管理、课程与往期、直播、数据统计、数据与资源打通、权限管理、操作日志（按授权数据域细化到按钮）',
+      menus: '工作台、办公助手（公文/通知/PPT/表格/校验/纪要/问答/批改/资料审核入口）、AI 画像与推送、智能资料审核、课程与往期、学习外链、直播、数据统计、服务配置、党员管理、不合格党员处置、数据与资源打通、活动管理、权限管理、操作日志、问答日志（按授权数据域细化到子模块与按钮）',
       data: '本街道 / 授权社区与支部',
     },
     {
       label: '委员',
       users: 38,
-      menus: '除系统级参数外的主要业务菜单；是否含「权限管理」由上级配置（演示为部分开放）',
+      menus: '除「权限管理」全量能力外的主要业务菜单（含办公助手各子页、AI 画像、审核与统计等）；是否开放权限管理由上级配置（演示为部分开放）',
       data: '授权支部 / 社区范围',
     },
     {
       label: '组织委员',
       users: 56,
-      menus: '党员管理、活动管理、课程与往期、直播、数据统计（通常不含权限管理、不含全局日志导出）',
+      menus: '党员管理、活动管理、办公助手（公文/通知/纪要等常用项）、课程与往期、直播、数据统计（通常不含权限管理、不含全局日志/问答导出）',
       data: '本支部及所辖数据',
     },
     {
       label: '普通党员',
       users: 1088,
-      menus: '以只读与本人相关为主（若开放 PC，则菜单极窄；多数能力在小程序）',
+      menus: '以只读与本人相关为主；若开放 PC 则多为工作台与 AI 画像。小程序含首页、学习、服务、我的及办公助手九宫格（与权限树中「办公助手」分组对应）',
       data: '仅本人',
     },
     {
       label: '流动党员',
       users: 90,
-      menus: '与普通党员同级模板，可按政策增加「组织关系」「流入流出」相关只读或填报项',
+      menus: '与普通党员同级模板；可按政策增加「组织关系」「流入流出」相关只读或填报项；小程序办公助手与外链学习等默认开放',
       data: '仅本人 / 流动支部授权范围',
     },
   ];
@@ -5763,7 +8178,7 @@ function RolesPage() {
     <div>
       <PageHeader
         title="权限管理 · 系统身份"
-        subtitle="系统内置五种身份，每人仅绑定一种；身份决定可访问菜单、按钮与数据范围。人员与手机号在「党员管理」中录入后，在此为其选定身份并套用对应权限模板（演示为静态说明）。"
+        subtitle="系统内置五种身份，每人仅绑定一种；身份决定可访问菜单、按钮与数据范围。人员与手机号在「党员管理」中录入后，在此为其选定身份并套用对应权限模板。下方「配置权限」中的 PC / 小程序树已与当前侧栏、办公助手（含纪要 / 问答 / 批改等）及首页入口对齐（演示可勾选）。"
         actions={<SecondaryBtn onClick={() => showPrototypeToast('权限矩阵导出（演示）')}><I.Download /> 导出矩阵说明</SecondaryBtn>}
       />
 
@@ -6044,6 +8459,16 @@ function App() {
   const renderPage = () => {
     switch (page) {
       case 'dashboard': return <DashboardPage setPage={setPage} setActivitySub={setActivitySub} />;
+      case 'officeAssistant': return <OfficeAssistantPage setPage={setPage} />;
+      case 'officeDocWriting': return <OfficeDocWritingPage />;
+      case 'officeMeetingNoticeTemplates': return <OfficeMeetingNoticeTemplatesPage setPage={setPage} />;
+      case 'officeMeetingNoticeCompose': return <OfficeMeetingNoticeComposePage setPage={setPage} />;
+      case 'officePptStudio': return <OfficeAiWorkbenchPage setPage={setPage} mode="ppt" />;
+      case 'officeTableStudio': return <OfficeAiWorkbenchPage setPage={setPage} mode="table" />;
+      case 'officeTypoCheck': return <OfficeTypoCheckPage setPage={setPage} />;
+      case 'officeMeetingMinutes': return <OfficeMeetingMinutesPage setPage={setPage} />;
+      case 'officeSmartQaPc': return <OfficeSmartQaPcPage setPage={setPage} />;
+      case 'officeHomeworkGrading': return <OfficeHomeworkGradingPage setPage={setPage} />;
       case 'members': return (
         <MembersListPage
           onViewAiPortrait={(id) => {
@@ -6103,24 +8528,30 @@ function App() {
         width: collapsed ? 64 : 232, background: T.sidebar, transition: 'width 0.25s ease',
         display: 'flex', flexDirection: 'column', overflow: 'hidden', flexShrink: 0,
       }}>
-        <div style={{ height: 56, display: 'flex', alignItems: 'center', padding: '0 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          {!collapsed && (
-            <span
-              onClick={() => { setPage('dashboard'); setActivitySub('list'); showPrototypeToast('已返回工作台'); }}
-              style={{ color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: "'Noto Serif SC', serif", letterSpacing: '1px', cursor: 'pointer' }}
-              title="返回工作台"
-            >{headerActiveOrg.branding}</span>
-          )}
-          {collapsed && (
-            <span
-              onClick={() => { setPage('dashboard'); setActivitySub('list'); showPrototypeToast('已返回工作台'); }}
-              style={{ color: '#fff', fontSize: 12, fontWeight: 700, fontFamily: "'Noto Serif SC', serif", cursor: 'pointer', padding: '4px 0' }}
-              title="返回工作台"
-            >{headerActiveOrg.branding.slice(0, 1)}</span>
-          )}
+        <div style={{ height: 56, display: 'flex', alignItems: 'center', padding: collapsed ? '0 8px' : '0 12px', borderBottom: '1px solid rgba(255,255,255,0.06)', gap: 6 }}>
+          <div
+            onClick={() => { setPage('dashboard'); setActivitySub('list'); showPrototypeToast('已返回工作台'); }}
+            style={{
+              flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
+              justifyContent: collapsed ? 'center' : 'flex-start',
+            }}
+            title="返回工作台"
+          >
+            <img
+              src={NW_BRAND_LOGO_SRC}
+              alt=""
+              style={{ height: collapsed ? 30 : 28, width: 'auto', objectFit: 'contain', flexShrink: 0, display: 'block' }}
+            />
+            {!collapsed && (
+              <span style={{
+                color: '#fff', fontSize: 14, fontWeight: 700, fontFamily: "'Noto Serif SC', serif", letterSpacing: '0.02em',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>{headerActiveOrg.branding}</span>
+            )}
+          </div>
           <button type="button" onClick={() => { setCollapsed(c => !c); showPrototypeToast(!collapsed ? '侧栏已收起' : '侧栏已展开'); }} style={{
             background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)',
-            fontSize: 16, cursor: 'pointer', padding: 6, marginLeft: collapsed ? 0 : 'auto',
+            fontSize: 16, cursor: 'pointer', padding: 6, flexShrink: 0,
             display: 'flex', alignItems: 'center', borderRadius: 4,
           }}>
             {collapsed ? <I.ChevronRight /> : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg>}
