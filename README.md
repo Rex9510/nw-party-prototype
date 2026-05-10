@@ -1,4 +1,4 @@
-# 南湾党建 · 党务智能体（原型）
+# 南湾党建-Ai管理平台（原型）
 
 纯静态 HTML：PC 管理端（`pc-admin/`）与小程序高保真单页（`prototype/mobile_v2.html`）。本地可用 `python start-servers.py`（根目录 `8080`）。
 
