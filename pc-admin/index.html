@@ -270,17 +270,16 @@ const I = {
 };
 
 // ============================================
-// Menu：与小程序 mobile_v2 底栏「首页 / 学习 / 服务 / 我的」对齐（侧栏分组仅为导航结构，非新路由）
+// Menu：与小程序 mobile_v2 底栏对齐（1期：首页 / 学习 / 我的；「服务」整组归档2期；侧栏分组仅为导航结构，非新路由）
 // ============================================
 const SIDEBAR_SECTIONS = [
   {
     key: 'wx-home',
     title: '首页',
-    hint: '工作台 · 办公助手 · AI画像',
+    hint: '工作台 · AI画像 · 智能审核',
     items: [
       { id: 'dashboard', icon: I.Dashboard, label: '工作台' },
       { id: 'homeBanner', icon: I.Slides, label: '首页 Banner' },
-      { id: 'officeAssistant', icon: I.LayoutGrid, label: '办公助手' },
       { id: 'aiProfile', icon: I.AI, label: 'AI 画像' },
       { id: 'aiPush', icon: I.Bell, label: '画像推送策略' },
       { id: 'audit', icon: I.Audit, label: '智能资料审核' },
@@ -295,14 +294,6 @@ const SIDEBAR_SECTIONS = [
       { id: 'wxRuntimeConfig', icon: I.Edit, label: '学习外链配置' },
       { id: 'live', icon: I.Video, label: '直播管理' },
       { id: 'stats', icon: I.Chart, label: '数据统计' },
-    ],
-  },
-  {
-    key: 'wx-service',
-    title: '服务',
-    hint: '生活服务入口配置',
-    items: [
-      { id: 'services', icon: I.Settings, label: '服务配置' },
     ],
   },
   {
@@ -817,7 +808,7 @@ function DashboardPage({ setPage, setActivitySub }) {
     <div>
       <PageHeader
         title="工作台"
-        subtitle="与小程序改版对齐：底栏「首页」能力（年份订阅、AI 画像、党务问答·深小服、智能审核）在 C 端展示；本后台负责内容配置、审核队列与画像管理。「学习 / 服务 / 我的」请用左侧分组进入对应模块。"
+        subtitle="与小程序改版对齐：底栏「首页」能力（年份订阅、AI 画像、党务问答·深小服、智能审核）在 C 端展示；本后台负责内容配置、审核队列与画像管理。「学习 / 我的」请用左侧分组进入对应模块。原「服务」分组与「办公助手」相关功能归档二期。"
       />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
         {stats.map((s, i) => (
@@ -832,7 +823,7 @@ function DashboardPage({ setPage, setActivitySub }) {
         background: 'linear-gradient(90deg, #FFF5F5 0%, #FFFBEB 100%)', fontSize: 12, color: T.textSecondary, lineHeight: 1.65,
       }}>
         <strong style={{ color: T.textPrimary }}>路由说明（原型）：</strong>
-        小程序「党务智能问答」跳转配置的 H5，<strong>无 PC 独立页</strong>；<strong>PPT 制作 / 表格制作</strong>见侧栏 <strong>办公助手</strong>。「在线课程一级平台外链」请在 <strong>学习 → 学习外链配置</strong>；「多场直播」请在 <strong>学习 → 直播管理</strong> 维护（写入浏览器 localStorage，小程序原型同域打开可即时同步）；正式环境请改为接口下发。
+        小程序「党务智能问答」跳转配置的 H5，<strong>无 PC 独立页</strong>。<strong>PPT 制作 / 表格制作</strong>等办公能力<strong>已归档二期</strong>（侧栏「办公助手」入口移除）。「在线课程一级平台外链」请在 <strong>学习 → 学习外链配置</strong>；「多场直播」请在 <strong>学习 → 直播管理</strong> 维护（写入浏览器 localStorage，小程序原型同域打开可即时同步）；正式环境请改为接口下发。
         <span style={{ display: 'block', marginTop: 8 }}><strong style={{ color: T.textPrimary }}>账号与权限：</strong>PC/小程序均以<strong>党员管理</strong>中手机号为准；登录后能力范围由<strong>权限管理</strong>中五类<strong>系统身份</strong>及细项勾选控制（与操作日志「系统身份」列一致）。</span>
       </div>
 
@@ -843,7 +834,6 @@ function DashboardPage({ setPage, setActivitySub }) {
             {[
               { icon: <I.Plus />, label: '新建活动', accent: '#1890FF', action: () => { setPage('activities'); setActivitySub('create'); } },
               { icon: <I.Slides />, label: '首页 Banner', accent: '#0EA5E9', action: () => setPage('homeBanner') },
-              { icon: <I.LayoutGrid />, label: '办公助手', accent: '#6366F1', action: () => setPage('officeAssistant') },
               { icon: <I.Users />, label: '党员管理', accent: T.success, action: () => setPage('members') },
               { icon: <I.Calendar />, label: '活动管理', accent: T.warning, action: () => setPage('activities') },
               { icon: <I.Book />, label: '课程与往期', accent: '#722ED1', action: () => setPage('courses') },
@@ -853,7 +843,6 @@ function DashboardPage({ setPage, setActivitySub }) {
               { icon: <I.AI />, label: 'AI 画像', accent: '#7C3AED', action: () => setPage('aiProfile') },
               { icon: <I.Bell />, label: '画像推送策略', accent: '#B45309', action: () => setPage('aiPush') },
               { icon: <I.AlertTriangle />, label: '不合格党员处置', accent: T.warning, action: () => setPage('memberDisposal') },
-              { icon: <I.Settings />, label: '服务配置', accent: '#0D9488', action: () => setPage('services') },
               { icon: <I.Shield />, label: '权限管理', accent: '#0F766E', action: () => setPage('roles') },
             ].map((item, i) => (
               <div key={i} style={{ textAlign: 'center', padding: '16px 8px', borderRadius: 10, cursor: 'pointer', background: `${item.accent}08`, border: `1px solid ${item.accent}15` }} onClick={item.action}>

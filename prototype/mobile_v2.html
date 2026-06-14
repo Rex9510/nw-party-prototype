@@ -32,7 +32,7 @@ body{margin:0;background:#F2EDE6;font-family:'Noto Serif SC',-apple-system,Blink
 // ============================================
 // Design Tokens
 // ============================================
-/** 底栏 Tab 占位（首页 / 学习 / 服务 / 我的；与 TabBar minHeight + padding + safe-area 对齐，略大于理论值避免最后一屏被挡） */
+/** 底栏 Tab 占位（1期：首页 / 学习 / 我的；与 TabBar minHeight + padding + safe-area 对齐，略大于理论值避免最后一屏被挡） */
 const NW_TAB_SCROLL_BOTTOM_PAD = 'calc(84px + env(safe-area-inset-bottom, 0px))';
 
 const T = {
@@ -349,7 +349,7 @@ function nwLearningRuntimeDefaults() {
       '深圳智慧党建': 'https://mp.weixin.qq.com/s/ZC1ovvIR68a7ZwyIWb9vGg',
     },
     liveSessions: [s0, s1],
-    /** 智能问答 H5：默认 DinTal；首页「办公助手 → 智能问答」跳转；PC「学习外链配置」可改为其它 https */
+    /** 智能问答 H5：默认 DinTal；首页「党务智能问答」卡片跳转；PC「学习外链配置」可改为其它 https */
     shenXiaoFuMiniLink: 'https://apps.jinrirencai.com/vision-chat/index.html#/chat/ff908081965601960191460192688000',
   };
 }
@@ -389,7 +389,7 @@ function readLearningRuntime() {
   }
 }
 
-/** 智能问答：优先 PC/本地配置的 https 链接，否则用内置默认（办公助手九宫格入口） */
+/** 智能问答：优先 PC/本地配置的 https 链接，否则用内置默认（首页「党务智能问答」入口） */
 function getAiQaExternalH5Url() {
   var link = (readLearningRuntime().shenXiaoFuMiniLink || '').trim();
   if (/^https?:\/\//i.test(link)) return link;
@@ -840,10 +840,10 @@ const TabBar = ({ active, onSwitch, items }) => (
   </div>
 );
 
+/** 1期底栏：去掉「服务」tab（服务tab全部功能归档2期）；剩 首页 / 学习 / 我的 */
 const tabItems = [
   { key: 'home', label: '首页', icon: Icons.Home, screen: 'home' },
   { key: 'learn', label: '学习', icon: Icons.Book, screen: 'learning' },
-  { key: 'service', label: '服务', icon: Icons.Service, screen: 'lifeServices' },
   { key: 'profile', label: '我的', icon: Icons.User, screen: 'profile' },
 ];
 
@@ -1359,15 +1359,15 @@ const HomeScreen = ({ nav }) => {
 
         <div style={homeStyles.sectionLabel}>主要入口</div>
 
-        <div style={homeStyles.moduleCard} onClick={() => nav.navigateTo('partyTools')}>
+        <div style={homeStyles.moduleCard} onClick={() => nav.navigateTo('aiQA')}>
           <div style={homeStyles.moduleHead}>
             <div style={homeStyles.moduleHeadLeft}>
-              <div style={{ ...homeStyles.moduleIcon, ...homeStyles.toolsIcon }}><Icons.GridFour /></div>
-              <div style={homeStyles.moduleTitle}>办公助手</div>
+              <div style={{ ...homeStyles.moduleIcon, ...homeStyles.toolsIcon }}><Icons.Chat /></div>
+              <div style={homeStyles.moduleTitle}>党务智能问答</div>
             </div>
             <div style={homeStyles.chevronMuted}><Icons.ChevronRight /></div>
           </div>
-          <div style={homeStyles.moduleSub}>公文写作（含会议通知模板）、录音纪要生成、校验、党务智能问答等九宫格能力；PPT / 表格制作请在 PC 管理端「办公助手」使用。</div>
+          <div style={homeStyles.moduleSub}>跳转「DinTal AI客服」H5 智能问答入口；其他办公能力（公文写作、录音纪要、资料校验、PPT / 表格制作等）作为二期规划。</div>
         </div>
       </div>
 
@@ -3791,7 +3791,7 @@ const LiveActivityScreen = ({ nav }) => {
 // ============================================
 // Screen 10: AI QA
 // ============================================
-/** 智能问答为第三方 DinTal H5；通过办公助手九宫格或 navigateTo('aiQA') 进入则立即跳转 */
+/** 智能问答为第三方 DinTal H5；通过首页「党务智能问答」卡片或 navigateTo('aiQA') 进入则立即跳转 */
 const AIQAScreen = ({ nav }) => {
   React.useEffect(function () {
     window.location.replace(getAiQaExternalH5Url());
@@ -5035,7 +5035,9 @@ const OfficeToolPlaceholderScreen = ({ nav }) => {
 };
 
 // ============================================
-// Screen 11: Career
+// ============================================
+// Screen 11: [二期归档] Career — 工作创业服务
+// 1期：服务tab整体去掉，本屏保留代码但不渲染；2期恢复
 // ============================================
 const CareerScreen = ({ nav }) => {
   const jobs = [
@@ -5106,7 +5108,9 @@ const CareerScreen = ({ nav }) => {
 };
 
 // ============================================
-// Screen 12: 服务 Tab — 党群共享（对齐 i龙岗 五大入口）
+// ============================================
+// Screen 12: [二期归档] 服务 Tab — 党群共享（对齐 i龙岗 五大入口）
+// 1期：服务tab整体去掉，本屏保留代码但不渲染（无 tab 入口）；2期恢复
 // 定制图标：浅填充 + 描边，略偏产品级视觉
 // ============================================
 const LsIconSharedSpace = () => (
@@ -5515,7 +5519,9 @@ const AdminExceptionsScreen = ({ nav }) => {
 };
 
 // ============================================
-// Screen: 办公助手（九宫格；PPT/表格在 PC 管理端）
+// ============================================
+// Screen: [二期归档] 办公助手（九宫格；PPT/表格在 PC 管理端）
+// 1期：首页入口已替换为「党务智能问答」单跳转；本屏代码保留不渲染，2期恢复
 // ============================================
 const PartyToolsScreen = ({ nav }) => {
   const grid = { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: T.gridGap };
