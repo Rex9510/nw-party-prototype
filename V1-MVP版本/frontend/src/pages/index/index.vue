@@ -20,9 +20,12 @@ onShow(async () => {
   }
 })
 
-function onCardTap(path: string) {
-  uni.showToast({ title: '该功能后续开发', icon: 'none' })
-  // uni.navigateTo({ url: path })
+function onCardTap(path: string, enabled: boolean) {
+  if (!enabled) {
+    uni.showToast({ title: '该功能后续开发', icon: 'none' })
+    return
+  }
+  uni.navigateTo({ url: path, fail: () => uni.showToast({ title: '页面打开失败', icon: 'none' }) })
 }
 
 function onLogout() {
@@ -64,7 +67,7 @@ function onLogout() {
         :key="card.key"
         class="card"
         :class="{ disabled: !card.enabled }"
-        @click="onCardTap(card.path)"
+        @click="onCardTap(card.path, card.enabled)"
       >
         <view class="emoji">{{ card.icon }}</view>
         <view class="card-title">{{ card.label }}</view>

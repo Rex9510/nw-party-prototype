@@ -1,12 +1,16 @@
 """党员 + 批量导入记录。"""
 from datetime import datetime, date
+from typing import TYPE_CHECKING
 from sqlalchemy import String, BigInteger, Integer, DateTime, Date, ForeignKey, JSON, func, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.db.session import Base
+
+if TYPE_CHECKING:
+    from app.models.party import Branch
 
 # SQLite 走 autoincrement 必须 INTEGER PRIMARY KEY；用 with_variant 兼容
 BigIntPK = BigInteger().with_variant(Integer(), "sqlite")
-from sqlalchemy.orm import Mapped, mapped_column
-
-from app.db.session import Base
 
 
 class Member(Base):
@@ -26,6 +30,8 @@ class Member(Base):
     created_by: Mapped[int | None] = mapped_column(BigIntPK, ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    branch: Mapped["Branch"] = relationship("Branch")
 
 
 class MemberImport(Base):
