@@ -42,6 +42,24 @@
       "style": {
         "navigationBarTitleText": "录入培训活动"
       }
+    },
+    {
+      "path": "pages/audit/pending",
+      "style": {
+        "navigationBarTitleText": "待审核"
+      }
+    },
+    {
+      "path": "pages/study-hours/index",
+      "style": {
+        "navigationBarTitleText": "学时档案"
+      }
+    },
+    {
+      "path": "pages/stats/yearly",
+      "style": {
+        "navigationBarTitleText": "年度统计"
+      }
     }
   ],
   "globalStyle": {
