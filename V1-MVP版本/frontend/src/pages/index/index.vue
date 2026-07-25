@@ -1,24 +1,29 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import { useAuthStore } from '@/stores/auth'
+import { ROLES, type Role } from '@/utils/roles'
 
 const auth = useAuthStore()
-const roleLabel = computed(() => {
-  const map: Record<string, string> = {
-    street_lead: '街道负责人',
-    community_organizer: '社区组织委员',
-    branch_secretary: '支部书记',
-    member: '党员',
-    system_admin: '系统管理员',
+
+const role = computed<Role>(() => (auth.user?.role as Role) || 'member')
+const roleConfig = computed(() => ROLES[role.value])
+const cards = computed(() => roleConfig.value?.cards || [])
+
+onShow(async () => {
+  if (auth.token && !auth.user) {
+    try {
+      await auth.fetchMe()
+    } catch (e) {
+      console.warn('fetchMe failed', e)
+    }
   }
-  return auth.user ? map[auth.user.role] || auth.user.role : ''
 })
 
-onMounted(() => {
-  if (!auth.user) {
-    auth.fetchMe().catch(() => {})
-  }
-})
+function onCardTap(path: string) {
+  uni.showToast({ title: '该功能后续开发', icon: 'none' })
+  // uni.navigateTo({ url: path })
+}
 
 function onLogout() {
   uni.showModal({
@@ -37,43 +42,34 @@ function onLogout() {
 <template>
   <view class="dashboard">
     <view class="header">
-      <view class="greet">
-        <view class="hi">你好，{{ auth.user?.name || '用户' }}</view>
-        <view class="role">{{ roleLabel }}</view>
+      <view class="user-card" :style="{ background: roleConfig?.color || '#B22222' }">
+        <view class="avatar">{{ (auth.user?.name || 'U').charAt(0) }}</view>
+        <view class="info">
+          <view class="name">{{ auth.user?.name || '加载中…' }}</view>
+          <view class="role">{{ roleConfig?.label }} · {{ roleConfig?.scope }}</view>
+        </view>
+        <view class="logout" @click="onLogout">退出</view>
       </view>
-      <view class="logout" @click="onLogout">退出</view>
     </view>
 
     <view class="welcome">
       <view class="title">V1-MVP 工作台</view>
-      <view class="sub">Day 1 脚手架就绪 · 后续功能陆续开放</view>
+      <view class="sub">Day 2 已就绪 · 角色权限联调通过</view>
     </view>
 
+    <view class="section-title">我的入口</view>
     <view class="grid">
-      <view class="card disabled">
-        <view class="card-title">党员库</view>
-        <view class="card-sub">手动新增 · 批量导入</view>
-        <view class="tag">D3</view>
-      </view>
-      <view class="card disabled">
-        <view class="card-title">培训活动</view>
-        <view class="card-sub">13+ 字段录入</view>
-        <view class="tag">D6-D7</view>
-      </view>
-      <view class="card disabled">
-        <view class="card-title">两级审核</view>
-        <view class="card-sub">社区初审 · 街道复审</view>
-        <view class="tag">D8-D10</view>
-      </view>
-      <view class="card disabled">
-        <view class="card-title">学时档案</view>
-        <view class="card-sub">个人汇总 · 明细</view>
-        <view class="tag">D11</view>
-      </view>
-      <view class="card disabled">
-        <view class="card-title">年度统计</view>
-        <view class="card-sub">Excel 导出</view>
-        <view class="tag">D12</view>
+      <view
+        v-for="card in cards"
+        :key="card.key"
+        class="card"
+        :class="{ disabled: !card.enabled }"
+        @click="onCardTap(card.path)"
+      >
+        <view class="emoji">{{ card.icon }}</view>
+        <view class="card-title">{{ card.label }}</view>
+        <view class="card-sub">{{ card.desc }}</view>
+        <view class="tag">后续开放</view>
       </view>
     </view>
   </view>
@@ -87,41 +83,73 @@ function onLogout() {
 }
 
 .header {
-  padding: 40rpx 0;
+  padding: 24rpx 0 32rpx;
+}
+.user-card {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  padding: 32rpx 28rpx;
+  border-radius: 24rpx;
+  color: #fff;
+  box-shadow: 0 8rpx 24rpx rgba(178, 34, 34, 0.18);
 }
-.greet .hi { font-size: 40rpx; font-weight: 700; color: #222; }
-.greet .role { font-size: 26rpx; color: #B22222; margin-top: 8rpx; }
-.logout { font-size: 28rpx; color: #888; padding: 8rpx 16rpx; }
+.avatar {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40rpx;
+  font-weight: 700;
+  margin-right: 24rpx;
+}
+.info { flex: 1; min-width: 0; }
+.name { font-size: 34rpx; font-weight: 700; }
+.role { font-size: 24rpx; opacity: 0.9; margin-top: 6rpx; }
+.logout {
+  font-size: 26rpx;
+  padding: 12rpx 20rpx;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 12rpx;
+}
 
 .welcome {
-  background: linear-gradient(135deg, #B22222, #8B0000);
-  color: #fff;
-  border-radius: 24rpx;
-  padding: 40rpx;
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 28rpx 32rpx;
   margin-bottom: 32rpx;
+  border: 1rpx solid #f0f0f0;
 }
-.welcome .title { font-size: 36rpx; font-weight: 700; }
-.welcome .sub { font-size: 24rpx; opacity: 0.85; margin-top: 8rpx; }
+.welcome .title { font-size: 32rpx; font-weight: 700; color: #222; }
+.welcome .sub { font-size: 24rpx; color: #888; margin-top: 6rpx; }
+
+.section-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 20rpx;
+  padding-left: 4rpx;
+}
 
 .grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 24rpx;
 }
-
 .card {
   background: #fff;
   border-radius: 20rpx;
   padding: 32rpx 28rpx;
   position: relative;
   box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.04);
+  border: 1rpx solid #f0f0f0;
 }
-.card.disabled { opacity: 0.6; }
+.card.disabled { opacity: 0.65; }
+.emoji { font-size: 56rpx; line-height: 1; margin-bottom: 12rpx; }
 .card-title { font-size: 30rpx; font-weight: 600; color: #222; }
-.card-sub { font-size: 24rpx; color: #888; margin-top: 8rpx; }
+.card-sub { font-size: 24rpx; color: #888; margin-top: 6rpx; }
 .tag {
   position: absolute;
   top: 16rpx;

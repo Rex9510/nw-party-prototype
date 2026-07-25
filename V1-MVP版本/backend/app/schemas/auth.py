@@ -1,5 +1,5 @@
 """认证相关 schema。"""
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 import re
 
 
@@ -28,6 +28,8 @@ class RefreshRequest(BaseModel):
 
 
 class UserInfo(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     phone: str
     name: str
@@ -35,6 +37,3 @@ class UserInfo(BaseModel):
     street_id: int | None = None
     community_id: int | None = None
     branch_id: int | None = None
-
-    class Config:
-        from_attributes = True
