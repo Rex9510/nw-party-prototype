@@ -1,6 +1,7 @@
 """/api/v1/members 党员库路由。"""
 import math
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -17,6 +18,10 @@ from app.schemas.member import (
     MemberOut,
     MemberUpdate,
 )
+from app.services.member_import import (
+    generate_template_xlsx,
+    parse_and_import,
+)
 from app.services.permissions import (
     can_create_member_in,
     can_manage_members,
@@ -24,6 +29,55 @@ from app.services.permissions import (
 )
 
 router = APIRouter(prefix="/members", tags=["members"])
+
+
+@router.get("/template")
+async def download_template(_user: User = Depends(get_current_user)) -> StreamingResponse:
+    """下载党员导入模板 xlsx。"""
+    content = generate_template_xlsx()
+    return StreamingResponse(
+        iter([content]),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": 'attachment; filename="members_template.xlsx"',
+            "Content-Length": str(len(content)),
+        },
+    )
+
+
+@router.post("/import")
+async def import_members(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """批量导入党员（xlsx）。
+
+    - 全有全无：任一行失败整文件回滚
+    - 返回 total_rows / success_rows / failed_rows / error_log
+    """
+    if not can_manage_members(user):
+        raise HTTPException(status_code=403, detail="无权导入党员")
+
+    if not file.filename or not file.filename.lower().endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="仅支持 .xlsx / .xls 文件")
+
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="文件超过 5MB")
+
+    result = await parse_and_import(db, content, user)
+
+    return {
+        "total_rows": result.total_rows,
+        "success_rows": result.success_rows,
+        "failed_rows": result.failed_rows,
+        "error_log": [
+            {"row": e.row, "phone": e.phone, "errors": e.errors}
+            for e in result.error_log
+        ],
+        "file_url": file.filename,
+    }
 
 
 @router.get("", response_model=MemberListResponse)

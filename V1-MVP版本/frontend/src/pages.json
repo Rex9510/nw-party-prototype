@@ -49,5 +49,11 @@
     "navigationBarTitleText": "南湾党建",
     "navigationBarBackgroundColor": "#B22222",
     "backgroundColor": "#F7F8FA"
+  },
+  "easycom": {
+    "autoscan": true,
+    "custom": {
+      "^MemberPicker$": "@/components/MemberPicker.vue"
+    }
   }
 }

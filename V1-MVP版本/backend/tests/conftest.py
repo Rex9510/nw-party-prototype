@@ -4,7 +4,7 @@ Pytest fixtures：异步 SQLAlchemy + aiosqlite 内存库。
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import event
+from sqlalchemy import event, select
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -17,6 +17,7 @@ from app.core.security import hash_password
 from app.db.session import Base, get_db
 from app.main import app as fastapi_app
 import app.db.base  # noqa: F401
+from app.models.dict import TrainingCategory, TrainingSource
 from app.models.party import Branch, Community, Street
 from app.models.user import User
 
@@ -87,6 +88,26 @@ async def sample_data(session_factory):
             status="active",
         )
         s.add_all([admin, street_lead, community_org])
+        await s.commit()
+
+        # 字典种子（与 scripts/seed.py 一致）
+        for code, name, sort in [
+            ("community_member", "社区党员", 1),
+            ("govt_member", "机关党员", 2),
+            ("ngo_member", "两新党组织党员", 3),
+        ]:
+            if not (await s.execute(
+                select(TrainingCategory).where(TrainingCategory.code == code)
+            )).scalar_one_or_none():
+                s.add(TrainingCategory(code=code, name=name, sort=sort))
+        for code, name, sort in [
+            ("upper_send", "上级送课", 1),
+            ("self_organize", "自行组织", 2),
+        ]:
+            if not (await s.execute(
+                select(TrainingSource).where(TrainingSource.code == code)
+            )).scalar_one_or_none():
+                s.add(TrainingSource(code=code, name=name, sort=sort))
         await s.commit()
 
     return {

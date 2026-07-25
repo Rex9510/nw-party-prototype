@@ -1,16 +1,20 @@
 """培训活动 + 附件 + 参加人员。"""
 from datetime import datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 from sqlalchemy import (
-    String, BigInteger, DateTime, ForeignKey, Integer, Boolean, Numeric,
+    String, BigInteger, Integer, DateTime, ForeignKey, Boolean, Numeric,
     UniqueConstraint, Text, func,
 )
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.db.session import Base
+
+if TYPE_CHECKING:
+    pass
 
 # SQLite 走 autoincrement 必须 INTEGER PRIMARY KEY；用 with_variant 兼容
 BigIntPK = BigInteger().with_variant(Integer(), "sqlite")
-from sqlalchemy.orm import Mapped, mapped_column
-
-from app.db.session import Base
 
 
 class Activity(Base):
@@ -46,6 +50,13 @@ class Activity(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
+    participants: Mapped[list["ActivityParticipant"]] = relationship(
+        "ActivityParticipant", back_populates="activity", cascade="all, delete-orphan"
+    )
+    attachments: Mapped[list["ActivityAttachment"]] = relationship(
+        "ActivityAttachment", back_populates="activity", cascade="all, delete-orphan"
+    )
+
 
 class ActivityAttachment(Base):
     __tablename__ = "activity_attachments"
@@ -59,6 +70,8 @@ class ActivityAttachment(Base):
     uploaded_by: Mapped[int | None] = mapped_column(BigIntPK, ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
+    activity: Mapped["Activity"] = relationship("Activity", back_populates="attachments")
+
 
 class ActivityParticipant(Base):
     __tablename__ = "activity_participants"
@@ -70,3 +83,5 @@ class ActivityParticipant(Base):
     study_hours: Mapped[Decimal] = mapped_column(Numeric(5, 1), nullable=False)
     attendance_status: Mapped[str] = mapped_column(String(16), default="signed", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    activity: Mapped["Activity"] = relationship("Activity", back_populates="participants")
