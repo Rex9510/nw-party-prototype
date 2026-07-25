@@ -1,0 +1,53 @@
+{
+  "pages": [
+    {
+      "path": "pages/login/index",
+      "style": {
+        "navigationBarTitleText": "登录",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/index/index",
+      "style": {
+        "navigationBarTitleText": "工作台"
+      }
+    },
+    {
+      "path": "pages/members/list",
+      "style": {
+        "navigationBarTitleText": "党员库"
+      }
+    },
+    {
+      "path": "pages/members/new",
+      "style": {
+        "navigationBarTitleText": "新增党员"
+      }
+    },
+    {
+      "path": "pages/members/import",
+      "style": {
+        "navigationBarTitleText": "批量导入"
+      }
+    },
+    {
+      "path": "pages/activities/list",
+      "style": {
+        "navigationBarTitleText": "培训活动"
+      }
+    },
+    {
+      "path": "pages/activities/new",
+      "style": {
+        "navigationBarTitleText": "录入培训活动"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "white",
+    "navigationBarTitleText": "南湾党建",
+    "navigationBarBackgroundColor": "#B22222",
+    "backgroundColor": "#F7F8FA"
+  }
+}

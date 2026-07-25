@@ -1,0 +1,28 @@
+{
+  "name": "南湾党建",
+  "appid": "__UNI__NWPARTY",
+  "description": "南湾党建 V1-MVP · 党员培训学时管理",
+  "versionName": "0.1.0",
+  "versionCode": "1",
+  "transformPx": false,
+  "app-plus": {
+    "usingComponents": true
+  },
+  "h5": {
+    "title": "南湾党建 V1-MVP",
+    "router": {
+      "mode": "history",
+      "base": "/"
+    },
+    "devServer": {
+      "port": 5173,
+      "proxy": {
+        "/api": {
+          "target": "http://localhost:8000",
+          "changeOrigin": true
+        }
+      }
+    }
+  },
+  "vueVersion": "3"
+}
