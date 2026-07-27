@@ -1,7 +1,5 @@
 /**
- * 认证状态管理（Pinia）。
- * - token 持久化到 localStorage
- * - 提供 login/logout/refreshMe
+ * 认证状态管理（Pinia）- Web 版本用 localStorage
  */
 import { defineStore } from 'pinia'
 import { api } from '@/utils/request'
@@ -14,6 +12,9 @@ export interface UserInfo {
   street_id: number | null
   community_id: number | null
   branch_id: number | null
+  street_name: string | null
+  community_name: string | null
+  branch_name: string | null
 }
 
 interface AuthState {
@@ -26,7 +27,7 @@ const STORAGE_KEY = 'nwparty_auth'
 
 function loadFromStorage(): Partial<AuthState> {
   try {
-    const raw = uni.getStorageSync(STORAGE_KEY)
+    const raw = localStorage.getItem(STORAGE_KEY)
     return raw ? JSON.parse(raw) : {}
   } catch {
     return {}
@@ -34,7 +35,11 @@ function loadFromStorage(): Partial<AuthState> {
 }
 
 function saveToStorage(state: Partial<AuthState>) {
-  uni.setStorageSync(STORAGE_KEY, JSON.stringify(state))
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+}
+
+function clearStorage() {
+  localStorage.removeItem(STORAGE_KEY)
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -56,8 +61,15 @@ export const useAuthStore = defineStore('auth', {
       }>('/auth/login', { phone, password })
       this.token = res.access_token
       this.refreshToken = res.refresh_token
-      await this.fetchMe()
+      // 关键：先把 token 写进 localStorage，下一次 fetchMe 才能拿到
       this._persist()
+      try {
+        await this.fetchMe()
+      } catch (e) {
+        // fetchMe 失败时清掉 storage，让用户重新登录
+        this.logout()
+        throw e
+      }
     },
 
     async fetchMe() {
@@ -69,7 +81,7 @@ export const useAuthStore = defineStore('auth', {
       this.token = ''
       this.refreshToken = ''
       this.user = null
-      uni.removeStorageSync(STORAGE_KEY)
+      clearStorage()
     },
 
     _persist() {

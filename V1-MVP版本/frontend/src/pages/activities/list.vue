@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { showConfirmDialog, showDialog, showToast, showSuccessToast } from 'vant'
 import { activitiesApi, type ActivityListItem } from '@/api/activities'
 
+const router = useRouter()
 const items = ref<ActivityListItem[]>([])
 const total = ref(0)
 const loading = ref(false)
@@ -17,6 +20,15 @@ const STATUS_LABEL: Record<string, { text: string; color: string }> = {
   rejected: { text: '已驳回', color: '#B22222' },
 }
 
+const statusOptions = [
+  { v: '', l: '全部' },
+  { v: 'draft', l: '草稿' },
+  { v: 'pending_community', l: '待社区' },
+  { v: 'pending_street', l: '待街道' },
+  { v: 'approved', l: '已通过' },
+  { v: 'rejected', l: '已驳回' },
+]
+
 async function load() {
   loading.value = true
   try {
@@ -28,35 +40,62 @@ async function load() {
     items.value = res.items
     total.value = res.total
   } catch (e: any) {
-    uni.showToast({ title: e?.message || '加载失败', icon: 'none' })
+    showToast({ message: e?.message || '加载失败', type: 'fail' })
   } finally {
     loading.value = false
   }
 }
 
 function onNew() {
-  uni.navigateTo({ url: '/pages/activities/new' })
+  router.push('/pages/activities/new')
 }
 
-function onItemTap(a: ActivityListItem) {
-  uni.showModal({
-    title: a.theme,
-    content: `时间：${a.training_at}\n地点：${a.location}\n人数：${a.participant_count}\n学时：${a.study_hours}`,
-    showCancel: false,
-  })
+async function onItemTap(a: ActivityListItem) {
+  try {
+    await showDialog({
+      title: a.theme,
+      message: `时间：${a.training_at}\n地点：${a.location}\n人数：${a.participant_count}\n学时：${a.study_hours}`,
+      confirmButtonText: '关闭',
+      showCancelButton: false,
+    })
+  } catch {}
 }
 
-const statusOptions = [
-  { v: '', l: '全部' },
-  { v: 'draft', l: '草稿' },
-  { v: 'pending_community', l: '待社区' },
-  { v: 'pending_street', l: '待街道' },
-  { v: 'approved', l: '已通过' },
-  { v: 'rejected', l: '已驳回' },
-]
+// 草稿/驳回 → 编辑 / 删除
+function onEdit(id: number) {
+  router.push(`/pages/activities/edit/${id}`)
+}
 
-function onPickStatus(e: any) {
-  statusFilter.value = statusOptions[e.detail.value]?.v || ''
+async function onDelete(id: number) {
+  try {
+    await showConfirmDialog({
+      title: '确认删除',
+      message: '确定删除该培训活动？删除后不可恢复。',
+      confirmButtonText: '删除',
+      confirmButtonColor: '#B22222',
+    })
+    await activitiesApi.remove(id)
+    showSuccessToast('已删除')
+    load()
+  } catch {
+    // 用户取消
+  }
+}
+
+// ===== 状态筛选（action-sheet 列表） =====
+const showStatusPicker = ref(false)
+const statusActions = computed(() =>
+  statusOptions.map((o) => ({
+    name: o.l,
+    subname: o.v === statusFilter.value ? '✓ 当前选中' : '',
+    value: o.v,
+  })),
+)
+const selectedStatusLabel = computed(() => {
+  return statusOptions.find((o) => o.v === statusFilter.value)?.l || '全部'
+})
+function onStatusSelect(action: { value: string }) {
+  statusFilter.value = action.value
   page.value = 1
   load()
 }
@@ -67,117 +106,160 @@ onMounted(() => {
 </script>
 
 <template>
-  <view class="page">
-    <view class="filter-row">
-      <picker
-        :value="statusOptions.findIndex((o) => o.v === statusFilter)"
-        :range="statusOptions.map((o) => o.l)"
-        @change="onPickStatus"
+  <div class="form-page">
+    <div class="page-header">
+      <div class="title">培训活动</div>
+      <div class="sub">共 {{ total }} 场</div>
+    </div>
+
+    <van-cell-group inset class="filter-group">
+      <van-field
+        :model-value="selectedStatusLabel"
+        label="状态"
+        placeholder="全部"
+        readonly
+        is-link
+        @click="showStatusPicker = true"
+      />
+    </van-cell-group>
+
+    <div class="action-row">
+      <van-button size="small" type="primary" @click="onNew">
+        + 录入培训
+      </van-button>
+    </div>
+
+    <div v-if="loading" class="status">加载中…</div>
+    <div v-else-if="!items.length" class="status empty">
+      <div class="empty-icon">📋</div>
+      <div>暂无培训活动</div>
+    </div>
+
+    <div v-else class="list">
+      <div
+        v-for="a in items"
+        :key="a.id"
+        class="card"
+        @click="onItemTap(a)"
       >
-        <view class="picker">
-          状态：{{ statusOptions.find((o) => o.v === statusFilter)?.l }}
-        </view>
-      </picker>
-    </view>
-
-    <view class="actions">
-      <view class="total">共 {{ total }} 场</view>
-      <view class="btn btn-primary" @click="onNew">+ 录入培训</view>
-    </view>
-
-    <view v-if="loading" class="loading">加载中…</view>
-    <view v-else-if="!items.length" class="empty">
-      <view class="empty-icon">📋</view>
-      <view>暂无培训活动</view>
-    </view>
-
-    <view v-else class="list">
-      <view v-for="a in items" :key="a.id" class="item" @click="onItemTap(a)">
-        <view class="item-header">
-          <view class="theme">{{ a.theme }}</view>
-          <view
+        <div class="card-header">
+          <div class="theme">{{ a.theme }}</div>
+          <div
             class="status"
             :style="{ background: (STATUS_LABEL[a.status] || { color: '#999' }).color }"
           >
             {{ (STATUS_LABEL[a.status] || { text: a.status }).text }}
-          </view>
-        </view>
-        <view class="meta">
-          <text>📅 {{ a.training_at }}</text>
-          <text>📍 {{ a.location }}</text>
-        </view>
-        <view class="meta">
-          <text>👥 {{ a.participant_count }} 人</text>
-          <text>🎓 {{ a.study_hours }} 学时</text>
-        </view>
-      </view>
-    </view>
-  </view>
+          </div>
+        </div>
+        <div class="meta">
+          <span>📅 {{ a.training_at }}</span>
+          <span>📍 {{ a.location }}</span>
+        </div>
+        <div class="meta">
+          <span>👥 {{ a.participant_count }} 人</span>
+          <span>🎓 {{ a.study_hours }} 学时</span>
+        </div>
+        <div v-if="a.status === 'draft' || a.status === 'rejected'" class="card-actions">
+          <van-button size="mini" plain hairline type="primary" @click.stop="onEdit(a.id)">
+            编辑
+          </van-button>
+          <van-button size="mini" plain hairline type="danger" @click.stop="onDelete(a.id)">
+            删除
+          </van-button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 状态选择（action-sheet 列表，PC 友好） -->
+    <van-action-sheet
+      v-model:show="showStatusPicker"
+      :actions="statusActions"
+      cancel-text="取消"
+      close-on-click-action
+      @select="onStatusSelect"
+    />
+  </div>
 </template>
 
-<style lang="scss" scoped>
-.page { min-height: 100vh; background: #F7F8FA; padding: 0 24rpx 32rpx; }
-.filter-row { display: flex; gap: 16rpx; padding: 16rpx 0; }
-.picker {
-  flex: 1;
-  height: 64rpx;
-  line-height: 64rpx;
-  padding: 0 20rpx;
-  background: #fff;
-  border-radius: 10rpx;
-  font-size: 26rpx;
-  border: 1rpx solid #eee;
+<style scoped>
+.form-page {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 8px 0 32px;
 }
-.actions {
+
+.page-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 4px 16px 12px;
+}
+.title { font-size: 20px; font-weight: 700; color: #222; }
+.sub { font-size: 13px; color: #888; }
+
+.filter-group { margin-top: 4px; }
+
+.action-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 16px;
+}
+
+.status {
+  text-align: center;
+  padding: 40px 16px;
+  color: #888;
+  font-size: 14px;
+}
+.status.empty .empty-icon { font-size: 48px; margin-bottom: 8px; }
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 8px;
+}
+.card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: transform .1s;
+}
+.card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.card:active { transform: scale(0.99); }
+.card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16rpx;
-}
-.total { font-size: 24rpx; color: #888; }
-.btn {
-  height: 60rpx;
-  line-height: 60rpx;
-  padding: 0 24rpx;
-  border-radius: 10rpx;
-  font-size: 26rpx;
-  font-weight: 600;
-}
-.btn-primary { background: #B22222; color: #fff; }
-.loading, .empty { text-align: center; padding: 80rpx 0; color: #888; font-size: 28rpx; }
-.empty-icon { font-size: 80rpx; margin-bottom: 16rpx; }
-.list { display: flex; flex-direction: column; gap: 16rpx; }
-.item {
-  background: #fff;
-  border-radius: 14rpx;
-  padding: 24rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04);
-}
-.item-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12rpx;
+  margin-bottom: 8px;
 }
 .theme {
-  font-size: 30rpx;
+  font-size: 15px;
   font-weight: 600;
   color: #222;
   flex: 1;
-  margin-right: 12rpx;
+  margin-right: 8px;
 }
-.status {
-  padding: 4rpx 16rpx;
+.card .status {
+  padding: 2px 8px;
   color: #fff;
-  font-size: 22rpx;
-  border-radius: 8rpx;
+  font-size: 12px;
+  border-radius: 4px;
   flex-shrink: 0;
 }
 .meta {
   display: flex;
-  gap: 24rpx;
-  font-size: 24rpx;
+  gap: 12px;
+  font-size: 13px;
   color: #888;
-  margin-top: 6rpx;
+  margin-top: 4px;
+}
+.card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid #f0f0f0;
 }
 </style>

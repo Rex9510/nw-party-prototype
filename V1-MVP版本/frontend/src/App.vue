@@ -1,65 +1,77 @@
 <script setup lang="ts">
-import { onLaunch } from '@dcloudio/uni-app'
+import { computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+import Layout from '@/components/Layout.vue'
 
-onLaunch(() => {
-  console.log('南湾党建 V1-MVP 启动')
+const auth = useAuthStore()
+const route = useRoute()
 
-  // 拦截所有路由跳转：未登录跳登录页（登录页自身除外）
-  const allowList = ['/pages/login/index']
+// login 路由不走主布局（自己就是全屏）
+const useLayout = computed(() => {
+  // 公开 H5 页面（党员名片）不走 Layout，全屏显示
+  if (route.name === 'public-member') return false
+  if (!auth.token) return false
+  return route.name !== 'login'
+})
 
-  uni.addInterceptor('navigateTo', {
-    invoke(args) {
-      const auth = uni.getStorageSync('nwparty_auth')
-      if (!auth || !auth.token) {
-        if (!allowList.includes(args.url.split('?')[0])) {
-          uni.reLaunch({ url: '/pages/login/index' })
-          return false
-        }
-      }
-      return true
-    },
-  })
-
-  uni.addInterceptor('redirectTo', {
-    invoke(args) {
-      const auth = uni.getStorageSync('nwparty_auth')
-      if (!auth || !auth.token) {
-        if (!allowList.includes(args.url.split('?')[0])) {
-          uni.reLaunch({ url: '/pages/login/index' })
-          return false
-        }
-      }
-      return true
-    },
-  })
-
-  uni.addInterceptor('reLaunch', {
-    invoke(args) {
-      const auth = uni.getStorageSync('nwparty_auth')
-      if (!auth || !auth.token) {
-        if (!allowList.includes(args.url.split('?')[0])) {
-          args.url = '/pages/login/index'
-        }
-      }
-      return true
-    },
-  })
-
-  // 启动时检查：未登录则跳登录
-  const auth = uni.getStorageSync('nwparty_auth')
-  if (!auth || !auth.token) {
-    const pages = getCurrentPages()
-    const current = pages.length > 0 ? pages[pages.length - 1] : null
-    if (!current || current.route !== 'pages/login/index') {
-      uni.reLaunch({ url: '/pages/login/index' })
+onMounted(async () => {
+  console.log('党员学时统计系统 启动')
+  if (auth.token && !auth.user) {
+    try {
+      await auth.fetchMe()
+    } catch (e) {
+      console.warn('fetchMe failed', e)
     }
   }
 })
 </script>
 
-<style lang="scss">
-page {
-  background: #F7F8FA;
-  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
+<template>
+  <Layout v-if="useLayout">
+    <!-- :key 强制路由变化时重新挂载，避免 router-view 在 slot 里不更新 -->
+    <router-view :key="route.fullPath" />
+  </Layout>
+  <router-view v-else :key="route.fullPath" />
+</template>
+
+<style>
+:root {
+  --primary: #B22222;
+  --primary-dark: #8B0000;
+  --primary-light: #FFF0F0;
+  --bg: #F7F8FA;
+  --surface: #fff;
+  --border: #f0f0f0;
+  --text-primary: #222;
+  --text-secondary: #666;
+  --text-muted: #999;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --shadow-sm: 0 1px 4px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.06);
+}
+html, body, #app { height: 100%; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: var(--bg);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+* { box-sizing: border-box; }
+button { font-family: inherit; }
+
+/* ============== 全局响应式 ============== */
+/* 在 PC 端，让被 Layout 包住的页面不再使用 min-height: 100vh（那是为了独立页面准备的，
+   在 Layout 里会导致内容区空一大块），并让页面在容器中可滚动 */
+@media (min-width: 768px) {
+  /* 覆盖 scoped 样式里的 min-height: 100vh */
+  .app-shell.pc .content > .page,
+  .app-shell.pc .content > .dashboard,
+  .app-shell.pc .content > * {
+    min-height: 0 !important;
+    background: transparent;
+  }
 }
 </style>

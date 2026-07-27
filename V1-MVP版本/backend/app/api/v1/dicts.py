@@ -10,6 +10,7 @@ from app.models.user import User
 from app.schemas.dict import (
     DictItemCreate,
     DictItemOut,
+    DictItemUpdate,
     LecturerCreate,
     LecturerOut,
     LecturerUpdate,
@@ -17,8 +18,11 @@ from app.schemas.dict import (
 
 router = APIRouter(prefix="/dicts", tags=["dicts"])
 
+# 只有系统管理员可写
+ADMIN_ONLY = (User.ROLE_ADMIN,)
 
-# 讲师 CRUD（仅 system_admin / street_lead 可写）
+
+# 讲师 CRUD
 @router.get("/lecturers", response_model=list[LecturerOut])
 async def list_lecturers(
     db: AsyncSession = Depends(get_db),
@@ -32,7 +36,7 @@ async def list_lecturers(
 async def create_lecturer(
     body: LecturerCreate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_roles(User.ROLE_ADMIN, User.ROLE_STREET_LEAD)),
+    _user: User = Depends(require_roles(*ADMIN_ONLY)),
 ) -> Lecturer:
     lec = Lecturer(**body.model_dump())
     db.add(lec)
@@ -46,7 +50,7 @@ async def update_lecturer(
     lecturer_id: int,
     body: LecturerUpdate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_roles(User.ROLE_ADMIN, User.ROLE_STREET_LEAD)),
+    _user: User = Depends(require_roles(*ADMIN_ONLY)),
 ) -> Lecturer:
     r = await db.execute(select(Lecturer).where(Lecturer.id == lecturer_id))
     lec = r.scalar_one_or_none()
@@ -63,7 +67,7 @@ async def update_lecturer(
 async def delete_lecturer(
     lecturer_id: int,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_roles(User.ROLE_ADMIN, User.ROLE_STREET_LEAD)),
+    _user: User = Depends(require_roles(*ADMIN_ONLY)),
 ) -> None:
     r = await db.execute(select(Lecturer).where(Lecturer.id == lecturer_id))
     lec = r.scalar_one_or_none()
@@ -73,7 +77,7 @@ async def delete_lecturer(
     await db.commit()
 
 
-# 培训对象类别（所有角色可读，仅超管可写）
+# 培训对象类别
 @router.get("/training-categories", response_model=list[DictItemOut])
 async def list_training_categories(
     db: AsyncSession = Depends(get_db),
@@ -87,13 +91,51 @@ async def list_training_categories(
 async def create_training_category(
     body: DictItemCreate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_roles(User.ROLE_ADMIN)),
+    _user: User = Depends(require_roles(*ADMIN_ONLY)),
 ):
+    # 校验 code 不重复
+    r = await db.execute(
+        select(TrainingCategory).where(TrainingCategory.code == body.code)
+    )
+    if r.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail=f"编码 {body.code} 已存在")
     item = TrainingCategory(**body.model_dump())
     db.add(item)
     await db.commit()
     await db.refresh(item)
     return item
+
+
+@router.patch("/training-categories/{item_id}", response_model=DictItemOut)
+async def update_training_category(
+    item_id: int,
+    body: DictItemUpdate,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_roles(*ADMIN_ONLY)),
+):
+    r = await db.execute(select(TrainingCategory).where(TrainingCategory.id == item_id))
+    item = r.scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=404, detail="类别不存在")
+    for k, v in body.model_dump(exclude_unset=True).items():
+        setattr(item, k, v)
+    await db.commit()
+    await db.refresh(item)
+    return item
+
+
+@router.delete("/training-categories/{item_id}", status_code=204)
+async def delete_training_category(
+    item_id: int,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_roles(*ADMIN_ONLY)),
+):
+    r = await db.execute(select(TrainingCategory).where(TrainingCategory.id == item_id))
+    item = r.scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=404, detail="类别不存在")
+    await db.delete(item)
+    await db.commit()
 
 
 # 培训来源
@@ -110,10 +152,47 @@ async def list_training_sources(
 async def create_training_source(
     body: DictItemCreate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_roles(User.ROLE_ADMIN)),
+    _user: User = Depends(require_roles(*ADMIN_ONLY)),
 ):
+    r = await db.execute(
+        select(TrainingSource).where(TrainingSource.code == body.code)
+    )
+    if r.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail=f"编码 {body.code} 已存在")
     item = TrainingSource(**body.model_dump())
     db.add(item)
     await db.commit()
     await db.refresh(item)
     return item
+
+
+@router.patch("/training-sources/{item_id}", response_model=DictItemOut)
+async def update_training_source(
+    item_id: int,
+    body: DictItemUpdate,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_roles(*ADMIN_ONLY)),
+):
+    r = await db.execute(select(TrainingSource).where(TrainingSource.id == item_id))
+    item = r.scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=404, detail="来源不存在")
+    for k, v in body.model_dump(exclude_unset=True).items():
+        setattr(item, k, v)
+    await db.commit()
+    await db.refresh(item)
+    return item
+
+
+@router.delete("/training-sources/{item_id}", status_code=204)
+async def delete_training_source(
+    item_id: int,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_roles(*ADMIN_ONLY)),
+):
+    r = await db.execute(select(TrainingSource).where(TrainingSource.id == item_id))
+    item = r.scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=404, detail="来源不存在")
+    await db.delete(item)
+    await db.commit()

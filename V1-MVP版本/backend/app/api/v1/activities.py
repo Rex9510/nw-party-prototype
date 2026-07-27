@@ -14,6 +14,7 @@ from app.models.activity import (
 )
 from app.models.audit import AuditFlow, AuditLog
 from app.models.party import Branch, Community
+from app.models.member import Member
 from app.models.user import User
 from app.schemas.activity import (
     ActivityCreate,
@@ -37,7 +38,7 @@ router = APIRouter(prefix="/activities", tags=["activities"])
 
 
 def _can_manage_activities(user: User) -> bool:
-    return user.role in (User.ROLE_ADMIN, User.ROLE_STREET_LEAD, User.ROLE_COMMUNITY_ORG)
+    return user.role in (User.ROLE_ADMIN, User.ROLE_STREET_LEAD, User.ROLE_COMMUNITY_ORG, User.ROLE_BRANCH_SEC)
 
 
 @router.get("", response_model=ActivityListResponse)
@@ -116,7 +117,28 @@ async def get_activity(
     if user.role in (User.ROLE_BRANCH_SEC, User.ROLE_MEMBER) and a.organizer_branch_id != user.branch_id:
         raise HTTPException(status_code=403, detail="无权查看")
 
-    return ActivityOut.model_validate(a)
+    # 查参与党员的名字/电话
+    member_ids = [p.member_id for p in a.participants]
+    member_map: dict[int, Member] = {}
+    if member_ids:
+        mr = await db.execute(select(Member).where(Member.id.in_(member_ids)))
+        for m in mr.scalars().all():
+            member_map[m.id] = m
+
+    from app.schemas.activity import ParticipantOut
+    out = ActivityOut.model_validate(a)
+    out.participants = [
+        ParticipantOut(
+            id=p.id,
+            member_id=p.member_id,
+            study_hours=p.study_hours,
+            attendance_status=p.attendance_status,
+            member_name=member_map[p.member_id].name if p.member_id in member_map else None,
+            member_phone=member_map[p.member_id].phone if p.member_id in member_map else None,
+        )
+        for p in a.participants
+    ]
+    return out
 
 
 @router.post("", response_model=ActivityOut, status_code=201)
@@ -136,6 +158,8 @@ async def create_activity(
         raise HTTPException(status_code=400, detail="支部不存在")
     if user.role == User.ROLE_COMMUNITY_ORG and user.community_id != branch.community_id:
         raise HTTPException(status_code=403, detail="无权在该支部录入")
+    if user.role == User.ROLE_BRANCH_SEC and user.branch_id != body.organizer_branch_id:
+        raise HTTPException(status_code=403, detail="只能在本支部录入活动")
 
     # 自动从支部得到 community_id
     community_id = branch.community_id
@@ -195,27 +219,40 @@ async def update_activity(
 
     if user.role == User.ROLE_COMMUNITY_ORG and a.community_id != user.community_id:
         raise HTTPException(status_code=403, detail="无权修改")
+    if user.role == User.ROLE_BRANCH_SEC and a.organizer_branch_id != user.branch_id:
+        raise HTTPException(status_code=403, detail="无权修改")
 
     data = body.model_dump(exclude_unset=True, exclude={"participants"})
     for k, v in data.items():
         setattr(a, k, v)
 
     if body.participants is not None:
-        # 删除旧的加新的
-        old_p = await db.execute(
+        # 用 member_id 做 upsert，避免 delete+insert 触发 UNIQUE 约束
+        existing_r = await db.execute(
             select(ActivityParticipant).where(ActivityParticipant.activity_id == a.id)
         )
-        for op in old_p.scalars().all():
-            await db.delete(op)
+        existing_map: dict[int, ActivityParticipant] = {p.member_id: p for p in existing_r.scalars().all()}
+
+        new_member_ids = {p.member_id for p in body.participants}
+        # 删掉不再存在的人员
+        for mid, op in existing_map.items():
+            if mid not in new_member_ids:
+                await db.delete(op)
+        # 新增或更新
         for p in body.participants:
-            db.add(
-                ActivityParticipant(
-                    activity_id=a.id,
-                    member_id=p.member_id,
-                    study_hours=p.study_hours,
-                    attendance_status=p.attendance_status,
+            if p.member_id in existing_map:
+                op = existing_map[p.member_id]
+                op.study_hours = p.study_hours
+                op.attendance_status = p.attendance_status
+            else:
+                db.add(
+                    ActivityParticipant(
+                        activity_id=a.id,
+                        member_id=p.member_id,
+                        study_hours=p.study_hours,
+                        attendance_status=p.attendance_status,
+                    )
                 )
-            )
         # 更新人数
         a.participant_count = len(body.participants)
 
@@ -252,6 +289,8 @@ async def submit_activity(
         raise HTTPException(status_code=400, detail="只有草稿/已驳回状态可提交")
 
     if user.role == User.ROLE_COMMUNITY_ORG and a.community_id != user.community_id:
+        raise HTTPException(status_code=403, detail="无权提交")
+    if user.role == User.ROLE_BRANCH_SEC and a.organizer_branch_id != user.branch_id:
         raise HTTPException(status_code=403, detail="无权提交")
 
     # 必须有至少 1 张现场照片
@@ -321,6 +360,8 @@ async def delete_activity(
 
     if user.role == User.ROLE_COMMUNITY_ORG and a.community_id != user.community_id:
         raise HTTPException(status_code=403, detail="无权删除")
+    if user.role == User.ROLE_BRANCH_SEC and a.organizer_branch_id != user.branch_id:
+        raise HTTPException(status_code=403, detail="无权删除")
 
     await db.delete(a)
     await db.commit()
@@ -341,6 +382,8 @@ async def add_attachment(
 
     if user.role == User.ROLE_COMMUNITY_ORG and a.community_id != user.community_id:
         raise HTTPException(status_code=403, detail="无权操作")
+    if user.role == User.ROLE_BRANCH_SEC and a.organizer_branch_id != user.branch_id:
+        raise HTTPException(status_code=403, detail="无权操作")
 
     if body.kind not in ("photo", "signin"):
         raise HTTPException(status_code=400, detail="kind 必须是 photo / signin")
@@ -359,6 +402,36 @@ async def add_attachment(
     return att
 
 
+@router.delete("/{activity_id}/attachments", status_code=204)
+async def remove_attachments(
+    activity_id: int,
+    kind: str | None = Query(None, description="只删该类型（photo/signin）；不传则全删"),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> None:
+    """批量删除活动附件（按 kind 可选过滤）。"""
+    a_r = await db.execute(select(Activity).where(Activity.id == activity_id))
+    a = a_r.scalar_one_or_none()
+    if not a:
+        raise HTTPException(status_code=404, detail="活动不存在")
+
+    if user.role == User.ROLE_COMMUNITY_ORG and a.community_id != user.community_id:
+        raise HTTPException(status_code=403, detail="无权操作")
+    if user.role == User.ROLE_BRANCH_SEC and a.organizer_branch_id != user.branch_id:
+        raise HTTPException(status_code=403, detail="无权操作")
+
+    if a.status not in ("draft", "rejected"):
+        raise HTTPException(status_code=400, detail="草稿/已驳回状态可删除附件")
+
+    stmt = select(ActivityAttachment).where(ActivityAttachment.activity_id == activity_id)
+    if kind:
+        stmt = stmt.where(ActivityAttachment.kind == kind)
+    r = await db.execute(stmt)
+    for att in r.scalars().all():
+        await db.delete(att)
+    await db.commit()
+
+
 @router.delete("/{activity_id}/attachments/{attachment_id}", status_code=204)
 async def remove_attachment(
     activity_id: int,
@@ -366,7 +439,7 @@ async def remove_attachment(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> None:
-    """删除活动附件。"""
+    """删除单个附件。"""
     r = await db.execute(
         select(ActivityAttachment).where(
             ActivityAttachment.id == attachment_id,
@@ -380,6 +453,8 @@ async def remove_attachment(
     a_r = await db.execute(select(Activity).where(Activity.id == activity_id))
     a = a_r.scalar_one()
     if user.role == User.ROLE_COMMUNITY_ORG and a.community_id != user.community_id:
+        raise HTTPException(status_code=403, detail="无权操作")
+    if user.role == User.ROLE_BRANCH_SEC and a.organizer_branch_id != user.branch_id:
         raise HTTPException(status_code=403, detail="无权操作")
 
     if a.status not in ("draft", "rejected"):

@@ -2,7 +2,7 @@
 from fastapi import APIRouter
 
 from app.api.v1 import (
-    activities, audits, auth, dicts, members, orgs, stats, study_hours,
+    activities, audits, auth, dicts, members, orgs, public, stats, study_hours,
 )
 
 api_router = APIRouter()
@@ -14,3 +14,4 @@ api_router.include_router(activities.router)
 api_router.include_router(audits.router)
 api_router.include_router(study_hours.router)
 api_router.include_router(stats.router)
+api_router.include_router(public.router)

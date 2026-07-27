@@ -1,0 +1,47 @@
+# 党员学时统计系统 V1-MVP · 生产 .env
+
+# ---- 应用 ----
+DEBUG=false
+APP_VERSION=1.0.0
+APP_NAME=党员学时统计系统 API
+
+# ---- CORS（pydantic 用 __0 索引语法解析 List）----
+CORS_ORIGINS__0=*
+
+# ---- 数据库 ----
+DATABASE_URL=sqlite+aiosqlite:////var/www/nwparty/data/nwparty.db
+
+# ---- Redis ----
+REDIS_HOST=
+REDIS_PORT=6379
+REDIS_DB=0
+REDIS_PASSWORD=
+
+# ---- JWT ----
+JWT_SECRET=bJU0IISYL2PsI3w6qhH9vvHqDTF-iSdvmPvFi1jYfs1YZIQffj2j90waORLMscPt
+JWT_ALGORITHM=HS256
+JWT_ACCESS_EXPIRE_MINUTES=120
+JWT_REFRESH_EXPIRE_DAYS=7
+
+# ---- 对象存储（不接）----
+STORAGE_PROVIDER=local
+MINIO_ENDPOINT=
+MINIO_ACCESS_KEY=
+MINIO_SECRET_KEY=
+MINIO_BUCKET=
+MINIO_SECURE=false
+OSS_ACCESS_KEY_ID=
+OSS_ACCESS_KEY_SECRET=
+OSS_BUCKET=
+OSS_ENDPOINT=
+
+# ---- 文件上传 ----
+UPLOAD_MAX_SIZE_MB=10
+UPLOAD_ALLOWED_TYPES__0=image/jpeg
+UPLOAD_ALLOWED_TYPES__1=image/png
+UPLOAD_ALLOWED_TYPES__2=image/webp
+UPLOAD_ALLOWED_TYPES__3=application/pdf
+
+# ---- 部署参数 ----
+PUBLIC_SERVER_NAME=_
+PUBLIC_API_BASE=

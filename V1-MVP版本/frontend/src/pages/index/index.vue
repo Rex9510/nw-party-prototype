@@ -1,16 +1,17 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { ROLES, type Role } from '@/utils/roles'
 
 const auth = useAuthStore()
+const router = useRouter()
 
 const role = computed<Role>(() => (auth.user?.role as Role) || 'member')
 const roleConfig = computed(() => ROLES[role.value])
 const cards = computed(() => roleConfig.value?.cards || [])
 
-onShow(async () => {
+onMounted(async () => {
   if (auth.token && !auth.user) {
     try {
       await auth.fetchMe()
@@ -22,145 +23,186 @@ onShow(async () => {
 
 function onCardTap(path: string, enabled: boolean) {
   if (!enabled) {
-    uni.showToast({ title: '该功能后续开发', icon: 'none' })
+    // @ts-ignore
+    window.uni.showToast({ title: '该功能后续开发', icon: 'none' })
     return
   }
-  uni.navigateTo({ url: path, fail: () => uni.showToast({ title: '页面打开失败', icon: 'none' }) })
-}
-
-function onLogout() {
-  uni.showModal({
-    title: '提示',
-    content: '确定退出登录？',
-    success: (r) => {
-      if (r.confirm) {
-        auth.logout()
-        uni.reLaunch({ url: '/pages/login/index' })
-      }
-    },
+  router.push(path).catch(() => {
+    // @ts-ignore
+    window.uni.showToast({ title: '页面打开失败', icon: 'none' })
   })
 }
 </script>
 
 <template>
-  <view class="dashboard">
-    <view class="header">
-      <view class="user-card" :style="{ background: roleConfig?.color || '#B22222' }">
-        <view class="avatar">{{ (auth.user?.name || 'U').charAt(0) }}</view>
-        <view class="info">
-          <view class="name">{{ auth.user?.name || '加载中…' }}</view>
-          <view class="role">{{ roleConfig?.label }} · {{ roleConfig?.scope }}</view>
-        </view>
-        <view class="logout" @click="onLogout">退出</view>
-      </view>
-    </view>
+  <div class="dashboard">
+    <!-- 欢迎条 -->
+    <div class="welcome" :style="{ borderLeftColor: roleConfig?.color }">
+      <div class="welcome-title">你好，{{ auth.user?.name || '加载中…' }} 👋</div>
+      <div class="welcome-sub">
+        {{ roleConfig?.label }} · {{ roleConfig?.scope }}
+      </div>
+    </div>
 
-    <view class="welcome">
-      <view class="title">V1-MVP 工作台</view>
-      <view class="sub">Day 2 已就绪 · 角色权限联调通过</view>
-    </view>
-
-    <view class="section-title">我的入口</view>
-    <view class="grid">
-      <view
+    <!-- 入口区 -->
+    <div class="section-title">我的入口</div>
+    <div class="grid">
+      <div
         v-for="card in cards"
         :key="card.key"
         class="card"
         :class="{ disabled: !card.enabled }"
         @click="onCardTap(card.path, card.enabled)"
       >
-        <view class="emoji">{{ card.icon }}</view>
-        <view class="card-title">{{ card.label }}</view>
-        <view class="card-sub">{{ card.desc }}</view>
-        <view class="tag">后续开放</view>
-      </view>
-    </view>
-  </view>
+        <div class="emoji">{{ card.icon }}</div>
+        <div class="card-body">
+          <div class="card-title">{{ card.label }}</div>
+          <div class="card-sub">{{ card.desc }}</div>
+        </div>
+        <div class="tag" :class="{ enabled: card.enabled }">
+          {{ card.enabled ? '可用' : '后续' }}
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
-<style lang="scss" scoped>
+<style scoped>
 .dashboard {
-  min-height: 100vh;
-  background: #F7F8FA;
-  padding: 0 32rpx 64rpx;
+  background: transparent;
+  padding: 8px;
 }
 
-.header {
-  padding: 24rpx 0 32rpx;
-}
-.user-card {
-  display: flex;
-  align-items: center;
-  padding: 32rpx 28rpx;
-  border-radius: 24rpx;
-  color: #fff;
-  box-shadow: 0 8rpx 24rpx rgba(178, 34, 34, 0.18);
-}
-.avatar {
-  width: 88rpx;
-  height: 88rpx;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.25);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 40rpx;
-  font-weight: 700;
-  margin-right: 24rpx;
-}
-.info { flex: 1; min-width: 0; }
-.name { font-size: 34rpx; font-weight: 700; }
-.role { font-size: 24rpx; opacity: 0.9; margin-top: 6rpx; }
-.logout {
-  font-size: 26rpx;
-  padding: 12rpx 20rpx;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 12rpx;
-}
-
+/* 欢迎条 */
 .welcome {
   background: #fff;
-  border-radius: 16rpx;
-  padding: 28rpx 32rpx;
-  margin-bottom: 32rpx;
-  border: 1rpx solid #f0f0f0;
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  border-left: 4px solid #B22222;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
 }
-.welcome .title { font-size: 32rpx; font-weight: 700; color: #222; }
-.welcome .sub { font-size: 24rpx; color: #888; margin-top: 6rpx; }
+.welcome-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #222;
+}
+.welcome-sub {
+  font-size: 12px;
+  color: #888;
+  margin-top: 4px;
+}
 
 .section-title {
-  font-size: 28rpx;
+  font-size: 14px;
   font-weight: 600;
   color: #333;
-  margin-bottom: 20rpx;
-  padding-left: 4rpx;
+  margin: 8px 4px 10px;
+  padding-left: 4px;
+  border-left: 3px solid #B22222;
+  line-height: 1.2;
 }
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 24rpx;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
+
 .card {
   background: #fff;
-  border-radius: 20rpx;
-  padding: 32rpx 28rpx;
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  cursor: pointer;
+  transition: transform .1s;
   position: relative;
-  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.04);
-  border: 1rpx solid #f0f0f0;
+  border: 1px solid #f5f5f5;
 }
-.card.disabled { opacity: 0.65; }
-.emoji { font-size: 56rpx; line-height: 1; margin-bottom: 12rpx; }
-.card-title { font-size: 30rpx; font-weight: 600; color: #222; }
-.card-sub { font-size: 24rpx; color: #888; margin-top: 6rpx; }
+.card:active { transform: scale(0.98); }
+.card:hover { border-color: #B22222; }
+.card.disabled { opacity: 0.6; cursor: not-allowed; }
+
+.emoji {
+  font-size: 32px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.card-body {
+  flex: 1;
+  min-width: 0;
+}
+.card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #222;
+}
+.card-sub {
+  font-size: 12px;
+  color: #888;
+  margin-top: 2px;
+}
 .tag {
   position: absolute;
-  top: 16rpx;
-  right: 16rpx;
+  top: 8px;
+  right: 8px;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: #f5f5f5;
+  color: #999;
+}
+.tag.enabled {
   background: #FFF0F0;
   color: #B22222;
-  font-size: 20rpx;
-  padding: 4rpx 12rpx;
-  border-radius: 8rpx;
+}
+
+/* ============ PC 端 ============ */
+@media (min-width: 768px) {
+  .dashboard {
+    padding: 0;
+  }
+  .welcome {
+    padding: 20px 28px;
+    margin-bottom: 20px;
+    border-radius: 12px;
+  }
+  .welcome-title {
+    font-size: 22px;
+  }
+  .welcome-sub {
+    font-size: 13px;
+    margin-top: 6px;
+  }
+  .section-title {
+    font-size: 15px;
+    margin: 8px 4px 12px;
+  }
+  .grid {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+  }
+  .card {
+    padding: 20px;
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+  }
+  .emoji {
+    font-size: 36px;
+  }
+  .card-title {
+    font-size: 16px;
+  }
+  .card-sub {
+    font-size: 13px;
+  }
+  .tag {
+    font-size: 11px;
+    padding: 2px 8px;
+  }
 }
 </style>

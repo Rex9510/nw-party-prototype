@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { membersApi } from '@/api/members'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { showToast, showSuccessToast } from 'vant'
 import { orgsApi, type Branch, type Community } from '@/api/orgs'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
+const router = useRouter()
 const branches = ref<Branch[]>([])
 const communities = ref<Community[]>([])
 const defaultBranchId = ref(0)
-const fileUrl = ref('')
 const totalRows = ref(0)
 const successRows = ref(0)
 const failedRows = ref(0)
@@ -31,221 +32,225 @@ async function loadBranches() {
   }
 }
 
+const branchColumns = computed(() => branches.value.map((b) => ({ text: b.name, value: b.id })))
+const selectedBranchIndex = computed(() =>
+  branches.value.findIndex((b) => b.id === defaultBranchId.value),
+)
+const selectedBranchName = computed(() => {
+  return branches.value.find((b) => b.id === defaultBranchId.value)?.name || '请选择'
+})
+
+const showBranchPicker = ref(false)
+function onBranchConfirm({ selectedOptions }: { selectedOptions: Array<{ text: string; value: number }> }) {
+  defaultBranchId.value = selectedOptions[0]?.value || 0
+  showBranchPicker.value = false
+}
+
 function onPickFile() {
-  // #ifdef H5
-  uni.chooseFile 不会在 H5 自动用 file input，需要自己包
-  // #endif
-  uni.chooseMessageFile  // 选聊天文件
-  // 简化：uni.chooseImage 不支持 xlsx，用 choosemessagefile
-  // 实际：H5 下要用 input[type=file]
-  // 这里我们用 uni.chooseFile 走兼容
-  uni.chooseFile  // h5 默认会有
-  // 跨平台：直接用 input 元素
-}
-
-const fileInputRef = ref<HTMLInputElement | null>(null)
-
-function onPickFile2() {
-  // H5 模式下直接打开 file dialog
-  // #ifdef H5
-  if (typeof document !== 'undefined') {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = '.xlsx,.xls'
-    input.onchange = async (e: any) => {
-      const file = e.target.files?.[0]
-      if (file) await doUpload(file)
-    }
-    input.click()
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx,.xls'
+  input.onchange = async (e: any) => {
+    const f = e.target.files?.[0]
+    if (f) await doUpload(f)
   }
-  // #endif
-  // #ifndef H5
-  uni.chooseMessageFile({
-    count: 1,
-    success: async (r) => {
-      const f = r.tempFiles?.[0]
-      if (f) await doUpload(f as any)
-    },
-  })
-  // #endif
+  input.click()
 }
 
-async function doUpload(file: File | { path: string; size: number; name?: string }) {
+async function doUpload(file: File) {
   if (!defaultBranchId.value) {
-    uni.showToast({ title: '请先选择默认支部', icon: 'none' })
+    showToast({ message: '请先选择默认支部', type: 'fail' })
     return
   }
   importing.value = true
   try {
-    // uni.uploadFile
-    const res = await new Promise<any>((resolve, reject) => {
-      uni.uploadFile({
-        url: '/api/v1/members/import',
-        filePath: (file as any).path || (file as any).tempFilePath,
-        name: 'file',
-        formData: { default_branch_id: String(defaultBranchId.value) },
-        header: {
-          Authorization: `Bearer ${auth.token}`,
-        },
-        success: (r) => {
-          try {
-            resolve(JSON.parse(r.data))
-          } catch {
-            reject(new Error('响应格式错误'))
-          }
-        },
-        fail: (err) => reject(err),
-      })
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('default_branch_id', String(defaultBranchId.value))
+
+    const r = await fetch('/api/v1/members/import', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${auth.token}`,
+      },
+      body: formData,
     })
+    const res = await r.json()
     totalRows.value = res.total_rows || 0
     successRows.value = res.success_rows || 0
     failedRows.value = res.failed_rows || 0
     errorLog.value = res.error_log || []
-    fileUrl.value = res.file_url || ''
     if (res.failed_rows === 0) {
-      uni.showToast({ title: '导入成功', icon: 'success' })
+      showSuccessToast({ message: '导入成功' })
     } else {
-      uni.showToast({ title: `部分失败：成功 ${res.success_rows} / 失败 ${res.failed_rows}`, icon: 'none' })
+      showToast({ message: `部分失败：成功 ${res.success_rows} / 失败 ${res.failed_rows}`, type: 'fail' })
     }
   } catch (e: any) {
-    uni.showToast({ title: e?.message || '导入失败', icon: 'none' })
+    showToast({ message: e?.message || '导入失败', type: 'fail' })
   } finally {
     importing.value = false
   }
 }
 
 function onDownloadTemplate() {
-  // 后端导出模板 xlsx
-  // #ifdef H5
-  window.open(`/api/v1/members/template?access_token=${auth.token}`)
-  // #endif
-  // #ifndef H5
-  uni.downloadFile({
-    url: `/api/v1/members/template?access_token=${auth.token}`,
-    success: (r) => {
-      uni.openDocument({ filePath: r.tempFilePath })
-    },
-  })
-  // #endif
+  const token = auth.token
+  const url = `/api/v1/members/template?access_token=${token}`
+  window.open(url, '_blank')
 }
 
-import { onMounted } from 'vue'
 onMounted(() => {
   loadBranches()
 })
 </script>
 
 <template>
-  <view class="page">
-    <view class="card">
-      <view class="card-title">操作步骤</view>
-      <view class="step">1. 下载导入模板（xlsx）</view>
-      <view class="step">2. 按模板填入党员信息</view>
-      <view class="step">3. 选择默认支部 + 上传文件</view>
-      <view class="btn btn-primary" @click="onDownloadTemplate">下载模板</view>
-    </view>
+  <div class="form-page">
+    <div class="page-header">
+      <div class="back" @click="router.back()">‹ 返回</div>
+      <div class="title">批量导入人员</div>
+    </div>
 
-    <view class="card">
-      <view class="card-title">选择默认支部</view>
-      <picker
+    <van-cell-group inset title="操作步骤" class="cell-group">
+      <van-cell title="1. 下载导入模板（xlsx）" />
+      <van-cell title="2. 按模板填入人员信息" />
+      <van-cell title="3. 选择默认支部 + 上传文件" />
+      <div class="cell-actions">
+        <van-button size="small" type="primary" plain hairline @click="onDownloadTemplate">
+          下载模板
+        </van-button>
+      </div>
+    </van-cell-group>
+
+    <van-cell-group inset title="选择默认支部" class="cell-group">
+      <van-field
         v-if="branches.length"
-        :value="branches.findIndex((b) => b.id === defaultBranchId)"
-        :range="branches.map((b) => b.name)"
-        @change="(e: any) => defaultBranchId = branches[e.detail.value]?.id || 0"
-      >
-        <view class="picker-input">
-          {{ branches.find((b) => b.id === defaultBranchId)?.name || '请选择' }}
-        </view>
-      </picker>
-    </view>
+        :model-value="selectedBranchName"
+        label="默认支部"
+        placeholder="请选择"
+        readonly
+        is-link
+        @click="showBranchPicker = true"
+      />
+    </van-cell-group>
 
-    <view class="card">
-      <view class="card-title">上传文件</view>
-      <view class="btn btn-primary" :class="{ disabled: importing }" @click="onPickFile2">
-        {{ importing ? '导入中…' : '选择 xlsx 文件' }}
-      </view>
-      <view class="hint">支持 .xlsx / .xls，单次最多 1000 行</view>
-    </view>
+    <van-cell-group inset title="上传文件" class="cell-group">
+      <van-cell title="支持 .xlsx / .xls，单次最多 1000 行" />
+      <div class="cell-actions">
+        <van-button
+          block
+          type="primary"
+          :loading="importing"
+          :disabled="importing"
+          @click="onPickFile"
+        >
+          {{ importing ? '导入中…' : '选择 xlsx 文件' }}
+        </van-button>
+      </div>
+    </van-cell-group>
 
-    <view v-if="totalRows" class="card result">
-      <view class="card-title">导入结果</view>
-      <view class="result-row">
-        <view class="result-item">
-          <view class="num">{{ totalRows }}</view>
-          <view class="label">总数</view>
-        </view>
-        <view class="result-item success">
-          <view class="num">{{ successRows }}</view>
-          <view class="label">成功</view>
-        </view>
-        <view class="result-item failed">
-          <view class="num">{{ failedRows }}</view>
-          <view class="label">失败</view>
-        </view>
-      </view>
-      <view v-if="errorLog.length" class="error-list">
-        <view class="error-title">错误明细：</view>
-        <view v-for="(e, i) in errorLog" :key="i" class="error-item">
+    <div v-if="totalRows" class="result-card">
+      <div class="result-title">导入结果</div>
+      <div class="result-row">
+        <div class="result-item">
+          <div class="num">{{ totalRows }}</div>
+          <div class="label">总数</div>
+        </div>
+        <div class="result-item success">
+          <div class="num">{{ successRows }}</div>
+          <div class="label">成功</div>
+        </div>
+        <div class="result-item failed">
+          <div class="num">{{ failedRows }}</div>
+          <div class="label">失败</div>
+        </div>
+      </div>
+      <div v-if="errorLog.length" class="error-list">
+        <div class="error-title">错误明细：</div>
+        <div v-for="(e, i) in errorLog" :key="i" class="error-item">
           第 {{ e.row }} 行: {{ e.errors?.join('; ') }}
-        </view>
-      </view>
-    </view>
-  </view>
+        </div>
+      </div>
+    </div>
+
+    <!-- 支部选择 -->
+    <van-popup v-model:show="showBranchPicker" position="bottom" round>
+      <van-picker
+        :columns="branchColumns"
+        :model-value="[selectedBranchIndex >= 0 ? selectedBranchIndex : 0]"
+        title="选择默认支部"
+        @confirm="onBranchConfirm"
+        @cancel="showBranchPicker = false"
+      />
+    </van-popup>
+  </div>
 </template>
 
-<style lang="scss" scoped>
-.page { min-height: 100vh; background: #F7F8FA; padding: 24rpx; }
-.card {
-  background: #fff;
-  border-radius: 16rpx;
-  padding: 28rpx 24rpx;
-  margin-bottom: 20rpx;
+<style scoped>
+.form-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px 0 32px;
 }
-.card-title { font-size: 30rpx; font-weight: 600; color: #222; margin-bottom: 16rpx; }
-.step { font-size: 26rpx; color: #555; line-height: 1.8; }
-.picker-input {
-  height: 72rpx;
-  line-height: 72rpx;
-  font-size: 28rpx;
-  color: #222;
-  padding: 0 20rpx;
-  background: #f5f5f5;
-  border-radius: 10rpx;
-}
-.btn {
-  display: block;
-  text-align: center;
-  height: 80rpx;
-  line-height: 80rpx;
-  font-size: 30rpx;
-  font-weight: 600;
-  border-radius: 12rpx;
-  margin-top: 16rpx;
-}
-.btn-primary { background: #B22222; color: #fff; }
-.btn-primary.disabled { opacity: 0.5; }
-.hint { font-size: 22rpx; color: #888; margin-top: 8rpx; }
 
-.result-row { display: flex; gap: 16rpx; margin: 16rpx 0; }
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 16px 16px;
+}
+.back {
+  color: var(--primary);
+  font-size: 15px;
+  cursor: pointer;
+  user-select: none;
+}
+.title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #222;
+}
+
+.cell-group { margin-bottom: 12px; }
+.cell-actions {
+  padding: 12px 16px 16px;
+}
+
+.result-card {
+  background: #fff;
+  border-radius: 8px;
+  margin: 12px 16px;
+  padding: 16px;
+}
+.result-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #222;
+  margin-bottom: 12px;
+}
+.result-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
 .result-item {
   flex: 1;
   text-align: center;
-  padding: 20rpx;
+  padding: 12px;
   background: #f5f5f5;
-  border-radius: 12rpx;
+  border-radius: 6px;
 }
 .result-item.success { background: #ECFDF5; }
 .result-item.failed { background: #FFF0F0; }
-.num { font-size: 40rpx; font-weight: 700; }
+.num { font-size: 24px; font-weight: 700; color: #222; }
 .result-item.success .num { color: #059669; }
 .result-item.failed .num { color: #B22222; }
-.label { font-size: 24rpx; color: #888; margin-top: 4rpx; }
-.error-list { margin-top: 16rpx; }
-.error-title { font-size: 26rpx; color: #B22222; font-weight: 600; margin-bottom: 8rpx; }
+.label { font-size: 12px; color: #888; margin-top: 2px; }
+
+.error-list { margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0f0f0; }
+.error-title { font-size: 13px; color: var(--primary); font-weight: 600; margin-bottom: 8px; }
 .error-item {
-  font-size: 24rpx;
-  color: #555;
-  padding: 8rpx 0;
-  border-bottom: 1rpx solid #f0f0f0;
+  font-size: 13px;
+  color: #666;
+  padding: 4px 0;
 }
 </style>

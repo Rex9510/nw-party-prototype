@@ -16,13 +16,13 @@
     {
       "path": "pages/members/list",
       "style": {
-        "navigationBarTitleText": "党员库"
+        "navigationBarTitleText": "人员管理库"
       }
     },
     {
       "path": "pages/members/new",
       "style": {
-        "navigationBarTitleText": "新增党员"
+        "navigationBarTitleText": "新增人员"
       }
     },
     {
@@ -64,7 +64,7 @@
   ],
   "globalStyle": {
     "navigationBarTextStyle": "white",
-    "navigationBarTitleText": "南湾党建",
+    "navigationBarTitleText": "党员学时统计系统",
     "navigationBarBackgroundColor": "#B22222",
     "backgroundColor": "#F7F8FA"
   },

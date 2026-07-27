@@ -35,3 +35,8 @@ class DictItemCreate(BaseModel):
     code: str = Field(..., min_length=1, max_length=32)
     name: str = Field(..., min_length=1, max_length=64)
     sort: int = 0
+
+
+class DictItemUpdate(BaseModel):
+    name: str | None = Field(None, min_length=1, max_length=64)
+    sort: int | None = None

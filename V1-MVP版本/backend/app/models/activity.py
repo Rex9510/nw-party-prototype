@@ -27,7 +27,8 @@ class Activity(Base):
     community_id: Mapped[int] = mapped_column(BigIntPK, ForeignKey("communities.id"), nullable=False, index=True)  # 冗余
     training_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     location: Mapped[str] = mapped_column(String(255), nullable=False)
-    lecturer_id: Mapped[int | None] = mapped_column(BigIntPK, ForeignKey("lecturers.id"), nullable=True)
+    lecturer_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    lecturer_bio: Mapped[str | None] = mapped_column(Text, nullable=True)
     theme: Mapped[str] = mapped_column(String(255), nullable=False)
     participant_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     online_offline: Mapped[str] = mapped_column(String(16), nullable=False)  # online / offline / hybrid

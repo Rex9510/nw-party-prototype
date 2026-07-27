@@ -1,7 +1,7 @@
 {
-  "name": "南湾党建",
+  "name": "党员学时统计系统",
   "appid": "__UNI__NWPARTY",
-  "description": "南湾党建 V1-MVP · 党员培训学时管理",
+  "description": "党员学时统计系统 V1-MVP · 党员培训学时管理",
   "versionName": "0.1.0",
   "versionCode": "1",
   "transformPx": false,
@@ -9,9 +9,9 @@
     "usingComponents": true
   },
   "h5": {
-    "title": "南湾党建 V1-MVP",
+    "title": "党员学时统计系统",
     "router": {
-      "mode": "history",
+      "mode": "hash",
       "base": "/"
     },
     "devServer": {

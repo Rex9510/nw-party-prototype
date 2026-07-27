@@ -12,3 +12,11 @@ htmlcov/
 .coverage
 dist/
 build/
+
+# SQLite 数据库文件（试点部署用）
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.db.bak

@@ -1,5 +1,11 @@
-"""Alembic env.py。"""
+"""Alembic env.py。
+
+驱动选择：
+- 默认从 DATABASE_URL 环境变量读（支持 sqlite+aiosqlite / postgresql+asyncpg）
+- 兜底用 settings.database_url（同步 PG，本地 dev 用）
+"""
 import asyncio
+import os
 from logging.config import fileConfig
 
 from sqlalchemy import pool
@@ -14,7 +20,10 @@ from app.db.session import Base
 import app.db.base  # noqa: F401
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.database_url_sync)
+
+# 优先用 DATABASE_URL 环境变量，兜底 settings.database_url
+db_url = os.environ.get("DATABASE_URL") or settings.database_url
+config.set_main_option("sqlalchemy.url", db_url)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

@@ -15,8 +15,9 @@ from openpyxl import Workbook, load_workbook
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.security import hash_password
 from app.models.member import Member
-from app.models.party import Branch
+from app.models.party import Branch, Community
 from app.models.user import User
 from app.services.permissions import can_create_member_in
 
@@ -267,7 +268,7 @@ async def parse_and_import(
     if result.failed_rows > 0:
         return result
 
-    # 5. 批量插入
+    # 5. 批量插入党员
     try:
         db.add_all(rows_to_insert)
         await db.commit()
@@ -277,5 +278,44 @@ async def parse_and_import(
         result.error_log.append(ImportError(row=0, phone=None, errors=[f"批量插入失败: {e}"]))
         result.failed_rows = result.total_rows
         result.success_rows = 0
+        return result
+
+    # 6. 为每个新党员同步创建登录账号（默认密码 = 手机号后 6 位）
+    try:
+        # 重新查一遍已有 User 手机号（避免重复）
+        existing_user_phones: set[str] = set()
+        ur = await db.execute(select(User.phone))
+        for (p,) in ur.all():
+            existing_user_phones.add(p)
+
+        # 预加载所有 community 一次性查 street_id
+        community_street: dict[int, int] = {}
+        cr = await db.execute(select(Community.id, Community.street_id))
+        for cid, sid in cr.all():
+            community_street[cid] = sid
+
+        new_users: list[User] = []
+        for m in rows_to_insert:
+            if m.phone in existing_user_phones:
+                continue
+            br = await db.get(Branch, m.branch_id)
+            if not br:
+                continue
+            new_users.append(User(
+                phone=m.phone,
+                password_hash=hash_password(m.phone[-6:]),
+                name=m.name,
+                role=User.ROLE_MEMBER,
+                street_id=community_street.get(br.community_id),
+                community_id=br.community_id,
+                branch_id=m.branch_id,
+                status='active',
+            ))
+        if new_users:
+            db.add_all(new_users)
+            await db.commit()
+    except Exception as e:
+        # 账号创建失败不影响党员数据
+        print(f'[WARN] 批量创建登录账号失败: {e}')
 
     return result

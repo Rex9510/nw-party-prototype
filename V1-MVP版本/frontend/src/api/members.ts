@@ -1,5 +1,5 @@
 /**
- * 党员库 API 客户端。
+ * 人员管理库 API 客户端。
  */
 import { api } from '@/utils/request'
 
@@ -13,6 +13,11 @@ export interface MemberItem {
   status: string
   branch_id: number
   branch_name: string | null
+  roles: string[]
+  identities: string[]
+  photo_urls: string[]
+  is_mobile_member: boolean
+  flow_in_date: string | null
   created_at: string
   updated_at: string
 }
@@ -26,9 +31,14 @@ export interface MemberCreateBody {
   name: string
   phone: string
   id_card_no?: string
-  gender?: 'male' | 'female' | 'other'
+  gender?: 'male' | 'female'
   join_date?: string
   branch_id: number
+  roles?: string[]
+  identities?: string[]
+  photo_urls?: string[]  // 最多 5 张 dataURL
+  is_mobile_member?: boolean
+  flow_in_date?: string | null  // is_mobile_member=true 时必填
 }
 
 export const membersApi = {
@@ -45,6 +55,11 @@ export const membersApi = {
 
   get(id: number) {
     return api.get<MemberItem>(`/members/${id}`)
+  },
+
+  /** 通过手机号查党员（"我的"页面用）。 */
+  getByPhone(phone: string) {
+    return api.get<MemberItem>(`/members/by-phone/${phone}`)
   },
 
   create(body: MemberCreateBody) {

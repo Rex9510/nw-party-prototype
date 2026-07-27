@@ -9,12 +9,14 @@ from app.core.security import (
     create_access_token,
     create_refresh_token,
     decode_token,
+    hash_password,
     verify_password,
 )
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.auth import (
     LoginRequest,
+    PasswordChangeRequest,
     RefreshRequest,
     TokenResponse,
     UserInfo,
@@ -73,6 +75,43 @@ async def refresh_token(body: RefreshRequest, db: AsyncSession = Depends(get_db)
 
 
 @router.get("/me", response_model=UserInfo)
-async def me(user: User = Depends(get_current_user)) -> UserInfo:
+async def me(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)) -> UserInfo:
     """当前登录用户信息。"""
-    return UserInfo.model_validate(user)
+    from app.models.party import Street, Community, Branch
+    from sqlalchemy.orm import selectinload
+    street_name = community_name = branch_name = None
+
+    if user.street_id:
+        r = await db.execute(select(Street.name).where(Street.id == user.street_id))
+        street_name = r.scalar_one_or_none()
+    if user.community_id:
+        r = await db.execute(select(Community.name).where(Community.id == user.community_id))
+        community_name = r.scalar_one_or_none()
+    if user.branch_id:
+        r = await db.execute(select(Branch.name).where(Branch.id == user.branch_id))
+        branch_name = r.scalar_one_or_none()
+
+    data = UserInfo.model_validate(user).model_dump()
+    data["street_name"] = street_name
+    data["community_name"] = community_name
+    data["branch_name"] = branch_name
+    return UserInfo.model_validate(data)
+
+
+@router.post("/change-password")
+async def change_password(
+    body: PasswordChangeRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """修改自己的密码。"""
+    if not verify_password(body.old_password, user.password_hash):
+        raise HTTPException(status_code=400, detail="原密码错误")
+    if body.old_password == body.new_password:
+        raise HTTPException(status_code=400, detail="新密码不能与原密码相同")
+    # 确认密码一致性（schema validator 已经检查过，这里兜底）
+    if body.new_password != body.confirm_password:
+        raise HTTPException(status_code=400, detail="两次输入的新密码不一致")
+    user.password_hash = hash_password(body.new_password)
+    await db.commit()
+    return {"message": "密码修改成功"}

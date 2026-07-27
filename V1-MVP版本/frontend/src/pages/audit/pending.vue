@@ -1,22 +1,123 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
+import { showToast, showSuccessToast } from 'vant'
 import { auditsApi, type AuditItem } from '@/api/audits'
-import { useAuthStore } from '@/stores/auth'
+import { activitiesApi, type Activity } from '@/api/activities'
 
-const auth = useAuthStore()
 const items = ref<AuditItem[]>([])
 const loading = ref(false)
 const actionItem = ref<AuditItem | null>(null)
 const actionType = ref<'approve' | 'reject' | null>(null)
 const comment = ref('')
-const showActionModal = ref(false)
-const showLogsModal = ref(false)
+const showActionDialog = ref(false)
+const showLogsDialog = ref(false)
+const showDetailDialog = ref(false)
+const detailLoading = ref(false)
+const detail = ref<Activity | null>(null)
 const logs = ref<any[]>([])
 const logsFor = ref<AuditItem | null>(null)
+
+// 图片预览
+const showImagePreview = ref(false)
+const previewImageUrl = ref('')
+const imageList = ref<string[]>([])  // 当前活动所有图片（用于显示数量）
+const imgError = ref(false)
+
+function isImage(url: string) {
+  return url.startsWith('data:image') || /\.(png|jpg|jpeg|gif|webp|bmp)$/i.test(url)
+}
+function fileTypeIcon(url: string) {
+  if (url.startsWith('data:application/pdf')) return '📄'
+  if (url.includes('spreadsheet') || url.includes('ms-excel')) return '📊'
+  if (url.includes('wordprocessingml') || url.includes('msword')) return '📝'
+  if (url.startsWith('data:text/plain')) return '📃'
+  return '📎'
+}
+function onPreviewImage(url: string) {
+  console.log('[audit] preview image', url.slice(0, 40))
+  imgError.value = false
+  previewImageUrl.value = url
+  // 收集所有图片用于计数
+  if (detail.value?.attachments) {
+    imageList.value = detail.value.attachments
+      .filter(a => isImage(a.file_url))
+      .map(a => a.file_url)
+  }
+  showImagePreview.value = true
+}
+
+function onImgLoad() {
+  console.log('[audit] image loaded ok')
+  imgError.value = false
+}
+function onImgError() {
+  console.warn('[audit] image load failed', previewImageUrl.value.slice(0, 40))
+  imgError.value = true
+}
+
+function onAttClick(a: any) {
+  console.log('[audit] att clicked', a.id, a.kind, a.file_url.slice(0, 40))
+  if (isImage(a.file_url)) {
+    onPreviewImage(a.file_url)
+  } else {
+    // 附件下载：data URL 转 blob 再下载
+    try {
+      const url = a.file_url
+      if (url.startsWith('data:')) {
+        const [meta, b64] = url.split(',')
+        const mime = meta.match(/data:([^;]+)/)?.[1] || 'application/octet-stream'
+        // MIME → 常用扩展名
+        const MIME_EXT: Record<string, string> = {
+          'application/pdf': 'pdf',
+          'application/msword': 'doc',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+          'application/vnd.ms-excel': 'xls',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+          'application/vnd.ms-powerpoint': 'ppt',
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+          'text/plain': 'txt',
+          'text/csv': 'csv',
+          'application/zip': 'zip',
+          'application/json': 'json',
+          'image/png': 'png',
+          'image/jpeg': 'jpg',
+          'image/gif': 'gif',
+          'image/webp': 'webp',
+          'image/svg+xml': 'svg',
+        }
+        const ext = MIME_EXT[mime]
+          || mime.split('/')[1]?.split('+').pop()?.split('.').pop()
+          || 'bin'
+        const bin = atob(b64)
+        const bytes = new Uint8Array(bin.length)
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+        const blob = new Blob([bytes], { type: mime })
+        const objUrl = URL.createObjectURL(blob)
+        const a2 = document.createElement('a')
+        a2.href = objUrl
+        a2.download = `附件-${a.id}.${ext}`
+        document.body.appendChild(a2)
+        a2.click()
+        document.body.removeChild(a2)
+        URL.revokeObjectURL(objUrl)
+      } else {
+        window.open(url, '_blank')
+      }
+    } catch (e) {
+      console.error('[audit] download failed', e)
+    }
+  }
+}
 
 const NODE_LABEL: Record<string, string> = {
   community_review: '社区初审',
   street_review: '街道复审',
+}
+
+const ACTION_LABEL: Record<string, { text: string; cls: string }> = {
+  submit: { text: '提交', cls: 'action-submit' },
+  approve: { text: '通过', cls: 'action-approve' },
+  reject: { text: '驳回', cls: 'action-reject' },
 }
 
 async function load() {
@@ -25,7 +126,7 @@ async function load() {
     const res = await auditsApi.pending()
     items.value = res.items
   } catch (e: any) {
-    uni.showToast({ title: e?.message || '加载失败', icon: 'none' })
+    showToast({ message: e?.message || '加载失败', type: 'fail' })
   } finally {
     loading.value = false
   }
@@ -35,19 +136,18 @@ function onApprove(item: AuditItem) {
   actionItem.value = item
   actionType.value = 'approve'
   comment.value = ''
-  showActionModal.value = true
+  showActionDialog.value = true
 }
-
 function onReject(item: AuditItem) {
   actionItem.value = item
   actionType.value = 'reject'
   comment.value = ''
-  showActionModal.value = true
+  showActionDialog.value = true
 }
 
 async function onViewLogs(item: AuditItem) {
   logsFor.value = item
-  showLogsModal.value = true
+  showLogsDialog.value = true
   try {
     logs.value = await auditsApi.logs(item.activity_id)
   } catch (e) {
@@ -55,24 +155,38 @@ async function onViewLogs(item: AuditItem) {
   }
 }
 
+async function onViewDetail(item: AuditItem) {
+  detail.value = null
+  showDetailDialog.value = true
+  detailLoading.value = true
+  try {
+    detail.value = await activitiesApi.get(item.activity_id)
+  } catch (e: any) {
+    showToast({ message: e?.message || '加载详情失败', type: 'fail' })
+    showDetailDialog.value = false
+  } finally {
+    detailLoading.value = false
+  }
+}
+
 async function onConfirmAction() {
   if (!actionItem.value || !actionType.value) return
   if (actionType.value === 'reject' && !comment.value.trim()) {
-    uni.showToast({ title: '驳回必须填意见', icon: 'none' })
+    showToast({ message: '驳回必须填意见', type: 'fail' })
     return
   }
   try {
     if (actionType.value === 'approve') {
       const r = await auditsApi.approve(actionItem.value.activity_id, comment.value)
-      uni.showToast({ title: r.status === 'approved' ? '已通过' : '已转交街道', icon: 'success' })
+      showSuccessToast({ message: r.status === 'approved' ? '已通过' : '已转交街道' })
     } else {
       await auditsApi.reject(actionItem.value.activity_id, comment.value)
-      uni.showToast({ title: '已驳回', icon: 'success' })
+      showSuccessToast({ message: '已驳回' })
     }
-    showActionModal.value = false
+    showActionDialog.value = false
     load()
   } catch (e: any) {
-    uni.showToast({ title: e?.message || '操作失败', icon: 'none' })
+    showToast({ message: e?.message || '操作失败', type: 'fail' })
   }
 }
 
@@ -82,201 +196,378 @@ onMounted(() => {
 </script>
 
 <template>
-  <view class="page">
-    <view class="header">
-      <view class="title">待审核</view>
-      <view class="total">共 {{ items.length }} 条</view>
-    </view>
+  <div class="form-page">
+    <div class="page-header">
+      <div class="title">待审核</div>
+      <div class="sub">共 {{ items.length }} 条</div>
+    </div>
 
-    <view v-if="loading" class="loading">加载中…</view>
-    <view v-else-if="!items.length" class="empty">
-      <view class="empty-icon">✅</view>
-      <view>暂无待审核活动</view>
-    </view>
+    <div v-if="loading" class="status">加载中…</div>
+    <div v-else-if="!items.length" class="status empty">
+      <div class="empty-icon">✅</div>
+      <div>暂无待审核活动</div>
+    </div>
 
-    <view v-else class="list">
-      <view v-for="item in items" :key="item.activity_id" class="card">
-        <view class="card-header">
-          <view class="theme">{{ item.theme }}</view>
-          <view class="node-tag">{{ NODE_LABEL[item.current_node] || item.current_node }}</view>
-        </view>
-        <view class="meta">
-          <text>📅 {{ item.training_at }}</text>
-          <text>📍 {{ item.location }}</text>
-        </view>
-        <view class="meta">
-          <text>👤 提交人：{{ item.submitter_name || '-' }}</text>
-          <text>🏛️ {{ item.community_name }}</text>
-        </view>
-        <view class="meta">
-          <text>👥 {{ item.participant_count }} 人</text>
-          <text>🎓 {{ item.study_hours }} 学时</text>
-        </view>
-        <view class="actions">
-          <view class="btn btn-secondary" @click="onViewLogs(item)">查看日志</view>
-          <view class="btn btn-danger" @click="onReject(item)">驳回</view>
-          <view class="btn btn-primary" @click="onApprove(item)">通过</view>
-        </view>
-      </view>
-    </view>
+    <div v-else class="list">
+      <div v-for="item in items" :key="item.activity_id" class="card">
+        <div class="card-header">
+          <div class="theme" @click="onViewDetail(item)">{{ item.theme }}</div>
+          <div class="node-tag">{{ NODE_LABEL[item.current_node] || item.current_node }}</div>
+        </div>
+        <div class="meta">
+          <span>📅 {{ item.training_at }}</span>
+          <span>📍 {{ item.location }}</span>
+        </div>
+        <div class="meta">
+          <span>👤 提交人：{{ item.submitter_name || '-' }}</span>
+          <span>🏛️ {{ item.community_name }}</span>
+        </div>
+        <div class="meta">
+          <span>👥 {{ item.participant_count }} 人</span>
+          <span>🎓 {{ item.study_hours }} 学时</span>
+        </div>
+        <div class="actions">
+          <van-button size="small" plain hairline type="primary" @click="onViewDetail(item)">查看详情</van-button>
+          <van-button size="small" plain hairline @click="onViewLogs(item)">查看日志</van-button>
+          <van-button size="small" plain hairline type="danger" @click="onReject(item)">驳回</van-button>
+          <van-button size="small" type="primary" @click="onApprove(item)">通过</van-button>
+        </div>
+      </div>
+    </div>
 
-    <!-- 操作弹窗 -->
-    <view v-if="showActionModal" class="modal-mask" @click="showActionModal = false">
-      <view class="modal" @click.stop>
-        <view class="modal-title">
-          {{ actionType === 'approve' ? '审核通过' : '审核驳回' }}
-        </view>
-        <view class="modal-sub">{{ actionItem?.theme }}</view>
-        <textarea
+    <!-- 审核操作弹窗 -->
+    <van-dialog
+      v-model:show="showActionDialog"
+      :title="actionType === 'approve' ? '审核通过' : '审核驳回'"
+      show-cancel-button
+      :before-close="async (action) => { if (action === 'confirm') await onConfirmAction(); else showActionDialog = false }"
+    >
+      <div class="dialog-body">
+        <div class="dialog-sub">{{ actionItem?.theme }}</div>
+        <van-field
           v-model="comment"
-          class="textarea"
+          type="textarea"
+          rows="4"
           :placeholder="actionType === 'reject' ? '请填写驳回意见（必填）' : '审核意见（可选）'"
           maxlength="500"
+          autosize
         />
-        <view class="modal-actions">
-          <view class="btn btn-secondary" @click="showActionModal = false">取消</view>
-          <view
-            class="btn"
-            :class="actionType === 'approve' ? 'btn-primary' : 'btn-danger'"
-            @click="onConfirmAction"
-          >
-            确认{{ actionType === 'approve' ? '通过' : '驳回' }}
-          </view>
-        </view>
-      </view>
-    </view>
+      </div>
+    </van-dialog>
+
+    <!-- 详情弹窗 -->
+    <van-popup
+      v-model:show="showDetailDialog"
+      position="bottom"
+      round
+      :style="{ maxHeight: '85vh' }"
+      closeable
+    >
+      <div class="detail-popup">
+        <div class="detail-title">活动详情</div>
+        <div v-if="detailLoading" class="detail-status">加载中…</div>
+        <div v-else-if="detail" class="detail-body">
+          <div class="detail-theme">{{ detail.theme }}</div>
+          <div class="detail-row"><span class="lbl">📅 培训时间</span><span>{{ detail.training_at }}</span></div>
+          <div class="detail-row"><span class="lbl">📍 培训地点</span><span>{{ detail.location }}</span></div>
+          <div class="detail-row"><span class="lbl">🎤 讲师</span><span>{{ detail.lecturer_name || '-' }}</span></div>
+          <div class="detail-row"><span class="lbl">🌐 形式</span><span>{{ detail.online_offline === 'online' ? '线上' : detail.online_offline === 'offline' ? '线下' : '混合' }}</span></div>
+          <div class="detail-row"><span class="lbl">📚 集中学习</span><span>{{ detail.is_centralized ? '是' : '否' }}</span></div>
+          <div class="detail-row"><span class="lbl">💡 创新理论教育</span><span>{{ detail.is_innovation_theory ? '是' : '否' }}</span></div>
+          <div class="detail-row"><span class="lbl">🏷️ 培训来源</span><span>{{ detail.source_type === 'upper_send' ? '上级送课' : '自行组织' }}</span></div>
+          <div class="detail-row"><span class="lbl">👥 参加人数</span><span>{{ detail.participant_count }} 人</span></div>
+          <div class="detail-row"><span class="lbl">⏱️ 学时</span><span>{{ detail.study_hours }} 学时</span></div>
+
+          <div v-if="detail.participants && detail.participants.length" class="detail-section">
+            <div class="section-title">参加人员（{{ detail.participants.length }}）</div>
+            <div class="member-list">
+              <div v-for="p in detail.participants" :key="p.id" class="member-item">
+                <span>👤 {{ p.member_name || '党员 #' + p.member_id }}</span>
+                <span class="member-phone" v-if="p.member_phone">{{ p.member_phone }}</span>
+                <span class="member-hours">+{{ p.study_hours }} 学时</span>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="detail.attachments && detail.attachments.length" class="detail-section">
+            <div class="section-title">现场照片 / 附件（{{ detail.attachments.length }}）</div>
+            <div class="att-grid">
+              <div
+                v-for="a in detail.attachments"
+                :key="a.id"
+                class="att-item"
+                @click.stop="onAttClick(a)"
+              >
+                <img v-if="isImage(a.file_url)" :src="a.file_url" class="att-thumb" />
+                <div v-else class="att-file">
+                  <div class="att-icon">{{ fileTypeIcon(a.file_url) }}</div>
+                  <div class="att-kind">{{ a.kind === 'photo' ? '照片' : '附件' }}</div>
+                  <div class="att-download">点击下载</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div v-else class="detail-status">暂无数据</div>
+      </div>
+    </van-popup>
+
+    <!-- 图片预览全屏（自实现，直接渲染 img，避免 van-image-preview 的覆盖问题） -->
+    <div v-if="showImagePreview" class="img-preview-mask" @click.self="showImagePreview = false">
+      <div class="img-preview-toolbar">
+        <span class="img-counter">{{ imageList.length }} 张</span>
+        <span class="img-close" @click="showImagePreview = false">✕ 关闭</span>
+      </div>
+      <div class="img-preview-content">
+        <img :src="previewImageUrl" class="img-preview-img" @load="onImgLoad" @error="onImgError" />
+        <div v-if="imgError" class="img-error">图片加载失败</div>
+      </div>
+    </div>
 
     <!-- 日志弹窗 -->
-    <view v-if="showLogsModal" class="modal-mask" @click="showLogsModal = false">
-      <view class="modal" @click.stop>
-        <view class="modal-title">审核日志</view>
-        <view class="modal-sub">{{ logsFor?.theme }}</view>
-        <scroll-view scroll-y class="log-list">
-          <view v-for="log in logs" :key="log.id" class="log-item">
-            <view class="log-time">{{ log.created_at }}</view>
-            <view class="log-action">
-              <text class="log-action-tag" :class="'action-' + log.action">
-                {{ log.action === 'submit' ? '提交' : log.action === 'approve' ? '通过' : '驳回' }}
-              </text>
-              <text class="log-operator">{{ log.operator_name }}</text>
-            </view>
-            <view v-if="log.comment" class="log-comment">{{ log.comment }}</view>
-          </view>
-          <view v-if="!logs.length" class="empty-mini">暂无日志</view>
-        </scroll-view>
-        <view class="modal-actions">
-          <view class="btn btn-secondary" @click="showLogsModal = false">关闭</view>
-        </view>
-      </view>
-    </view>
-  </view>
+    <van-dialog
+      v-model:show="showLogsDialog"
+      title="审核日志"
+      show-cancel-button
+      :before-close="(action) => { if (action !== 'confirm') showLogsDialog = false; else showLogsDialog = false }"
+    >
+      <div class="dialog-body">
+        <div class="dialog-sub">{{ logsFor?.theme }}</div>
+        <div class="log-list">
+          <div v-if="!logs.length" class="empty-mini">暂无日志</div>
+          <div v-for="log in logs" :key="log.id" class="log-item">
+            <div class="log-time">{{ log.created_at }}</div>
+            <div class="log-action">
+              <span class="log-action-tag" :class="ACTION_LABEL[log.action]?.cls || ''">
+                {{ ACTION_LABEL[log.action]?.text || log.action }}
+              </span>
+              <span class="log-operator">{{ log.operator_name }}</span>
+            </div>
+            <div v-if="log.comment" class="log-comment">{{ log.comment }}</div>
+          </div>
+        </div>
+      </div>
+    </van-dialog>
+  </div>
 </template>
 
-<style lang="scss" scoped>
-.page { min-height: 100vh; background: #F7F8FA; padding: 24rpx; }
-.header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 20rpx; }
-.title { font-size: 36rpx; font-weight: 700; color: #222; }
-.total { font-size: 24rpx; color: #888; }
-.loading, .empty { text-align: center; padding: 80rpx 0; color: #888; font-size: 28rpx; }
-.empty-icon { font-size: 80rpx; margin-bottom: 16rpx; }
+<style scoped>
+.form-page {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 8px 0 32px;
+}
 
-.list { display: flex; flex-direction: column; gap: 20rpx; }
+.page-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 4px 16px 16px;
+}
+.title { font-size: 20px; font-weight: 700; color: #222; }
+.sub { font-size: 13px; color: #888; }
+
+.status {
+  text-align: center;
+  padding: 40px 16px;
+  color: #888;
+  font-size: 14px;
+}
+.status.empty .empty-icon { font-size: 48px; margin-bottom: 8px; }
+
+.list { display: flex; flex-direction: column; gap: 10px; padding: 0 8px; }
 .card {
   background: #fff;
-  border-radius: 16rpx;
-  padding: 24rpx;
-  box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.04);
+  border-radius: 8px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
 }
 .card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12rpx;
+  margin-bottom: 8px;
 }
-.theme { font-size: 30rpx; font-weight: 600; color: #222; flex: 1; margin-right: 12rpx; }
+.theme { font-size: 15px; font-weight: 600; color: #222; flex: 1; margin-right: 8px; }
 .node-tag {
   background: #FFF0F0;
-  color: #B22222;
-  padding: 4rpx 12rpx;
-  border-radius: 6rpx;
-  font-size: 22rpx;
+  color: var(--primary);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  flex-shrink: 0;
 }
 .meta {
   display: flex;
-  gap: 24rpx;
-  font-size: 24rpx;
+  gap: 12px;
+  font-size: 13px;
   color: #888;
-  margin-top: 6rpx;
+  margin-top: 4px;
 }
-.actions { display: flex; gap: 12rpx; margin-top: 16rpx; }
-.btn {
-  flex: 1;
-  height: 64rpx;
-  line-height: 64rpx;
-  text-align: center;
-  border-radius: 8rpx;
-  font-size: 26rpx;
-  font-weight: 600;
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
 }
-.btn-primary { background: #B22222; color: #fff; }
-.btn-danger { background: #fff; color: #B22222; border: 1rpx solid #B22222; }
-.btn-secondary { background: #f5f5f5; color: #666; }
+.actions > * { flex: 1; }
 
-.modal-mask {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-  padding: 60rpx;
-}
-.modal {
-  background: #fff;
-  border-radius: 16rpx;
-  padding: 32rpx 28rpx;
-  width: 100%;
-  max-width: 600rpx;
-  max-height: 80vh;
-  display: flex;
-  flex-direction: column;
-}
-.modal-title { font-size: 32rpx; font-weight: 700; color: #222; margin-bottom: 8rpx; }
-.modal-sub { font-size: 24rpx; color: #888; margin-bottom: 20rpx; }
-.textarea {
-  width: 100%;
-  min-height: 160rpx;
-  background: #f5f5f5;
-  border-radius: 8rpx;
-  padding: 16rpx;
-  font-size: 26rpx;
-  margin-bottom: 20rpx;
-  box-sizing: border-box;
-}
-.modal-actions { display: flex; gap: 16rpx; }
-.modal-actions .btn { flex: 1; height: 72rpx; line-height: 72rpx; }
-.log-list { max-height: 500rpx; }
-.log-item { padding: 16rpx 0; border-bottom: 1rpx solid #f0f0f0; }
-.log-time { font-size: 22rpx; color: #999; }
-.log-action { display: flex; align-items: center; gap: 12rpx; margin-top: 6rpx; }
+.dialog-body { padding: 12px 16px; }
+.dialog-sub { font-size: 13px; color: #888; margin-bottom: 12px; }
+.log-list { max-height: 50vh; overflow-y: auto; }
+.log-item { padding: 8px 0; border-bottom: 1px solid #f5f5f5; }
+.log-item:last-child { border-bottom: none; }
+.log-time { font-size: 11px; color: #999; }
+.log-action { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
 .log-action-tag {
-  padding: 2rpx 12rpx;
-  border-radius: 4rpx;
-  font-size: 22rpx;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11px;
   color: #fff;
 }
 .action-submit { background: #6B7280; }
 .action-approve { background: #059669; }
 .action-reject { background: #B22222; }
-.log-operator { font-size: 26rpx; color: #222; }
+.log-operator { font-size: 13px; color: #222; }
 .log-comment {
-  margin-top: 6rpx;
-  font-size: 24rpx;
+  margin-top: 4px;
+  font-size: 12px;
   color: #666;
   background: #f5f5f5;
-  padding: 8rpx 12rpx;
-  border-radius: 4rpx;
+  padding: 4px 8px;
+  border-radius: 3px;
 }
-.empty-mini { text-align: center; padding: 40rpx; color: #999; font-size: 24rpx; }
+.empty-mini { text-align: center; padding: 20px; color: #999; font-size: 13px; }
+
+/* 详情弹窗 */
+.detail-popup {
+  padding: 20px 16px 32px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+.detail-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #222;
+  text-align: center;
+  margin-bottom: 16px;
+}
+.detail-status { text-align: center; padding: 40px 0; color: #999; }
+.detail-theme {
+  font-size: 17px;
+  font-weight: 600;
+  color: #B22222;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  padding: 8px 0;
+  border-bottom: 1px dashed #f5f5f5;
+}
+.detail-row .lbl { color: #888; }
+.detail-row > span:last-child { color: #222; max-width: 60%; text-align: right; }
+.detail-section { margin-top: 16px; }
+.section-title { font-size: 14px; font-weight: 600; color: #222; margin-bottom: 8px; }
+.member-list { background: #f9f9f9; border-radius: 6px; padding: 8px 12px; max-height: 200px; overflow-y: auto; }
+.member-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  font-size: 13px;
+  color: #555;
+  border-bottom: 1px dashed #eee;
+  gap: 8px;
+}
+.member-item:last-child { border-bottom: none; }
+.member-phone { color: #888; font-size: 12px; }
+.member-hours { color: #B22222; font-weight: 600; flex-shrink: 0; }
+.att-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.att-item {
+  display: block;
+  cursor: pointer;
+  position: relative;
+}
+.att-item:hover { opacity: 0.85; }
+.att-thumb {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 4px;
+  background: #f5f5f5;
+}
+.att-file {
+  width: 100%;
+  aspect-ratio: 1;
+  background: #FFF0F0;
+  border: 1px dashed #B22222;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.att-icon { font-size: 32px; }
+.att-kind { font-size: 11px; color: #B22222; margin-top: 2px; }
+.att-download { font-size: 10px; color: #999; margin-top: 2px; }
+.card-header .theme { cursor: pointer; }
+.card-header .theme:hover { color: var(--primary); }
+
+/* 自实现图片全屏预览 */
+.img-preview-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.92);
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  animation: previewFade 0.2s ease;
+}
+@keyframes previewFade { from { opacity: 0; } to { opacity: 1; } }
+.img-preview-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  color: #fff;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.img-close {
+  cursor: pointer;
+  padding: 4px 12px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  user-select: none;
+}
+.img-close:hover { background: rgba(255, 255, 255, 0.25); }
+.img-counter { opacity: 0.7; }
+.img-preview-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  overflow: auto;
+}
+.img-preview-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  background: #000;
+  border-radius: 4px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+}
+.img-error {
+  color: #aaa;
+  font-size: 14px;
+  padding: 20px;
+}
 </style>

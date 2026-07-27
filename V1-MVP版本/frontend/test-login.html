@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Login Debug</title>
+</head>
+<body>
+  <h1>Login Test</h1>
+  <pre id="out"></pre>
+  <script>
+    const out = document.getElementById('out')
+    const log = (m) => { out.textContent += m + '\n'; console.log(m) }
+    log('Testing fetch to /api/v1/auth/login...')
+    fetch('/api/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: '13800000000', password: 'admin123' })
+    })
+    .then(async r => {
+      log('Status: ' + r.status)
+      log('Body: ' + (await r.text()))
+    })
+    .catch(e => log('Error: ' + e.message))
+  </script>
+</body>
+</html>

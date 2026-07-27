@@ -24,11 +24,12 @@ def get_member_scope_filter(user: User) -> dict:
 
 
 def can_manage_members(user: User) -> bool:
-    """哪些角色能管理党员库。"""
+    """哪些角色能管理党员库（任何范围）。"""
     return user.role in (
         User.ROLE_ADMIN,
         User.ROLE_STREET_LEAD,
         User.ROLE_COMMUNITY_ORG,
+        User.ROLE_BRANCH_SEC,  # 支部书记可在本支部内管理
     )
 
 
@@ -38,4 +39,22 @@ def can_create_member_in(user: User, branch_community_id: int) -> bool:
         return False
     if user.role == User.ROLE_COMMUNITY_ORG:
         return user.community_id == branch_community_id
+    # 支部书记只能在本支部新增
+    if user.role == User.ROLE_BRANCH_SEC:
+        # 需要知道目标支部的 community_id 和 branch_id
+        # 简化：调用方已经在 create_member 里查过 branch 并能用 user.branch_id 校验
+        return user.branch_id is not None
     return True
+
+
+def can_manage_member_in(user: User, target_branch_id: int, target_community_id: int | None = None) -> bool:
+    """判断 user 能否管理（编辑/删除）指定支部的党员。"""
+    if not can_manage_members(user):
+        return False
+    if user.role in (User.ROLE_ADMIN, User.ROLE_STREET_LEAD):
+        return True
+    if user.role == User.ROLE_COMMUNITY_ORG:
+        return user.community_id == target_community_id
+    if user.role == User.ROLE_BRANCH_SEC:
+        return user.branch_id == target_branch_id
+    return False

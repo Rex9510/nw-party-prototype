@@ -8,6 +8,8 @@ export interface Participant {
   member_id: number
   study_hours: number
   attendance_status: string
+  member_name?: string | null
+  member_phone?: string | null
 }
 
 export interface Attachment {
@@ -24,7 +26,8 @@ export interface Activity {
   community_id: number
   training_at: string
   location: string
-  lecturer_id: number | null
+  lecturer_name: string | null
+  lecturer_bio: string | null
   theme: string
   participant_count: number
   online_offline: 'online' | 'offline' | 'hybrid'
@@ -32,7 +35,7 @@ export interface Activity {
   is_innovation_theory: boolean
   source_type: 'upper_send' | 'self_organize'
   audience_category: string
-  study_hours: number
+  study_hours: number | null
   status: 'draft' | 'pending_community' | 'pending_street' | 'approved' | 'rejected'
   reject_reason: string | null
   created_by: number
@@ -101,5 +104,12 @@ export const activitiesApi = {
 
   removeAttachment(activityId: number, attachmentId: number) {
     return api.delete(`/activities/${activityId}/attachments/${attachmentId}`)
+  },
+  clearAttachments(activityId: number, kind?: 'photo' | 'signin') {
+    return api.delete(
+      kind
+        ? `/activities/${activityId}/attachments?kind=${kind}`
+        : `/activities/${activityId}/attachments`,
+    )
   },
 }
