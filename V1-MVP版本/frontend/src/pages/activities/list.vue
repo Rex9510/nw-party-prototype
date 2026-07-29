@@ -1,8 +1,12 @@
 <script setup lang="ts">
+// v2026-07-29: 给 keep-alive 用的组件名
+defineOptions({ name: 'ActivitiesList' })
+
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { showConfirmDialog, showDialog, showToast, showSuccessToast } from 'vant'
 import { activitiesApi, type ActivityListItem } from '@/api/activities'
+import { formatDateTime } from '@/utils/date'
 
 const router = useRouter()
 const items = ref<ActivityListItem[]>([])
@@ -54,7 +58,7 @@ async function onItemTap(a: ActivityListItem) {
   try {
     await showDialog({
       title: a.theme,
-      message: `时间：${a.training_at}\n地点：${a.location}\n人数：${a.participant_count}\n学时：${a.study_hours}`,
+      message: `时间：${formatDateTime(a.training_at)}\n地点：${a.location}\n人数：${a.participant_count}\n学时：${a.study_hours}`,
       confirmButtonText: '关闭',
       showCancelButton: false,
     })
@@ -152,7 +156,7 @@ onMounted(() => {
           </div>
         </div>
         <div class="meta">
-          <span>📅 {{ a.training_at }}</span>
+          <span>📅 {{ formatDateTime(a.training_at) }}</span>
           <span>📍 {{ a.location }}</span>
         </div>
         <div class="meta">

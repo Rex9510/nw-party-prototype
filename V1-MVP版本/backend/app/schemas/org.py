@@ -7,6 +7,7 @@ class StreetOut(BaseModel):
 
     id: int
     name: str
+    sort: int
 
 
 class StreetCreate(BaseModel):
@@ -23,6 +24,7 @@ class CommunityOut(BaseModel):
     id: int
     street_id: int
     name: str
+    sort: int
 
 
 class CommunityCreate(BaseModel):
@@ -40,6 +42,7 @@ class BranchOut(BaseModel):
     id: int
     community_id: int
     name: str
+    sort: int
 
 
 class BranchCreate(BaseModel):

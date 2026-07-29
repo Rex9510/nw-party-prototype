@@ -18,6 +18,7 @@ class Street(Base):
 
     id: Mapped[int] = mapped_column(BigIntPK, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(64), nullable=False)
+    sort: Mapped[int] = mapped_column(Integer, default=0, nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     communities: Mapped[list["Community"]] = relationship(
@@ -31,6 +32,7 @@ class Community(Base):
     id: Mapped[int] = mapped_column(BigIntPK, primary_key=True, autoincrement=True)
     street_id: Mapped[int] = mapped_column(BigIntPK, ForeignKey("streets.id"), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(64), nullable=False)
+    sort: Mapped[int] = mapped_column(Integer, default=0, nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     street: Mapped["Street"] = relationship("Street", back_populates="communities")
@@ -45,6 +47,7 @@ class Branch(Base):
     id: Mapped[int] = mapped_column(BigIntPK, primary_key=True, autoincrement=True)
     community_id: Mapped[int] = mapped_column(BigIntPK, ForeignKey("communities.id"), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(128), nullable=False)
+    sort: Mapped[int] = mapped_column(Integer, default=0, nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     community: Mapped["Community"] = relationship("Community", back_populates="branches")

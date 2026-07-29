@@ -15,11 +15,8 @@ const scopeBadge = computed(() => {
   if (role === 'street_lead') {
     return u.street_name ? `📍 ${u.street_name}（街道全部）` : '📍 街道全部'
   }
-  if (role === 'community_organizer') {
+  if (role === 'community_organizer' || role === 'branch_secretary') {
     return u.community_name ? `📍 ${u.community_name}` : '📍 本社区'
-  }
-  if (role === 'branch_secretary') {
-    return u.branch_name ? `📍 ${u.branch_name}` : '📍 本支部'
   }
   return ''
 })

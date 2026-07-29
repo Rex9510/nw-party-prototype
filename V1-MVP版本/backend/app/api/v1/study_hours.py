@@ -103,13 +103,10 @@ async def get_member_study(
     if not member:
         raise HTTPException(status_code=404, detail="党员不存在")
 
-    # 权限
-    if user.role == User.ROLE_COMMUNITY_ORG:
+    # 权限（v2026-07-28：社区组织员 = 本社区权限，与 community_organizer 等价）
+    if user.role in (User.ROLE_COMMUNITY_ORG, User.ROLE_BRANCH_SEC):
         br = await db.get(Branch, member.branch_id)
         if not br or br.community_id != user.community_id:
-            raise HTTPException(status_code=403, detail="无权查看")
-    elif user.role in (User.ROLE_BRANCH_SEC,):
-        if member.branch_id != user.branch_id:
             raise HTTPException(status_code=403, detail="无权查看")
     elif user.role == User.ROLE_MEMBER:
         # 党员只能看自己（按手机号匹配）

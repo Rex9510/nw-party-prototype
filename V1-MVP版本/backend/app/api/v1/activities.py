@@ -24,6 +24,7 @@ from app.schemas.activity import (
     ActivityUpdate,
     AttachmentOut,
     ParticipantIn,
+    validate_organize_and_methods,
 )
 
 
@@ -111,17 +112,25 @@ async def get_activity(
     if not a:
         raise HTTPException(status_code=404, detail="活动不存在")
 
-    # 权限校验
-    if user.role == User.ROLE_COMMUNITY_ORG and a.community_id != user.community_id:
+    # 权限校验（v2026-07-28：社区组织员 = 本社区权限；普通党员 = 本支部）
+    if user.role in (User.ROLE_COMMUNITY_ORG, User.ROLE_BRANCH_SEC) and a.community_id != user.community_id:
         raise HTTPException(status_code=403, detail="无权查看")
-    if user.role in (User.ROLE_BRANCH_SEC, User.ROLE_MEMBER) and a.organizer_branch_id != user.branch_id:
-        raise HTTPException(status_code=403, detail="无权查看")
+    if user.role == User.ROLE_MEMBER:
+        # v3: organizer_branch_id 可能为 None（上级送课），用 co_organize_branch_ids 判断
+        allowed_branches = set(a.co_organize_branch_ids or [])
+        if user.branch_id not in allowed_branches:
+            raise HTTPException(status_code=403, detail="无权查看")
 
-    # 查参与党员的名字/电话
+    # 查参与党员的名字/电话/所属组织
     member_ids = [p.member_id for p in a.participants]
     member_map: dict[int, Member] = {}
     if member_ids:
-        mr = await db.execute(select(Member).where(Member.id.in_(member_ids)))
+        from app.models.party import Branch as _Branch
+        mr = await db.execute(
+            select(Member)
+            .options(selectinload(Member.branch).selectinload(_Branch.community))
+            .where(Member.id.in_(member_ids))
+        )
         for m in mr.scalars().all():
             member_map[m.id] = m
 
@@ -135,9 +144,30 @@ async def get_activity(
             attendance_status=p.attendance_status,
             member_name=member_map[p.member_id].name if p.member_id in member_map else None,
             member_phone=member_map[p.member_id].phone if p.member_id in member_map else None,
+            member_org_level=member_map[p.member_id].org_level if p.member_id in member_map else None,
+            member_branch_name=member_map[p.member_id].branch.name
+                if p.member_id in member_map and member_map[p.member_id].branch else None,
         )
         for p in a.participants
     ]
+    # 社区/街道名二次查（不在 Member 上，需要走 community_map + street_map）
+    if member_ids:
+        cids = {m.community_id for m in member_map.values() if m.community_id}
+        sids = {m.street_id for m in member_map.values() if m.street_id}
+        from app.models.party import Community as _Community, Street as _Street
+        cmap: dict[int, str] = {}
+        smap: dict[int, str] = {}
+        if cids:
+            cr = await db.execute(select(_Community.id, _Community.name).where(_Community.id.in_(cids)))
+            cmap = {r[0]: r[1] for r in cr.all()}
+        if sids:
+            sr = await db.execute(select(_Street.id, _Street.name).where(_Street.id.in_(sids)))
+            smap = {r[0]: r[1] for r in sr.all()}
+        for p in out.participants:
+            m = member_map.get(p.member_id)
+            if m:
+                p.member_community_name = cmap.get(m.community_id) if m.community_id else None
+                p.member_street_name = smap.get(m.street_id) if m.street_id else None
     return out
 
 
@@ -151,28 +181,70 @@ async def create_activity(
     if not _can_manage_activities(user):
         raise HTTPException(status_code=403, detail="无权录入活动")
 
-    # 校验支部存在 + 权限
-    br_r = await db.execute(select(Branch).where(Branch.id == body.organizer_branch_id))
-    branch = br_r.scalar_one_or_none()
-    if not branch:
-        raise HTTPException(status_code=400, detail="支部不存在")
-    if user.role == User.ROLE_COMMUNITY_ORG and user.community_id != branch.community_id:
-        raise HTTPException(status_code=403, detail="无权在该支部录入")
-    if user.role == User.ROLE_BRANCH_SEC and user.branch_id != body.organizer_branch_id:
-        raise HTTPException(status_code=403, detail="只能在本支部录入活动")
+    # v3 业务校验（手调，不放 schema model_validator，避免详情接口对老数据 422）
+    try:
+        validate_organize_and_methods(body.model_dump())
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
-    # 自动从支部得到 community_id
-    community_id = branch.community_id
+    # v3: 举办方式改为 organize_type + co_organize_branch_ids（自行组织时填） / upper_org（上级送课时填）。
+    # community_id 仍然必填冗余，从 co_organize_branch_ids[0] 反查得到。
+    # organizer_branch_id 仅做审计占位（取 co_organize_branch_ids[0]）。
+    community_id: int | None = None
+    organizer_branch_id: int | None = None
+
+    if body.organize_type == "self_organize":
+        # 校验协办支部：全部存在 + 同一社区
+        if not body.co_organize_branch_ids:
+            raise HTTPException(status_code=400, detail="自行组织必须选择至少 1 个协办支部")
+        brs_r = await db.execute(
+            select(Branch).where(Branch.id.in_(body.co_organize_branch_ids))
+        )
+        branches = brs_r.scalars().all()
+        if len(branches) != len(set(body.co_organize_branch_ids)):
+            raise HTTPException(status_code=400, detail="部分协办支部不存在")
+        community_ids = {b.community_id for b in branches}
+        if len(community_ids) != 1:
+            raise HTTPException(status_code=400, detail="所有协办支部必须在同一社区")
+        community_id = community_ids.pop()
+        # 兼容老字段：organizer_branch_id 记第一个
+        organizer_branch_id = body.co_organize_branch_ids[0]
+        # 角色权限校验（只校验社区级，街道级全看）
+        if user.role in (User.ROLE_COMMUNITY_ORG, User.ROLE_BRANCH_SEC) and user.community_id != community_id:
+            raise HTTPException(status_code=403, detail="无权在该社区录入")
+        # v2026-07-28：社区组织员可在本社区下任何支部录入活动
+    else:  # upper_send
+        if not body.upper_org or not body.upper_org.strip():
+            raise HTTPException(status_code=400, detail="上级送课必须填写具体部门")
+        # 上级送课：community_id 从创建者上下文推（默认放创建者所在社区，否则取第一社区）
+        if user.community_id:
+            community_id = user.community_id
+        else:
+            # 兜底：取第一社区
+            r = await db.execute(select(Community).order_by(Community.id).limit(1))
+            c = r.scalar_one_or_none()
+            community_id = c.id if c else 1
+        organizer_branch_id = None
+
+    if community_id is None:
+        raise HTTPException(status_code=400, detail="无法确定社区")
 
     # 校验照片至少 1 张（D6 阶段；当前只校验字段）
     if body.photo_count < 1:
-        # 注意：photo_count 客户端上传后才知道，这里只是软校验
-        # 实际校验在提交审核（submit）时做
         pass
 
     # 创建活动
-    data = body.model_dump(exclude={"participants", "photo_count"})
-    activity = Activity(**data, created_by=user.id, status="draft", community_id=community_id)
+    # v3: organizer_branch_id / source_type 兼容字段已由 schema 自动填（source_type=organize_type）
+    data = body.model_dump(
+        exclude={"participants", "photo_count", "organizer_branch_id"},
+    )
+    activity = Activity(
+        **data,
+        created_by=user.id,
+        status="draft",
+        community_id=community_id,
+        organizer_branch_id=organizer_branch_id,
+    )
     db.add(activity)
     await db.flush()  # 拿 id
 
@@ -214,17 +286,54 @@ async def update_activity(
     if not a:
         raise HTTPException(status_code=404, detail="活动不存在")
 
+    # v3 业务校验：partial update，只对提交了的字段校验
+    try:
+        data = body.model_dump(exclude_unset=True)
+        # 补全可能缺少的字段（用 DB 当前值）
+        for k in ("organize_type", "is_centralized", "co_organize_branch_ids", "upper_org", "study_methods"):
+            if k not in data:
+                v = getattr(a, k, None)
+                if v is not None:
+                    data[k] = v
+        validate_organize_and_methods(data)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
     if a.status not in ("draft", "rejected"):
         raise HTTPException(status_code=400, detail="只有草稿/已驳回状态可修改")
 
     if user.role == User.ROLE_COMMUNITY_ORG and a.community_id != user.community_id:
         raise HTTPException(status_code=403, detail="无权修改")
-    if user.role == User.ROLE_BRANCH_SEC and a.organizer_branch_id != user.branch_id:
-        raise HTTPException(status_code=403, detail="无权修改")
+    if user.role == User.ROLE_MEMBER:
+        # v3: organizer_branch_id 可能为 None（上级送课），用 co_organize_branch_ids 判断
+        allowed_branches = set(a.co_organize_branch_ids or [])
+        if user.branch_id not in allowed_branches:
+            raise HTTPException(status_code=403, detail="无权修改")
 
-    data = body.model_dump(exclude_unset=True, exclude={"participants"})
+    data = body.model_dump(exclude_unset=True, exclude={"participants", "organizer_branch_id"})
     for k, v in data.items():
         setattr(a, k, v)
+    # v3: 当 organize_type / co_organize_branch_ids 变化时，重算 organizer_branch_id / community_id / source_type
+    # （要在 setattr 之后做，否则会被 data 覆盖）
+    if "organize_type" in data or "co_organize_branch_ids" in data:
+        new_org_type = a.organize_type
+        if new_org_type == "self_organize":
+            new_co_ids = list(a.co_organize_branch_ids or [])
+            if new_co_ids:
+                brs_r = await db.execute(
+                    select(Branch).where(Branch.id.in_(new_co_ids))
+                )
+                branches = brs_r.scalars().all()
+                community_ids = {b.community_id for b in branches}
+                if len(community_ids) == 1:
+                    a.community_id = community_ids.pop()
+                a.organizer_branch_id = new_co_ids[0]
+                a.source_type = "self_organize"
+                a.upper_org = None
+        elif new_org_type == "upper_send":
+            a.organizer_branch_id = None
+            a.source_type = "upper_send"
+            a.co_organize_branch_ids = []
 
     if body.participants is not None:
         # 用 member_id 做 upsert，避免 delete+insert 触发 UNIQUE 约束
@@ -290,8 +399,11 @@ async def submit_activity(
 
     if user.role == User.ROLE_COMMUNITY_ORG and a.community_id != user.community_id:
         raise HTTPException(status_code=403, detail="无权提交")
-    if user.role == User.ROLE_BRANCH_SEC and a.organizer_branch_id != user.branch_id:
-        raise HTTPException(status_code=403, detail="无权提交")
+    if user.role == User.ROLE_MEMBER:
+        # v3: organizer_branch_id 可能为 None（上级送课），用 co_organize_branch_ids 判断
+        allowed_branches = set(a.co_organize_branch_ids or [])
+        if user.branch_id not in allowed_branches:
+            raise HTTPException(status_code=403, detail="无权提交")
 
     # 必须有至少 1 张现场照片
     photo_count = sum(1 for att in a.attachments if att.kind == "photo")
@@ -349,19 +461,22 @@ async def delete_activity(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> None:
-    """删除活动（仅草稿状态）。"""
+    """删除活动（草稿 / 已驳回状态）。"""
     r = await db.execute(select(Activity).where(Activity.id == activity_id))
     a = r.scalar_one_or_none()
     if not a:
         raise HTTPException(status_code=404, detail="活动不存在")
 
-    if a.status != "draft":
-        raise HTTPException(status_code=400, detail="只有草稿状态可删除")
+    if a.status not in ("draft", "rejected"):
+        raise HTTPException(status_code=400, detail="只有草稿/已驳回状态可删除")
 
-    if user.role == User.ROLE_COMMUNITY_ORG and a.community_id != user.community_id:
+    if user.role in (User.ROLE_COMMUNITY_ORG, User.ROLE_BRANCH_SEC) and a.community_id != user.community_id:
         raise HTTPException(status_code=403, detail="无权删除")
-    if user.role == User.ROLE_BRANCH_SEC and a.organizer_branch_id != user.branch_id:
-        raise HTTPException(status_code=403, detail="无权删除")
+    if user.role == User.ROLE_MEMBER:
+        # v3: organizer_branch_id 可能为 None（上级送课），用 co_organize_branch_ids 判断
+        allowed_branches = set(a.co_organize_branch_ids or [])
+        if user.branch_id not in allowed_branches:
+            raise HTTPException(status_code=403, detail="无权删除")
 
     await db.delete(a)
     await db.commit()
@@ -382,8 +497,11 @@ async def add_attachment(
 
     if user.role == User.ROLE_COMMUNITY_ORG and a.community_id != user.community_id:
         raise HTTPException(status_code=403, detail="无权操作")
-    if user.role == User.ROLE_BRANCH_SEC and a.organizer_branch_id != user.branch_id:
-        raise HTTPException(status_code=403, detail="无权操作")
+    if user.role == User.ROLE_MEMBER:
+        # v3: organizer_branch_id 可能为 None（上级送课），用 co_organize_branch_ids 判断
+        allowed_branches = set(a.co_organize_branch_ids or [])
+        if user.branch_id not in allowed_branches:
+            raise HTTPException(status_code=403, detail="无权操作")
 
     if body.kind not in ("photo", "signin"):
         raise HTTPException(status_code=400, detail="kind 必须是 photo / signin")
@@ -417,8 +535,11 @@ async def remove_attachments(
 
     if user.role == User.ROLE_COMMUNITY_ORG and a.community_id != user.community_id:
         raise HTTPException(status_code=403, detail="无权操作")
-    if user.role == User.ROLE_BRANCH_SEC and a.organizer_branch_id != user.branch_id:
-        raise HTTPException(status_code=403, detail="无权操作")
+    if user.role == User.ROLE_MEMBER:
+        # v3: organizer_branch_id 可能为 None（上级送课），用 co_organize_branch_ids 判断
+        allowed_branches = set(a.co_organize_branch_ids or [])
+        if user.branch_id not in allowed_branches:
+            raise HTTPException(status_code=403, detail="无权操作")
 
     if a.status not in ("draft", "rejected"):
         raise HTTPException(status_code=400, detail="草稿/已驳回状态可删除附件")
@@ -454,8 +575,11 @@ async def remove_attachment(
     a = a_r.scalar_one()
     if user.role == User.ROLE_COMMUNITY_ORG and a.community_id != user.community_id:
         raise HTTPException(status_code=403, detail="无权操作")
-    if user.role == User.ROLE_BRANCH_SEC and a.organizer_branch_id != user.branch_id:
-        raise HTTPException(status_code=403, detail="无权操作")
+    if user.role == User.ROLE_MEMBER:
+        # v3: organizer_branch_id 可能为 None（上级送课），用 co_organize_branch_ids 判断
+        allowed_branches = set(a.co_organize_branch_ids or [])
+        if user.branch_id not in allowed_branches:
+            raise HTTPException(status_code=403, detail="无权操作")
 
     if a.status not in ("draft", "rejected"):
         raise HTTPException(status_code=400, detail="草稿/已驳回状态可删除附件")

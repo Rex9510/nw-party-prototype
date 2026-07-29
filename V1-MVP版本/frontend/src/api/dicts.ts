@@ -41,6 +41,12 @@ export const dictsApi = {
   updateTrainingCategory(id: number, body: { name?: string; sort?: number }) {
     return api.patch<DictItem>(`/dicts/training-categories/${id}`, body)
   },
+  moveTrainingCategoryUp(id: number) {
+    return api.post<DictItem>(`/dicts/training-categories/${id}/move-up`)
+  },
+  moveTrainingCategoryDown(id: number) {
+    return api.post<DictItem>(`/dicts/training-categories/${id}/move-down`)
+  },
   deleteTrainingCategory(id: number) {
     return api.delete(`/dicts/training-categories/${id}`)
   },
@@ -54,6 +60,12 @@ export const dictsApi = {
   },
   updateTrainingSource(id: number, body: { name?: string; sort?: number }) {
     return api.patch<DictItem>(`/dicts/training-sources/${id}`, body)
+  },
+  moveTrainingSourceUp(id: number) {
+    return api.post<DictItem>(`/dicts/training-sources/${id}/move-up`)
+  },
+  moveTrainingSourceDown(id: number) {
+    return api.post<DictItem>(`/dicts/training-sources/${id}/move-down`)
   },
   deleteTrainingSource(id: number) {
     return api.delete(`/dicts/training-sources/${id}`)

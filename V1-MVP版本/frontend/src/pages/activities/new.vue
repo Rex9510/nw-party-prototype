@@ -15,6 +15,7 @@ const props = defineProps<{ id?: string }>()
 const isEdit = computed(() => !!props.id)
 
 const form = ref({
+  // v3: 不再填 organizer_branch_id（前端不展示）
   organizer_branch_id: 0,
   training_at: '',
   training_time: '',
@@ -26,9 +27,19 @@ const form = ref({
   online_offline: 'offline' as 'online' | 'offline' | 'hybrid',
   is_centralized: true,
   is_innovation_theory: true,
+  // v3: 举办方式（前端展示名 = 举办单位）
+  organize_type: 'self_organize' as 'self_organize' | 'upper_send',
+  // v3: 自行组织时填，1+ 支部 id
+  co_organize_branch_ids: [] as number[],
+  // 兼容老数据：source_type 后端会用 organize_type 自动填
   source_type: 'self_organize' as 'upper_send' | 'self_organize',
-  audience_category: 'community_member',
+  // v2: 培训对象多选
+  audience_category: [] as string[],
   study_hours: null as number | null,
+  // v3: 上级送课具体部门
+  upper_org: '',
+  // v2: 集中学习方式
+  study_methods: [] as string[],
 })
 
 const communities = ref<Community[]>([])
@@ -72,7 +83,7 @@ async function loadDicts() {
 async function loadActivity(id: number) {
   try {
     const a = await activitiesApi.get(id)
-    form.value.organizer_branch_id = a.organizer_branch_id
+    form.value.organizer_branch_id = a.organizer_branch_id || 0
     // 从 ISO datetime 拆分日期和时间
     const dt = new Date(a.training_at)
     form.value.training_at = dt.toISOString().slice(0, 10)
@@ -85,9 +96,14 @@ async function loadActivity(id: number) {
     form.value.online_offline = a.online_offline as any
     form.value.is_centralized = a.is_centralized
     form.value.is_innovation_theory = a.is_innovation_theory
-    form.value.source_type = a.source_type as any
-    form.value.audience_category = a.audience_category
+    // v3: organize_type + co_organize_branch_ids
+    form.value.organize_type = (a.organize_type as any) || 'self_organize'
+    form.value.co_organize_branch_ids = Array.isArray(a.co_organize_branch_ids) ? a.co_organize_branch_ids : []
+    form.value.source_type = form.value.organize_type as any  // 兼容
+    form.value.audience_category = Array.isArray(a.audience_category) ? a.audience_category : [a.audience_category]
     form.value.study_hours = a.study_hours
+    form.value.upper_org = a.upper_org || ''
+    form.value.study_methods = Array.isArray(a.study_methods) ? a.study_methods : []
     // 关键：把已有 participants 同步给 selectedMemberIds，否则 MemberPicker 是空
     if (a.participants && a.participants.length) {
       selectedMemberIds.value = a.participants.map(p => p.member_id)
@@ -170,6 +186,17 @@ watch(datePickerValue, (v) => {
   }
 })
 
+// v3: 切换 organize_type 时清空对应字段
+watch(() => form.value.organize_type, (v) => {
+  if (v === 'upper_send') {
+    form.value.co_organize_branch_ids = []
+  } else {
+    form.value.upper_org = ''
+  }
+  // 同步 source_type（兼容字段）
+  form.value.source_type = v
+})
+
 // ===== 时间选择 =====
 const showTimePicker = ref(false)
 const timePickerValue = ref<string[]>(['09', '00'])
@@ -185,23 +212,27 @@ function onTimeConfirm({ selectedValues }: { selectedValues: string[] }) {
   showTimePicker.value = false
 }
 
-// ===== 举办支部（action-sheet 列表，PC 友好） =====
-const showBranchPicker = ref(false)
-const branchActions = computed(() =>
+// ===== v3: 协办支部多选（action-sheet 列表） =====
+const showCoBranchPicker = ref(false)
+const coBranchActions = computed(() =>
   branches.value.map((b) => ({
     name: b.name,
     subname: communityForBranch(b.id),
     value: b.id,
   })),
 )
-const selectedBranchName = computed(() => {
-  if (!form.value.organizer_branch_id) return ''
-  const b = branches.value.find((x) => x.id === form.value.organizer_branch_id)
-  if (!b) return ''
-  return `${b.name} / ${communityForBranch(b.id)}`
+const coBranchSummary = computed(() => {
+  if (!form.value.co_organize_branch_ids.length) return ''
+  const names = form.value.co_organize_branch_ids
+    .map((id) => branches.value.find((b) => b.id === id)?.name)
+    .filter(Boolean) as string[]
+  return names.length > 1 ? `已选 ${names.length} 个支部` : names[0] || ''
 })
-function onBranchSelect(action: { value: number }) {
-  form.value.organizer_branch_id = action.value
+function toggleCoBranch(b: { value: number }) {
+  const ids = form.value.co_organize_branch_ids
+  const idx = ids.indexOf(b.value)
+  if (idx >= 0) ids.splice(idx, 1)
+  else ids.push(b.value)
 }
 
 // ===== 字典项的 chip 行 =====
@@ -212,6 +243,24 @@ const onlineOfflineOptions = [
   { v: 'offline', l: '线下' },
   { v: 'hybrid', l: '混合' },
 ]
+
+// ===== 学习方式选项（集中学习=是时显示） =====
+const studyMethodOptions = [
+  { value: 'party_meeting', label: '党员大会' },
+  { value: 'theme_day', label: '主题党日' },
+  { value: 'onsite_teaching', label: '现场教学' },
+  { value: 'special_lecture', label: '专题党课' },
+]
+
+// 切集中学习时清空学习方式
+watch(() => form.value.is_centralized, (v) => {
+  if (!v) form.value.study_methods = []
+})
+
+// 切来源时清空具体部门
+watch(() => form.value.source_type, (v) => {
+  if (v !== 'upper_send') form.value.upper_org = ''
+})
 
 // ===== 参加人员 =====
 function onMemberChange(ids: number[]) {
@@ -276,12 +325,23 @@ function fileName(url: string): string {
 
 // ===== 提交 =====
 function validate(asDraft: boolean): string {
-  if (!form.value.organizer_branch_id) return '请选择举办支部'
   if (!form.value.training_at) return '请选择培训日期'
   if (!form.value.training_time) return '请选择培训时间'
   if (!form.value.location.trim()) return '请填写培训地点'
   if (!form.value.theme.trim()) return '请填写主题'
   if (selectedMemberIds.value.length < 1) return '请选择参加人员'
+  // 培训对象多选
+  if (form.value.audience_category.length < 1) return '请选择培训对象'
+  // v3: 举办方式校验
+  if (form.value.organize_type === 'upper_send') {
+    if (!form.value.upper_org.trim()) return '上级送课必须填写具体部门'
+  } else if (form.value.organize_type === 'self_organize') {
+    if (form.value.co_organize_branch_ids.length < 1) return '自行组织必须选择至少 1 个协办支部'
+  }
+  // 集中学习 → 学习方式必填
+  if (form.value.is_centralized && form.value.study_methods.length < 1) {
+    return '集中学习必须选择至少 1 项学习方式'
+  }
   // 草稿模式下学时和现场照片都不强制
   if (!asDraft) {
     if (form.value.study_hours === null || form.value.study_hours === undefined || form.value.study_hours <= 0) {
@@ -318,7 +378,7 @@ async function onSave(asDraft: boolean) {
         : Number(rawHours)
 
     const body = {
-      organizer_branch_id: form.value.organizer_branch_id,
+      // v3: organizer_branch_id 不再由前端填，后端从 co_organize_branch_ids[0] 反推
       training_at: trainingAt,
       location: form.value.location,
       lecturer_name: form.value.lecturer_name || null,
@@ -328,9 +388,16 @@ async function onSave(asDraft: boolean) {
       online_offline: form.value.online_offline,
       is_centralized: form.value.is_centralized,
       is_innovation_theory: form.value.is_innovation_theory,
-      source_type: form.value.source_type,
+      // v3: 举办方式
+      organize_type: form.value.organize_type,
+      co_organize_branch_ids: form.value.organize_type === 'self_organize' ? form.value.co_organize_branch_ids : [],
+      // 兼容老字段
+      source_type: form.value.organize_type,
       audience_category: form.value.audience_category,
       study_hours: studyHoursNum,
+      // v3: 上级送课具体部门
+      upper_org: form.value.organize_type === 'upper_send' ? form.value.upper_org : null,
+      study_methods: form.value.is_centralized ? form.value.study_methods : [],
       participants: selectedMemberIds.value.map((mid) => ({
         member_id: mid,
         study_hours: studyHoursNum,
@@ -433,15 +500,35 @@ onMounted(async () => {
 
     <van-form @submit="onSave(false)">
       <van-cell-group inset title="基础信息" class="cell-group">
+        
+        <!-- v3: 举办单位（合并了原"举办单位"+"来源"两个字段） -->
+        <van-cell>
+          <template #title><span class="req">*</span> 举办单位</template>
+          <template #value>
+            <van-radio-group v-model="form.organize_type" direction="horizontal">
+              <van-radio name="self_organize">自行组织</van-radio>
+              <van-radio name="upper_send">上级送课</van-radio>
+            </van-radio-group>
+          </template>
+        </van-cell>
+        <!-- 自行组织：选支部（可多选） -->
+        <template v-if="form.organize_type === 'self_organize'">
+          <van-cell title="选择支部" required>
+            <template #value>
+              <van-button size="mini" type="primary" plain hairline @click="showCoBranchPicker = true">
+                {{ coBranchSummary || '点击选择' }}
+              </van-button>
+            </template>
+          </van-cell>
+        </template>
+        <!-- 上级送课：填具体部门 -->
         <van-field
-          :model-value="selectedBranchName"
-          label="举办支部"
-          placeholder="点击选择"
-          readonly
-          is-link
+          v-if="form.organize_type === 'upper_send'"
+          v-model="form.upper_org"
+          label="具体部门"
+          placeholder="填写上级送课单位的具体部门（≤50字）"
+          maxlength="50"
           required
-          :rules="[{ required: true, message: '请选择举办支部' }]"
-          @click="showBranchPicker = true"
         />
         <van-field label="培训日期" required>
           <template #input>
@@ -513,6 +600,14 @@ onMounted(async () => {
             </van-radio-group>
           </template>
         </van-cell>
+        <van-cell v-if="form.is_centralized">
+          <template #title><span class="req">*</span> 学习方式</template>
+          <template #value>
+            <van-checkbox-group v-model="form.study_methods" direction="horizontal">
+              <van-checkbox v-for="opt in studyMethodOptions" :key="opt.value" :name="opt.value" shape="square">{{ opt.label }}</van-checkbox>
+            </van-checkbox-group>
+          </template>
+        </van-cell>
         <van-cell>
           <template #title><span class="req">*</span> 创新理论教育</template>
           <template #value>
@@ -521,32 +616,20 @@ onMounted(async () => {
               <van-radio :name="false">否</van-radio>
             </van-radio-group>
           </template>
-        </van-cell>
-        <van-cell>
-          <template #title><span class="req">*</span> 来源</template>
-          <template #value>
-            <van-radio-group v-model="form.source_type" direction="horizontal">
-              <van-radio
-                v-for="s in sources.filter((x) => ALLOWED_SOURCE_CODES.includes(x.code))"
-                :key="s.code"
-                :name="s.code"
-              >{{ s.name }}</van-radio>
-            </van-radio-group>
-          </template>
-        </van-cell>
+        </van-cell>
         <van-cell>
           <template #title><span class="req">*</span> 培训对象</template>
           <template #value>
-            <van-radio-group v-model="form.audience_category" direction="horizontal">
-              <van-radio v-for="c in categories" :key="c.code" :name="c.code">{{ c.name }}</van-radio>
-            </van-radio-group>
+            <van-checkbox-group v-model="form.audience_category" direction="horizontal">
+              <van-checkbox v-for="c in categories" :key="c.code" :name="c.code" shape="square">{{ c.name }}</van-checkbox>
+            </van-checkbox-group>
           </template>
         </van-cell>
         <van-field
           v-model.number="form.study_hours"
           label="学时"
           type="digit"
-          placeholder="如 4"
+          placeholder="如 1"
           required
         />
       </van-cell-group>
@@ -554,7 +637,11 @@ onMounted(async () => {
       <van-cell-group inset class="cell-group">
         <template #title><span class="req">*</span> 参加人员</template>
         <div class="picker-cell">
-          <MemberPicker v-model="selectedMemberIds" :branch-id="form.organizer_branch_id" @change="onMemberChange" />
+          <MemberPicker
+            v-model="selectedMemberIds"
+            :initial-branch-ids="form.organize_type === 'self_organize' ? form.co_organize_branch_ids : []"
+            @change="onMemberChange"
+          />
         </div>
       </van-cell-group>
 
@@ -646,14 +733,37 @@ onMounted(async () => {
       />
     </van-popup>
 
-    <!-- 支部（action-sheet） -->
-    <van-action-sheet
-      v-model:show="showBranchPicker"
-      :actions="branchActions"
-      cancel-text="取消"
-      close-on-click-action
-      @select="onBranchSelect"
-    />
+    <!-- v3: 协办支部多选（自建 popup，避免 action-sheet slot 渲染异常） -->
+    <van-popup
+      v-model:show="showCoBranchPicker"
+      position="bottom"
+      round
+      :style="{ maxHeight: '70vh' }"
+    >
+      <div class="co-branch-picker">
+        <div class="co-branch-header">
+          <span class="co-branch-cancel" @click="showCoBranchPicker = false">取消</span>
+          <span class="co-branch-title">选择支部</span>
+          <span class="co-branch-confirm" @click="showCoBranchPicker = false">确定</span>
+        </div>
+        <div class="co-branch-list">
+          <div
+            v-for="b in coBranchActions"
+            :key="b.value"
+            class="co-branch-row"
+            :class="{ active: form.co_organize_branch_ids.includes(b.value) }"
+            @click="toggleCoBranch(b)"
+          >
+            <div class="check">{{ form.co_organize_branch_ids.includes(b.value) ? '✓' : '' }}</div>
+            <div class="info">
+              <div class="name">{{ b.name }}</div>
+              <div class="sub">{{ b.subname }}</div>
+            </div>
+          </div>
+          <div v-if="!coBranchActions.length" class="co-branch-empty">暂无支部数据</div>
+        </div>
+      </div>
+    </van-popup>
   </div>
 </template>
 
@@ -805,4 +915,63 @@ onMounted(async () => {
   content: '点击选择日期';
   color: #c8c9cc;
 }
+
+/* v3: 协办支部多选行 */
+.co-branch-picker {
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  max-height: 70vh;
+}
+.co-branch-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid #eee;
+  font-size: 14px;
+}
+.co-branch-cancel { color: #666; cursor: pointer; min-width: 60px; }
+.co-branch-title { color: #222; font-weight: 600; flex: 1; text-align: center; }
+.co-branch-confirm { color: #B22222; cursor: pointer; min-width: 60px; text-align: right; font-weight: 600; }
+.co-branch-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+  max-height: 60vh;
+}
+.co-branch-empty {
+  text-align: center;
+  padding: 30px;
+  color: #999;
+  font-size: 13px;
+}
+.co-branch-row {
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  gap: 10px;
+  text-align: left;
+}
+.co-branch-row .check {
+  width: 20px;
+  height: 20px;
+  border: 1px solid #ddd;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: transparent;
+  background: #fff;
+  flex-shrink: 0;
+}
+.co-branch-row.active .check {
+  background: #B22222;
+  border-color: #B22222;
+  color: #fff;
+}
+.co-branch-row .info { flex: 1; min-width: 0; }
+.co-branch-row .name { font-size: 14px; color: #222; }
+.co-branch-row .sub { font-size: 12px; color: #999; margin-top: 2px; }
 </style>

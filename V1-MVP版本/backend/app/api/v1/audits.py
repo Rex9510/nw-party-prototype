@@ -53,7 +53,7 @@ async def list_pending(
 ) -> AuditListResponse:
     """当前用户的待审核列表。
 
-    - 社区委员（community_organizer）：本社区、待社区审核、提交人 ≠ 自己
+    - 社区委员（community_organizer）：本社区、待社区审核（含自己提交的，但操作层禁止自审）
     - 街道负责人（street_lead）：全街道、待街道审核
     - 系统管理员：全
     """
@@ -68,7 +68,8 @@ async def list_pending(
             Activity.community_id == user.community_id,
             AuditFlow.current_node == "community_review",
             AuditFlow.status == "in_progress",
-            Activity.created_by != user.id,  # 不可自审
+            # 不排除自己提交的——用户需要看到"等待他人审核"的状态
+            # 自审保护在 _do_audit_action 的 403 里兜底
         )
     elif user.role == User.ROLE_STREET_LEAD:
         stmt = stmt.where(
@@ -106,11 +107,9 @@ async def list_history(
         .order_by(Activity.updated_at.desc())
     )
 
-    # 角色数据范围
-    if user.role == User.ROLE_COMMUNITY_ORG:
+    # 角色数据范围（v2026-07-28：社区组织员 = 本社区）
+    if user.role in (User.ROLE_COMMUNITY_ORG, User.ROLE_BRANCH_SEC):
         stmt = stmt.where(Activity.community_id == user.community_id)
-    elif user.role == User.ROLE_BRANCH_SEC:
-        stmt = stmt.where(Activity.organizer_branch_id == user.branch_id)
     elif user.role == User.ROLE_MEMBER:
         # 党员看自己参加的
         from app.models.activity import ActivityParticipant
@@ -154,11 +153,7 @@ async def _do_audit_action(
     if not activity:
         raise HTTPException(status_code=404, detail="活动不存在")
 
-    # 不可自审：任何节点都不能审核自己提交的活动
-    if activity.created_by == user.id:
-        raise HTTPException(status_code=403, detail="不可审核自己提交的活动")
-
-    # 节点权限校验
+    # 节点权限校验（已放开自审：社区组织委员/街道负责人可审核自己提交的活动）
     if af.current_node == "community_review":
         if user.role != User.ROLE_COMMUNITY_ORG:
             raise HTTPException(status_code=403, detail="仅社区组织委员可初审")

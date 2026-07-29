@@ -1,8 +1,63 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+// v2026-07-29: 给 keep-alive 用的组件名
+defineOptions({ name: 'AuditPending' })
+
+import { ref, onMounted, computed } from 'vue'
 import { showToast, showSuccessToast } from 'vant'
 import { auditsApi, type AuditItem } from '@/api/audits'
 import { activitiesApi, type Activity } from '@/api/activities'
+import { orgsApi, type StreetTreeNode } from '@/api/orgs'
+import { dictsApi, type DictItem } from '@/api/dicts'
+import { formatDateTime } from '@/utils/date'
+
+// 缓存组织树（用于按 ids 查名字）
+const orgTree = ref<StreetTreeNode[]>([])
+// 培训对象字典（code → 中文名）
+const categoryMap = ref<Record<string, string>>({})
+
+// 把 co_organize_branch_ids 转 names
+const coBranchNames = computed(() => {
+  if (!detail.value?.co_organize_branch_ids?.length) return []
+  const flat: { id: number; name: string }[] = []
+  for (const s of orgTree.value) {
+    for (const c of s.communities || []) {
+      for (const b of c.branches || []) {
+        flat.push({ id: b.id, name: `${s.name} / ${c.name} / ${b.name}` })
+      }
+    }
+  }
+  return detail.value.co_organize_branch_ids
+    .map((id) => flat.find((b) => b.id === id)?.name)
+    .filter(Boolean) as string[]
+})
+
+// 培训对象 code → 中文
+const audienceCategoryText = computed(() => {
+  const arr = detail.value?.audience_category || []
+  if (!arr.length) return '-'
+  return arr.map((c) => categoryMap.value[c] || c).join('、')
+})
+
+// 学习方式 code → label
+const STUDY_METHOD_LABELS: Record<string, string> = {
+  party_meeting: '党员大会',
+  theme_day: '主题党日',
+  onsite_teaching: '现场教学',
+  special_lecture: '专题党课',
+}
+
+// 参加人员所属组织：按 org_level 取对应级别名字
+function memberOrgName(p: { member_org_level?: string | null; member_branch_name?: string | null; member_community_name?: string | null; member_street_name?: string | null }): string {
+  if (p.member_org_level === 'street' && p.member_street_name) return p.member_street_name
+  if (p.member_org_level === 'community' && p.member_community_name) return p.member_community_name
+  if (p.member_org_level === 'branch' && p.member_branch_name) return p.member_branch_name
+  return ''
+}
+const studyMethodsText = computed(() => {
+  const m = detail.value?.study_methods
+  if (!m || !m.length) return '-'
+  return m.map((c) => STUDY_METHOD_LABELS[c] || c).join('、')
+})
 
 const items = ref<AuditItem[]>([])
 const loading = ref(false)
@@ -132,6 +187,23 @@ async function load() {
   }
 }
 
+async function loadOrgs() {
+  try {
+    orgTree.value = await orgsApi.tree()
+  } catch (e) {
+    console.warn('[audit] loadOrgs failed', e)
+  }
+}
+
+async function loadCategories() {
+  try {
+    const list: DictItem[] = await dictsApi.trainingCategories()
+    categoryMap.value = Object.fromEntries(list.map((c) => [c.code, c.name]))
+  } catch (e) {
+    console.warn('[audit] loadCategories failed', e)
+  }
+}
+
 function onApprove(item: AuditItem) {
   actionItem.value = item
   actionType.value = 'approve'
@@ -192,6 +264,8 @@ async function onConfirmAction() {
 
 onMounted(() => {
   load()
+  loadOrgs()
+  loadCategories()
 })
 </script>
 
@@ -215,7 +289,7 @@ onMounted(() => {
           <div class="node-tag">{{ NODE_LABEL[item.current_node] || item.current_node }}</div>
         </div>
         <div class="meta">
-          <span>📅 {{ item.training_at }}</span>
+          <span>📅 {{ formatDateTime(item.training_at) }}</span>
           <span>📍 {{ item.location }}</span>
         </div>
         <div class="meta">
@@ -268,21 +342,37 @@ onMounted(() => {
         <div v-if="detailLoading" class="detail-status">加载中…</div>
         <div v-else-if="detail" class="detail-body">
           <div class="detail-theme">{{ detail.theme }}</div>
-          <div class="detail-row"><span class="lbl">📅 培训时间</span><span>{{ detail.training_at }}</span></div>
+          <div class="detail-row"><span class="lbl">📅 培训时间</span><span>{{ formatDateTime(detail.training_at) }}</span></div>
           <div class="detail-row"><span class="lbl">📍 培训地点</span><span>{{ detail.location }}</span></div>
           <div class="detail-row"><span class="lbl">🎤 讲师</span><span>{{ detail.lecturer_name || '-' }}</span></div>
           <div class="detail-row"><span class="lbl">🌐 形式</span><span>{{ detail.online_offline === 'online' ? '线上' : detail.online_offline === 'offline' ? '线下' : '混合' }}</span></div>
           <div class="detail-row"><span class="lbl">📚 集中学习</span><span>{{ detail.is_centralized ? '是' : '否' }}</span></div>
+          <div v-if="detail.is_centralized" class="detail-row"><span class="lbl">📋 学习方式</span><span>{{ studyMethodsText }}</span></div>
           <div class="detail-row"><span class="lbl">💡 创新理论教育</span><span>{{ detail.is_innovation_theory ? '是' : '否' }}</span></div>
-          <div class="detail-row"><span class="lbl">🏷️ 培训来源</span><span>{{ detail.source_type === 'upper_send' ? '上级送课' : '自行组织' }}</span></div>
-          <div class="detail-row"><span class="lbl">👥 参加人数</span><span>{{ detail.participant_count }} 人</span></div>
-          <div class="detail-row"><span class="lbl">⏱️ 学时</span><span>{{ detail.study_hours }} 学时</span></div>
+          <!-- v3: 举办单位 + 二级字段 -->
+          <div class="detail-row"><span class="lbl">🏢 举办单位</span><span>{{ detail.organize_type === 'upper_send' ? '上级送课' : '自行组织' }}</span></div>
+          <div v-if="detail.organize_type === 'self_organize' && coBranchNames.length" class="detail-row">
+            <span class="lbl">🏛️ 协办支部</span>
+            <span class="branch-list">
+              <span v-for="(n, i) in coBranchNames" :key="i" class="branch-chip">{{ n }}</span>
+            </span>
+          </div>
+          <div v-else-if="detail.organize_type === 'self_organize' && !coBranchNames.length" class="detail-row">
+            <span class="lbl">🏛️ 协办支部</span><span class="muted">未选择</span>
+          </div>
+          <div v-if="detail.organize_type === 'upper_send'" class="detail-row"><span class="lbl">📋 具体部门</span><span>{{ detail.upper_org || '-' }}</span></div>
+          <!-- v2: 培训对象多选 -->
+          <div class="detail-row"><span class="lbl">👥 培训对象</span><span>{{ audienceCategoryText }}</span></div>
+          <div class="detail-row"><span class="lbl">🧑‍🤝‍🧑 参加人数</span><span>{{ detail.participant_count }} 人</span></div>
+          <div class="detail-row"><span class="lbl">⏱️ 学时</span><span>{{ detail.study_hours || '-' }} 学时</span></div>
 
           <div v-if="detail.participants && detail.participants.length" class="detail-section">
             <div class="section-title">参加人员（{{ detail.participants.length }}）</div>
             <div class="member-list">
               <div v-for="p in detail.participants" :key="p.id" class="member-item">
-                <span>👤 {{ p.member_name || '党员 #' + p.member_id }}</span>
+                <span>👤 {{ p.member_name || '党员 #' + p.member_id }}
+                  <span v-if="memberOrgName(p)" class="member-org">{{ memberOrgName(p) }}</span>
+                </span>
                 <span class="member-phone" v-if="p.member_phone">{{ p.member_phone }}</span>
                 <span class="member-hours">+{{ p.study_hours }} 学时</span>
               </div>
@@ -336,7 +426,7 @@ onMounted(() => {
         <div class="log-list">
           <div v-if="!logs.length" class="empty-mini">暂无日志</div>
           <div v-for="log in logs" :key="log.id" class="log-item">
-            <div class="log-time">{{ log.created_at }}</div>
+            <div class="log-time">{{ formatDateTime(log.created_at) }}</div>
             <div class="log-action">
               <span class="log-action-tag" :class="ACTION_LABEL[log.action]?.cls || ''">
                 {{ ACTION_LABEL[log.action]?.text || log.action }}
@@ -485,6 +575,35 @@ onMounted(() => {
 .member-item:last-child { border-bottom: none; }
 .member-phone { color: #888; font-size: 12px; }
 .member-hours { color: #B22222; font-weight: 600; flex-shrink: 0; }
+.member-org {
+  font-size: 11px;
+  color: #888;
+  background: #f5f5f5;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-left: 6px;
+  font-weight: normal;
+  vertical-align: middle;
+}
+.muted { color: #999 !important; }
+.branch-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: flex-end;
+  max-width: 60%;
+}
+.branch-chip {
+  font-size: 12px;
+  background: #FFF0F0;
+  color: #B22222;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .att-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

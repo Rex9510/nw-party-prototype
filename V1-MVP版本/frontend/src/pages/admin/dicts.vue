@@ -31,6 +31,7 @@ const branches = ref<Branch[]>([])
 const selectedStreetId = ref<number | null>(null)
 const selectedCommunityId = ref<number | null>(null)
 const orgLoading = ref(false)
+const movingId = ref<number | null>(null)
 
 const selectedStreet = computed(() =>
   streets.value.find((s) => s.id === selectedStreetId.value) || null,
@@ -39,10 +40,26 @@ const selectedCommunity = computed(() =>
   communities.value.find((c) => c.id === selectedCommunityId.value) || null,
 )
 const filteredCommunities = computed(() =>
-  communities.value.filter((c) => c.street_id === selectedStreetId.value),
+  communities.value
+    .filter((c) => c.street_id === selectedStreetId.value)
+    .slice()
+    .sort((a, b) => a.sort - b.sort || a.id - b.id),
 )
 const filteredBranches = computed(() =>
-  branches.value.filter((b) => b.community_id === selectedCommunityId.value),
+  branches.value
+    .filter((b) => b.community_id === selectedCommunityId.value)
+    .slice()
+    .sort((a, b) => a.sort - b.sort || a.id - b.id),
+)
+
+const sortedStreets = computed(() =>
+  streets.value.slice().sort((a, b) => a.sort - b.sort || a.id - b.id),
+)
+const sortedCommunities = computed(() =>
+  communities.value.slice().sort((a, b) => a.sort - b.sort || a.id - b.id),
+)
+const sortedBranches = computed(() =>
+  branches.value.slice().sort((a, b) => a.sort - b.sort || a.id - b.id),
 )
 
 async function loadOrg() {
@@ -55,8 +72,8 @@ async function loadOrg() {
     } else {
       streets.value = allStreets
     }
-    if (streets.value.length && !selectedStreetId.value) {
-      selectedStreetId.value = streets.value[0].id
+    if (sortedStreets.value.length && !selectedStreetId.value) {
+      selectedStreetId.value = sortedStreets.value[0].id
     }
     // 社区：街道负责人只看自己街道下的
     if (isStreetLead.value && auth.user?.street_id) {
@@ -83,7 +100,7 @@ async function loadOrg() {
 function selectStreet(id: number) {
   selectedStreetId.value = id
   // 重置社区选中
-  const first = communities.value.find((c) => c.street_id === id)
+  const first = filteredCommunities.value.find((c) => c.street_id === id)
   selectedCommunityId.value = first?.id || null
 }
 
@@ -92,6 +109,81 @@ function communityCount(streetId: number) {
 }
 function branchCount(communityId: number) {
   return branches.value.filter((b) => b.community_id === communityId).length
+}
+
+// 通用：调 API 上下移某条（list 局部 reorder）
+async function moveItem<T extends { id: number; sort: number }>(
+  list: T[],
+  item: T,
+  direction: 'up' | 'down',
+  apiCall: (id: number) => Promise<any>,
+  reload: () => Promise<void>,
+) {
+  if (movingId.value) return
+  movingId.value = item.id
+  try {
+    const updated = direction === 'up'
+      ? await apiCall(item.id)
+      : await apiCall(item.id)
+    // 简单做法：调一次 reload，保证 sort 与服务端一致
+    await reload()
+  } catch (e: any) {
+    showToast({ message: e?.message || '移动失败', type: 'fail' })
+  } finally {
+    movingId.value = null
+  }
+}
+
+// 街道上下移（仅 admin 可见按钮，街道负责人看不到）
+async function moveStreet(s: Street, dir: 'up' | 'down') {
+  await moveItem(
+    sortedStreets.value,
+    s,
+    dir,
+    dir === 'up' ? orgsApi.moveStreetUp : orgsApi.moveStreetDown,
+    async () => {
+      const all = await orgsApi.streets()
+      if (isStreetLead.value && auth.user?.street_id) {
+        streets.value = all.filter((x) => x.id === auth.user!.street_id)
+      } else {
+        streets.value = all
+      }
+    },
+  )
+}
+
+// 社区上下移
+async function moveCommunity(c: Community, dir: 'up' | 'down') {
+  await moveItem(
+    filteredCommunities.value,
+    c,
+    dir,
+    dir === 'up' ? orgsApi.moveCommunityUp : orgsApi.moveCommunityDown,
+    async () => {
+      if (isStreetLead.value && auth.user?.street_id) {
+        communities.value = await orgsApi.communities(auth.user.street_id)
+      } else {
+        communities.value = await orgsApi.communities()
+      }
+    },
+  )
+}
+
+// 支部上下移
+async function moveBranch(b: Branch, dir: 'up' | 'down') {
+  await moveItem(
+    filteredBranches.value,
+    b,
+    dir,
+    dir === 'up' ? orgsApi.moveBranchUp : orgsApi.moveBranchDown,
+    async () => {
+      branches.value = await orgsApi.branches()
+      if (isStreetLead.value) {
+        const visibleCommunityIds = new Set(communities.value.map((c) => c.id))
+        branches.value = branches.value.filter((x) => visibleCommunityIds.has(x.community_id))
+      }
+    },
+  )
 }
 
 // 街道
@@ -244,10 +336,13 @@ function useDictTab(
   create: (code: string, name: string, sort: number) => Promise<DictItem>,
   update: (id: number, body: { name?: string; sort?: number }) => Promise<DictItem>,
   remove: (id: number) => Promise<any>,
+  moveUp: (id: number) => Promise<DictItem>,
+  moveDown: (id: number) => Promise<DictItem>,
   label: string,
 ) {
   const items = ref<DictItem[]>([])
   const loading = ref(false)
+  const movingId = ref<number | null>(null)
   const dialog = ref<{ show: boolean; mode: 'add' | 'edit'; id?: number; code: string; name: string; sort: number }>({
     show: false, mode: 'add', code: '', name: '', sort: 0,
   })
@@ -301,8 +396,21 @@ function useDictTab(
       if (e?.message) showToast({ message: e.message, type: 'fail' })
     }
   }
+  async function move(item: DictItem, dir: 'up' | 'down') {
+    if (movingId.value) return
+    movingId.value = item.id
+    try {
+      if (dir === 'up') await moveUp(item.id)
+      else await moveDown(item.id)
+      await load()
+    } catch (e: any) {
+      showToast({ message: e?.message || '移动失败', type: 'fail' })
+    } finally {
+      movingId.value = null
+    }
+  }
 
-  return { items, loading, dialog, load, openAdd, openEdit, save, removeItem }
+  return { items, loading, movingId, dialog, load, openAdd, openEdit, save, removeItem, move }
 }
 
 const cat = useDictTab(
@@ -310,6 +418,8 @@ const cat = useDictTab(
   (code, name, sort) => dictsApi.createTrainingCategory(code, name, sort),
   (id, body) => dictsApi.updateTrainingCategory(id, body),
   (id) => dictsApi.deleteTrainingCategory(id),
+  (id) => dictsApi.moveTrainingCategoryUp(id),
+  (id) => dictsApi.moveTrainingCategoryDown(id),
   '培训对象',
 )
 const src = useDictTab(
@@ -317,6 +427,8 @@ const src = useDictTab(
   (code, name, sort) => dictsApi.createTrainingSource(code, name, sort),
   (id, body) => dictsApi.updateTrainingSource(id, body),
   (id) => dictsApi.deleteTrainingSource(id),
+  (id) => dictsApi.moveTrainingSourceUp(id),
+  (id) => dictsApi.moveTrainingSourceDown(id),
   '培训来源',
 )
 
@@ -384,7 +496,7 @@ onMounted(() => {
                 还没有街道<br/>点右上「+ 新增」开始
               </div>
               <div
-                v-for="s in streets"
+                v-for="(s, sIdx) in sortedStreets"
                 :key="s.id"
                 class="row"
                 :class="{ active: selectedStreetId === s.id }"
@@ -396,6 +508,18 @@ onMounted(() => {
                 </div>
                 <div class="row-actions">
                   <template v-if="isAdmin">
+                    <van-button
+                      size="mini" plain icon="arrow-up"
+                      :disabled="sIdx === 0 || movingId === s.id"
+                      :loading="movingId === s.id"
+                      @click.stop="moveStreet(s, 'up')"
+                    />
+                    <van-button
+                      size="mini" plain icon="arrow-down"
+                      :disabled="sIdx === sortedStreets.length - 1 || movingId === s.id"
+                      :loading="movingId === s.id"
+                      @click.stop="moveStreet(s, 'down')"
+                    />
                     <van-button size="mini" plain @click.stop="openEditStreet(s)">改</van-button>
                     <van-button size="mini" plain type="danger" @click.stop="deleteStreet(s)">删</van-button>
                   </template>
@@ -424,7 +548,7 @@ onMounted(() => {
                 「{{ selectedStreet.name }}」下暂无社区<br/>点右上「+ 新增」开始
               </div>
               <div
-                v-for="c in filteredCommunities"
+                v-for="(c, cIdx) in filteredCommunities"
                 :key="c.id"
                 class="row"
                 :class="{ active: selectedCommunityId === c.id }"
@@ -435,6 +559,18 @@ onMounted(() => {
                   <div class="row-meta">{{ branchCount(c.id) }} 个支部</div>
                 </div>
                 <div class="row-actions">
+                  <van-button
+                    size="mini" plain icon="arrow-up"
+                    :disabled="cIdx === 0 || movingId === c.id"
+                    :loading="movingId === c.id"
+                    @click.stop="moveCommunity(c, 'up')"
+                  />
+                  <van-button
+                    size="mini" plain icon="arrow-down"
+                    :disabled="cIdx === filteredCommunities.length - 1 || movingId === c.id"
+                    :loading="movingId === c.id"
+                    @click.stop="moveCommunity(c, 'down')"
+                  />
                   <van-button size="mini" plain @click.stop="openEditCommunity(c)">改</van-button>
                   <van-button size="mini" plain type="danger" @click.stop="deleteCommunity(c)">删</van-button>
                 </div>
@@ -460,11 +596,23 @@ onMounted(() => {
               <div v-else-if="!filteredBranches.length" class="status empty-hint">
                 「{{ selectedCommunity?.name }}」下暂无支部<br/>点右上「+ 新增」开始
               </div>
-              <div v-for="b in filteredBranches" :key="b.id" class="row">
+              <div v-for="(b, bIdx) in filteredBranches" :key="b.id" class="row">
                 <div class="row-main">
                   <div class="row-name">{{ b.name }}</div>
                 </div>
                 <div class="row-actions">
+                  <van-button
+                    size="mini" plain icon="arrow-up"
+                    :disabled="bIdx === 0 || movingId === b.id"
+                    :loading="movingId === b.id"
+                    @click.stop="moveBranch(b, 'up')"
+                  />
+                  <van-button
+                    size="mini" plain icon="arrow-down"
+                    :disabled="bIdx === filteredBranches.length - 1 || movingId === b.id"
+                    :loading="movingId === b.id"
+                    @click.stop="moveBranch(b, 'down')"
+                  />
                   <van-button size="mini" plain @click="openEditBranch(b)">改</van-button>
                   <van-button size="mini" plain type="danger" @click="deleteBranch(b)">删</van-button>
                 </div>
@@ -483,12 +631,24 @@ onMounted(() => {
           <div v-if="cat.loading.value" class="status">加载中…</div>
           <div v-else-if="!cat.items.value.length" class="status">暂无类别</div>
           <div v-else class="card-list">
-            <div v-for="i in cat.items.value" :key="i.id" class="row-card">
+            <div v-for="(i, iIdx) in cat.items.value" :key="i.id" class="row-card">
               <div class="row-main">
                 <div class="row-name">{{ i.name }} <span class="code">({{ i.code }})</span></div>
                 <div class="row-meta">排序：{{ i.sort }}</div>
               </div>
               <div class="row-actions">
+                <van-button
+                  size="mini" plain icon="arrow-up"
+                  :disabled="iIdx === 0 || cat.movingId.value === i.id"
+                  :loading="cat.movingId.value === i.id"
+                  @click="cat.move(i, 'up')"
+                />
+                <van-button
+                  size="mini" plain icon="arrow-down"
+                  :disabled="iIdx === cat.items.value.length - 1 || cat.movingId.value === i.id"
+                  :loading="cat.movingId.value === i.id"
+                  @click="cat.move(i, 'down')"
+                />
                 <van-button size="mini" plain @click="cat.openEdit(i)">改</van-button>
                 <van-button size="mini" plain type="danger" @click="cat.removeItem(i)">删</van-button>
               </div>
@@ -506,12 +666,24 @@ onMounted(() => {
           <div v-if="src.loading.value" class="status">加载中…</div>
           <div v-else-if="!src.items.value.length" class="status">暂无来源</div>
           <div v-else class="card-list">
-            <div v-for="i in src.items.value" :key="i.id" class="row-card">
+            <div v-for="(i, iIdx) in src.items.value" :key="i.id" class="row-card">
               <div class="row-main">
                 <div class="row-name">{{ i.name }} <span class="code">({{ i.code }})</span></div>
                 <div class="row-meta">排序：{{ i.sort }}</div>
               </div>
               <div class="row-actions">
+                <van-button
+                  size="mini" plain icon="arrow-up"
+                  :disabled="iIdx === 0 || src.movingId.value === i.id"
+                  :loading="src.movingId.value === i.id"
+                  @click="src.move(i, 'up')"
+                />
+                <van-button
+                  size="mini" plain icon="arrow-down"
+                  :disabled="iIdx === src.items.value.length - 1 || src.movingId.value === i.id"
+                  :loading="src.movingId.value === i.id"
+                  @click="src.move(i, 'down')"
+                />
                 <van-button size="mini" plain @click="src.openEdit(i)">改</van-button>
                 <van-button size="mini" plain type="danger" @click="src.removeItem(i)">删</van-button>
               </div>

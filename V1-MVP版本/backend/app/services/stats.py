@@ -16,7 +16,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.activity import Activity
+from app.models.activity import Activity, ActivityParticipant
 from app.models.member import Member
 from app.models.party import Branch, Community, Street
 from app.models.study import StudyHour
@@ -116,9 +116,12 @@ async def compute_category_stats(
 
     stats = []
     for label, source_filter, audience_filter in CATEGORY_DEFS:
+        # v2: audience_category 是 list，做"包含"匹配（in）而不是 ==
         matched = [
             a for a in activities
-            if a.source_type == source_filter and a.audience_category == audience_filter
+            if a.source_type == source_filter
+            and isinstance(a.audience_category, list)
+            and audience_filter in a.audience_category
         ]
         session_count = len(matched)
         participant_count = sum(a.participant_count for a in matched)

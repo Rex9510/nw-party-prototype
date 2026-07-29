@@ -1,4 +1,5 @@
 """/api/v1/stats 统计路由（年/月/日 三维度）。"""
+import re
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 from jose import JWTError
@@ -144,7 +145,8 @@ async def export_stats(
     items = await compute_category_stats(db, user, start, end)
     member_rows = await compute_member_hours_in_range(db, user, start, end)
     content = generate_stats_xlsx(label, items, member_rows=member_rows, user=user)
-    safe_label = label.replace(" ", "_").replace("-", "")
+    # latin-1 只能编码 ASCII + 西欧字符，中文直接炸 → 只保留 [a-zA-Z0-9_-]
+    safe_label = re.sub(r'[^a-zA-Z0-9_-]', '', label.replace(" ", "_").replace("-", ""))
     return StreamingResponse(
         iter([content]),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

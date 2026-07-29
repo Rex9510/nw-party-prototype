@@ -1,0 +1,1 @@
+import{I as r}from"./index-Ds6rhNGn.js";const u={list(t){return r.get("/study-hours",t)},me(t){return r.get("/study-hours/me",{year:t})},member(t,s){return r.get(`/study-hours/${t}`,{year:s})}};export{u as s};

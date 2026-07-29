@@ -1,18 +1,20 @@
 <script setup lang="ts">
 /**
- * 新增人员 - 3 级联动 picker（街道 → 社区 → 支部）
+ * 新增人员 - 单选 Cascader（街道 / 社区 / 支部 任选一级）
  *
  * 角色规则（创建者的角色决定可选范围）：
- * - 支部书记 (branch_secretary)：可加本支部成员。3 级全部自动锁定为本人所属。
- * - 社区组织委员 (community_organizer)：可加本社区下任意支部。街道+社区锁定，支部可选。
- * - 街道负责人 (street_lead)：可加本街道下任意支部。街道锁定，社区+支部可选。
- * - 系统管理员 (system_admin)：3 级全部可选。
+ * - 社区组织员 (branch_secretary)：只能选到本支部（org_level=branch，3 级锁定）
+ * - 社区组织委员 (community_organizer)：可选到本社区/本社区下任何支部（org_level=community 或 branch）
+ * - 街道负责人 (street_lead)：可选到本街道/本街道下任何社区或支部（org_level=street/community/branch）
+ * - 系统管理员 (system_admin)：3 级都可任选
+ *
+ * v3：表单只记录 org_level + 对应组织 ID，提交时由后端反查 community_id/street_id。
  */
 import { ref, computed, nextTick, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showToast, showSuccessToast } from 'vant'
 import { membersApi } from '@/api/members'
-import { orgsApi, type Street, type Community, type Branch } from '@/api/orgs'
+import { orgsApi, type Street, type Community, type Branch, type StreetTreeNode } from '@/api/orgs'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
@@ -26,227 +28,234 @@ const editingId = computed<number | null>(() => {
 })
 const isEdit = computed(() => editingId.value !== null)
 
+type OrgLevel = '' | 'street' | 'community' | 'branch'
+
 const form = ref({
   name: '',
   phone: '',
   id_card_no: '',
   gender: '' as '' | 'male' | 'female',
   join_date: '',
+  org_level: '' as OrgLevel,   // 'street' | 'community' | 'branch'
   street_id: 0,
   community_id: 0,
   branch_id: 0,
   roles: [] as string[],
   identities: [] as string[],
   photo_urls: [] as string[],
-  is_mobile_member: false as boolean,        // 是否流动党员
-  flow_in_date: '' as string,               // 流入日期（仅 is_mobile_member=true 时必填）
+  is_mobile_member: false as boolean,
+  flow_in_date: '' as string,
 })
 const submitting = ref(false)
 const errorMsg = ref('')
 
-const streets = ref<Street[]>([])
-const communities = ref<Community[]>([])
-const branches = ref<Branch[]>([])
+// ===== 组织树 =====
+const tree = ref<StreetTreeNode[]>([])
+
+async function loadTree() {
+  try {
+    const role = auth.user?.role
+    if (role === 'system_admin') {
+      tree.value = await orgsApi.tree()
+    } else if (auth.user?.street_id) {
+      // 其他角色：只加载本街道及以下
+      const all = await orgsApi.tree()
+      tree.value = all.filter((s) => s.id === auth.user!.street_id)
+    } else {
+      tree.value = await orgsApi.tree()
+    }
+  } catch (e) {
+    console.warn('loadTree failed', e)
+  }
+}
 
 const role = computed(() => auth.user?.role || '')
 
-// 各角色 picker 是否可编辑
-const streetEditable = computed(() => role.value === 'system_admin')
-const communityEditable = computed(() => ['system_admin', 'street_lead'].includes(role.value))
-const branchEditable = computed(() =>
-  ['system_admin', 'street_lead', 'community_organizer'].includes(role.value),
-)
-
-// 3 级级联：上一级变化时，清空下级
-watch(() => form.value.street_id, (v, old) => {
-  if (v !== old) {
-    form.value.community_id = 0
-    form.value.branch_id = 0
+// 角色可选的 org_level 范围
+const allowedLevels = computed<OrgLevel[]>(() => {
+  const r = role.value
+  if (r === 'system_admin' || r === 'street_lead') {
+    return ['street', 'community', 'branch']
   }
-})
-watch(() => form.value.community_id, (v, old) => {
-  if (v !== old) {
-    form.value.branch_id = 0
+  if (r === 'community_organizer') {
+    return ['community', 'branch']
   }
+  if (r === 'branch_secretary') {
+    return ['branch']
+  }
+  return ['branch']
 })
 
-// 根据当前选中的 street 过滤 community
-const availableCommunities = computed(() => {
-  if (!form.value.street_id) return []
-  return communities.value.filter((c) => c.street_id === form.value.street_id)
+// ===== 3 步走组织选择（街道 → 社区 → 支部，每步可"选到这一级"立即提交） =====
+type Action = { name: string; subname?: string; value: number; level?: OrgLevel }
+const showOrgPicker = ref(false)
+const pickerStep = ref<'street' | 'community' | 'branch'>('street')
+const pickerBreadcrumb = ref<{ name: string; level: OrgLevel; value: number }[]>([])
+// 当前级可选的 nodes（每 node 含 level）
+const pickerActions = computed<Action[]>(() => {
+  const list: Action[] = []
+  const allowed = allowedLevels.value
+  if (pickerStep.value === 'street') {
+    for (const s of tree.value) {
+      const actions: Action = { name: s.name, value: s.id, level: 'street' }
+      if (s.id === form.value.street_id) actions.subname = '✓ 当前选中'
+      if (allowed.includes('street')) {
+        // 可以选到这一级：subname 给提示
+        actions.subname = actions.subname ? `${actions.subname} · 选到街道` : '点此选到街道'
+      }
+      list.push(actions)
+    }
+  } else if (pickerStep.value === 'community') {
+    const street = tree.value.find((s) => s.id === pickerBreadcrumb.value[0]?.value)
+    const allowed2 = allowed
+    for (const c of street?.communities || []) {
+      const a: Action = { name: c.name, value: c.id, level: 'community' }
+      if (c.id === form.value.community_id) a.subname = '✓ 当前选中'
+      if (allowed2.includes('community')) {
+        a.subname = a.subname ? `${a.subname} · 选到社区` : '点此选到社区'
+      }
+      list.push(a)
+    }
+  } else if (pickerStep.value === 'branch') {
+    const street = tree.value.find((s) => s.id === pickerBreadcrumb.value[0]?.value)
+    const community = street?.communities.find((c) => c.id === pickerBreadcrumb.value[1]?.value)
+    for (const b of community?.branches || []) {
+      const a: Action = { name: b.name, value: b.id, level: 'branch' }
+      if (b.id === form.value.branch_id) a.subname = '✓ 当前选中'
+      list.push(a)
+    }
+  }
+  return list
 })
 
-// 根据当前选中的 community 过滤 branch
-const availableBranches = computed(() => {
-  if (!form.value.community_id) return []
-  return branches.value.filter((b) => b.community_id === form.value.community_id)
+function levelLabel(l: OrgLevel): string {
+  if (l === 'street') return '街道级'
+  if (l === 'community') return '社区级'
+  if (l === 'branch') return '支部级'
+  return ''
+}
+
+// 顶部"面包屑"，可点击回退
+const pickerTitle = computed(() => {
+  if (pickerStep.value === 'street') return '选择街道'
+  if (pickerStep.value === 'community') {
+    const b = pickerBreadcrumb.value[0]
+    return `选择社区（${b?.name || ''}）`
+  }
+  const b = pickerBreadcrumb.value[1]
+  return `选择支部（${b?.name || ''}）`
 })
 
-async function loadOrgs() {
-  try {
-    // 街道：管理员看全部，其他角色看自己所在的（一般就 1 个）
-    if (role.value === 'system_admin') {
-      streets.value = await orgsApi.streets()
-    } else if (auth.user?.street_id) {
-      const all = await orgsApi.streets()
-      streets.value = all.filter((s) => s.id === auth.user!.street_id)
-    }
+const selectedOrgText = computed(() => {
+  if (form.value.org_level === 'branch' && form.value.branch_id) {
+    const s = tree.value.find((x) => x.communities?.some((c) => c.branches?.some((b) => b.id === form.value.branch_id)))
+    const c = s?.communities.find((x) => x.branches?.some((b) => b.id === form.value.branch_id))
+    const b = c?.branches.find((x) => x.id === form.value.branch_id)
+    return b ? `${s?.name} / ${c?.name} / ${b.name}（${levelLabel('branch')}）` : ''
+  }
+  if (form.value.org_level === 'community' && form.value.community_id) {
+    const s = tree.value.find((x) => x.communities?.some((c) => c.id === form.value.community_id))
+    const c = s?.communities.find((x) => x.id === form.value.community_id)
+    return c ? `${s?.name} / ${c.name}（${levelLabel('community')}）` : ''
+  }
+  if (form.value.org_level === 'street' && form.value.street_id) {
+    const s = tree.value.find((x) => x.id === form.value.street_id)
+    return s ? `${s.name}（${levelLabel('street')}）` : ''
+  }
+  return ''
+})
 
-    // 社区：取所有（按 street_id 过滤）
-    if (auth.user?.street_id) {
-      communities.value = await orgsApi.communities(auth.user.street_id)
-    } else {
-      communities.value = await orgsApi.communities()
-    }
+function openOrgPicker() {
+  // 重置到第 1 步
+  pickerStep.value = 'street'
+  pickerBreadcrumb.value = []
+  showOrgPicker.value = true
+}
 
-    // 支部：取所有
-    branches.value = await orgsApi.branches()
+function commitOrg(level: OrgLevel, value: number) {
+  form.value.street_id = 0
+  form.value.community_id = 0
+  form.value.branch_id = 0
+  form.value.org_level = level
+  if (level === 'street') form.value.street_id = value
+  if (level === 'community') form.value.community_id = value
+  if (level === 'branch') form.value.branch_id = value
+  showOrgPicker.value = false
+}
 
-    // 预选：根据角色
-    await nextTick()
-    initFormByRole()
+function onOrgActionSelect(action: Action) {
+  // 默认：点 item = 选到该级（commit）
+  commitOrg(action.level as OrgLevel, action.value)
+}
 
-    // 调试：方便排查"为啥没默认加载"
-    if (auth.user) {
-      console.log('[members/new] user 组织信息', {
-        role: auth.user.role,
-        street_id: auth.user.street_id,
-        community_id: auth.user.community_id,
-        branch_id: auth.user.branch_id,
-        streets_loaded: streets.value.length,
-        communities_loaded: communities.value.length,
-        branches_loaded: branches.value.length,
-        form_after_init: { ...form.value },
-      })
-    }
-  } catch (e) {
-    console.warn('loadOrgs failed', e)
+function onOrgItemGotoChildren(action: Action) {
+  // 点右侧箭头 = 进下一步（不 commit）
+  if (action.level === 'street') {
+    pickerBreadcrumb.value = [{ name: action.name, level: 'street', value: action.value }]
+    pickerStep.value = 'community'
+  } else if (action.level === 'community') {
+    pickerBreadcrumb.value.push({ name: action.name, level: 'community', value: action.value })
+    pickerStep.value = 'branch'
   }
 }
 
-async function initFormByRole() {
-  // 用本地变量避免响应式 trap（编辑模式 watch 抢着清空）
-  const u = auth.user
-  if (!u) return
+function onOrgPickerCancel() {
+  showOrgPicker.value = false
+}
 
-  // 仅在"该字段可编辑"或"该字段未被接口回填过时"才覆盖
-  // 这里采用：先按用户所属填，再用列表兜底
-  // 街道
-  if (!form.value.street_id && u.street_id) {
-    form.value.street_id = u.street_id
-  } else if (!form.value.street_id && streets.value.length) {
-    form.value.street_id = streets.value[0].id
-  }
-
-  // 社区（依赖 street_id 已被设上）
-  await nextTick()
-  if (!form.value.community_id && u.community_id) {
-    // 校验该 community 确实在可用列表里（避免用户跨组织时拉不到）
-    if (availableCommunities.value.some((c) => c.id === u.community_id)) {
-      form.value.community_id = u.community_id
-    }
-  }
-  if (!form.value.community_id && availableCommunities.value.length) {
-    form.value.community_id = availableCommunities.value[0].id
-  }
-
-  // 支部
-  await nextTick()
-  if (!form.value.branch_id && u.branch_id) {
-    if (availableBranches.value.some((b) => b.id === u.branch_id)) {
-      form.value.branch_id = u.branch_id
-    }
-  }
-  if (!form.value.branch_id && availableBranches.value.length) {
-    form.value.branch_id = availableBranches.value[0].id
+function goBackOrgStep() {
+  if (pickerStep.value === 'branch') {
+    pickerStep.value = 'community'
+    pickerBreadcrumb.value.pop()
+  } else if (pickerStep.value === 'community') {
+    pickerStep.value = 'street'
+    pickerBreadcrumb.value = []
+  } else {
+    showOrgPicker.value = false
   }
 }
 
-// ===== 选中的文本（显示用） =====
-const selectedStreetName = computed(() => {
-  return streets.value.find((s) => s.id === form.value.street_id)?.name || '未选择'
-})
-const selectedCommunityName = computed(() => {
-  return communities.value.find((c) => c.id === form.value.community_id)?.name || '未选择'
-})
-const selectedBranchName = computed(() => {
-  if (!form.value.branch_id) return ''
-  const b = branches.value.find((x) => x.id === form.value.branch_id)
-  return b?.name || ''
+// 顶部"选到 XX 级"按钮
+const canPickThisLevel = computed(() => {
+  if (pickerStep.value === 'street') return allowedLevels.value.includes('street')
+  if (pickerStep.value === 'community') return allowedLevels.value.includes('community')
+  return false // branch 没有更上级
 })
 
-// ===== 街道 picker（action-sheet 列表，PC 友好） =====
-const showStreetPicker = ref(false)
-const streetActions = computed(() =>
-  streets.value.map((s) => ({
-    name: s.name,
-    subname: s.id === form.value.street_id ? '✓ 当前选中' : '',
-    value: s.id,
-  })),
-)
-function onStreetSelect(action: { value: number }) {
-  form.value.street_id = action.value
+function pickCurrentLevel() {
+  if (pickerStep.value === 'street' && pickerBreadcrumb.value[0]) {
+    commitOrg('street', pickerBreadcrumb.value[0].value)
+  } else if (pickerStep.value === 'community' && pickerBreadcrumb.value[1]) {
+    commitOrg('community', pickerBreadcrumb.value[1].value)
+  }
 }
 
-// ===== 社区 picker（action-sheet 列表） =====
-const showCommunityPicker = ref(false)
-const communityActions = computed(() =>
-  availableCommunities.value.map((c) => ({
-    name: c.name,
-    subname: c.id === form.value.community_id ? '✓ 当前选中' : '',
-    value: c.id,
-  })),
-)
-function onCommunitySelect(action: { value: number }) {
-  form.value.community_id = action.value
-}
-
-// ===== 支部 picker（action-sheet 列表） =====
-const showBranchPicker = ref(false)
-const branchActions = computed(() =>
-  availableBranches.value.map((b) => ({
-    name: b.name,
-    subname: b.id === form.value.branch_id ? '✓ 当前选中' : '',
-    value: b.id,
-  })),
-)
-function onBranchSelect(action: { value: number }) {
-  form.value.branch_id = action.value
-}
-
-// ===== 入党时间 picker：Vant van-date-picker（年/月/日 3 滚轮，更稳） =====
+// ===== 入党时间 picker =====
 const showJoinDatePicker = ref(false)
-
-// van-date-picker 接收的 selectedValues 格式是 ['YYYY', 'MM', 'DD']
 const joinDatePickerValue = ref<string[]>([])
-
-// van-date-picker 的列配置
 const joinDatePickerColumns = computed(() => {
-  const now = new Date().getFullYear()
+  const now = new Date()
+  const curYear = now.getFullYear()
   const years: { text: string; value: string }[] = []
-  for (let y = now + 5; y >= 1950; y--) years.push({ text: `${y} 年`, value: String(y) })
+  for (let y = curYear + 5; y >= 1950; y--) years.push({ text: `${y} 年`, value: String(y) })
   const months: { text: string; value: string }[] = []
   for (let m = 1; m <= 12; m++) months.push({ text: `${m} 月`, value: String(m).padStart(2, '0') })
-  // 日期：根据当前选中年/月动态算（van-date-picker 会按 columnsFn 调）
-  const [yStr, mStr] = joinDatePickerValue.value
-  const y = yStr ? +yStr : now
-  const m = mStr ? +mStr : new Date().getMonth() + 1
+  // 拿当前 picker 选中的 y/m，没有就默认当前
+  const val = joinDatePickerValue.value || []
+  const yStr = val[0]
+  const mStr = val[1]
+  const y = yStr && !isNaN(+yStr) ? +yStr : curYear
+  const m = mStr && !isNaN(+mStr) ? +mStr : (now.getMonth() + 1)
   const lastDay = new Date(y, m, 0).getDate()
   const days: { text: string; value: string }[] = []
   for (let d = 1; d <= lastDay; d++) days.push({ text: `${d} 日`, value: String(d).padStart(2, '0') })
-  return [
-    { values: years },
-    { values: months },
-    { values: days },
-  ]
+  return [years, months, days]
 })
-
 const displayDate = computed(() => {
   if (!form.value.join_date) return ''
   const [y, m, d] = form.value.join_date.split('-')
   return `${y}年${Number(m)}月${Number(d)}日`
 })
-
 function openJoinDatePicker() {
   const n = new Date()
   let y = n.getFullYear(), m = n.getMonth() + 1, d = n.getDate()
@@ -257,52 +266,43 @@ function openJoinDatePicker() {
   joinDatePickerValue.value = [String(y), String(m).padStart(2, '0'), String(d).padStart(2, '0')]
   showJoinDatePicker.value = true
 }
-
 function onJoinDateConfirm({ selectedValues }: { selectedValues: string[] }) {
   const [y, m, d] = selectedValues
   form.value.join_date = `${y}-${m}-${d}`
   showJoinDatePicker.value = false
 }
-
-// 切年/月时如果当前日超出新月最大天数，重置到 1 号
 watch(joinDatePickerValue, (v) => {
   if (!v || v.length !== 3) return
   const y = +v[0], m = +v[1], d = +v[2]
   const lastDay = new Date(y, m, 0).getDate()
-  if (d > lastDay) {
-    joinDatePickerValue.value = [v[0], v[1], '01']
-  }
+  if (d > lastDay) joinDatePickerValue.value = [v[0], v[1], '01']
 })
 
-// ===== 流动党员 / 流入日期 picker（Vant van-date-picker） =====
+// ===== 流动党员 / 流入日期 =====
 const showFlowInDatePicker = ref(false)
 const flowInDatePickerValue = ref<string[]>([])
-
 const flowInDatePickerColumns = computed(() => {
-  const now = new Date().getFullYear()
+  const now = new Date()
+  const curYear = now.getFullYear()
   const years: { text: string; value: string }[] = []
-  for (let y = now + 5; y >= 1950; y--) years.push({ text: `${y} 年`, value: String(y) })
+  for (let y = curYear; y >= 1950; y--) years.push({ text: `${y} 年`, value: String(y) })
   const months: { text: string; value: string }[] = []
   for (let m = 1; m <= 12; m++) months.push({ text: `${m} 月`, value: String(m).padStart(2, '0') })
-  const [yStr, mStr] = flowInDatePickerValue.value
-  const y = yStr ? +yStr : now
-  const m = mStr ? +mStr : new Date().getMonth() + 1
+  const val = flowInDatePickerValue.value || []
+  const yStr = val[0]
+  const mStr = val[1]
+  const y = yStr && !isNaN(+yStr) ? +yStr : curYear
+  const m = mStr && !isNaN(+mStr) ? +mStr : (now.getMonth() + 1)
   const lastDay = new Date(y, m, 0).getDate()
   const days: { text: string; value: string }[] = []
   for (let d = 1; d <= lastDay; d++) days.push({ text: `${d} 日`, value: String(d).padStart(2, '0') })
-  return [
-    { values: years },
-    { values: months },
-    { values: days },
-  ]
+  return [years, months, days]
 })
-
-const flowInDisplayDate = computed(() => {
+const displayFlowInDate = computed(() => {
   if (!form.value.flow_in_date) return ''
   const [y, m, d] = form.value.flow_in_date.split('-')
   return `${y}年${Number(m)}月${Number(d)}日`
 })
-
 function openFlowInDatePicker() {
   const n = new Date()
   let y = n.getFullYear(), m = n.getMonth() + 1, d = n.getDate()
@@ -313,138 +313,101 @@ function openFlowInDatePicker() {
   flowInDatePickerValue.value = [String(y), String(m).padStart(2, '0'), String(d).padStart(2, '0')]
   showFlowInDatePicker.value = true
 }
-
 function onFlowInDateConfirm({ selectedValues }: { selectedValues: string[] }) {
   const [y, m, d] = selectedValues
   form.value.flow_in_date = `${y}-${m}-${d}`
   showFlowInDatePicker.value = false
 }
-
 watch(flowInDatePickerValue, (v) => {
   if (!v || v.length !== 3) return
-  const y = +v[0], m = +v[1], d = +v[2]
-  const lastDay = new Date(y, m, 0).getDate()
-  if (d > lastDay) {
-    flowInDatePickerValue.value = [v[0], v[1], '01']
-  }
+  const m = +v[1], d = +v[2]
+  const lastDay = new Date(+v[0], m, 0).getDate()
+  if (d > lastDay) flowInDatePickerValue.value = [v[0], v[1], '01']
 })
 
-// 流动党员 = false 时清空 flow_in_date
+// 流动党员开关联动：开启时清空
 watch(() => form.value.is_mobile_member, (v) => {
   if (!v) form.value.flow_in_date = ''
 })
 
-// 切月份时如果当前日超出新月天数，重置到 1 号
-//（已迁移到 flowInDatePickerValue 的 watch，见下方）
-
-// ===== 角色 & 身份选项 =====
-// 全集（按权限从高到低排）
-const ALL_ROLE_OPTIONS = [
+// ===== 角色/身份 选项（仅展示） =====
+const ROLE_OPTIONS = [
   { label: '系统管理员', value: 'system_admin' },
   { label: '街道负责人', value: 'street_lead' },
   { label: '社区组织委员', value: 'community_organizer' },
-  { label: '支部书记', value: 'branch_secretary' },
+  { label: '社区组织员', value: 'branch_secretary' },
   { label: '党员', value: 'party_member' },
 ]
-// 按"创建者自己的角色"裁剪可选项 —— 只能给自己及以下的角色：
-// - 系统管理员 → 5 个全选
-// - 街道负责人 → 4 个（街道、社区、支部、党员）
-// - 社区组织委员 → 3 个（社区、支部、党员）
-// - 支部书记 → 2 个（支部、党员）
-// - 党员 → 0 个（无法给任何人赋角色）
-const ROLE_RANK: Record<string, number> = {
-  system_admin: 0,
-  street_lead: 1,
-  community_organizer: 2,
-  branch_secretary: 3,
-  party_member: 4,
-}
-const roleOptions = computed(() => {
-  const fromIdx = ROLE_RANK[role.value]
-  if (fromIdx === undefined) return []
-  // 从自己所在 rank 开始，往下取所有（包含自己）
-  return ALL_ROLE_OPTIONS.slice(fromIdx)
-})
-// 角色权限变化时，把已选但不属于自己的角色剔掉（避免脏数据）
-watch(roleOptions, (opts) => {
-  const allowed = new Set(opts.map((o) => o.value))
-  form.value.roles = form.value.roles.filter((r) => allowed.has(r))
-})
-const identityOptions = [
-  { label: '普通党员' },
-  { label: '党支部书记' },
-  { label: '党委副书记' },
-  { label: '党委委员' },
-  { label: '支委会委员' },
+const IDENTITY_OPTIONS = [
+  { label: '普通党员', value: '普通党员' },
+  { label: '党组织书记', value: '党组织书记' },
+  { label: '副书记', value: '副书记' },
+  { label: '委员', value: '委员' },
+  { label: '流动党员', value: '流动党员' },
 ]
-
-// ===== 角色提示 =====
-const roleHint = computed(() => {
-  switch (role.value) {
-    case 'branch_secretary': return '你只能在本支部添加人员'
-    case 'community_organizer': return '你只能在本社区下添加人员'
-    case 'street_lead': return '你只能在本街道下添加人员'
-    case 'system_admin': return '你可以选择任何街道/社区/支部'
-    case 'member': return '你没有添加人员的权限，即将跳转回首页……'
-    default: return '当前角色暂不支持添加人员'
-  }
-})
-
-// 无权限角色拦截
-const allowedRoles = ['system_admin', 'street_lead', 'community_organizer', 'branch_secretary']
-const canAccess = computed(() => allowedRoles.includes(role.value))
-
-// ===== 校验 + 提交 =====
-function validate(): string {
-  if (!form.value.name.trim()) return '请输入姓名'
-  if (!/^1[3-9]\d{9}$/.test(form.value.phone)) return '手机号格式错误'
-  if (form.value.id_card_no && !/^\d{17}[\dXx]$/.test(form.value.id_card_no)) return '身份证号格式错误'
-  if (!form.value.gender) return '请选择性别'
-  if (!form.value.join_date) return '请选择入党时间'
-  // 角色：仅当操作人有赋权资格时才校验
-  if (roleOptions.value.length && !form.value.roles.length) return '请至少选择一个角色'
-  if (!form.value.branch_id) return '请选择支部'
-  // 流动党员 = 是 时必填流入日期
-  if (form.value.is_mobile_member && !form.value.flow_in_date) return '请选择流入日期'
-  return ''
+function identityLabel(v: string) {
+  return v
+}
+function roleLabel(v: string) {
+  const o = ROLE_OPTIONS.find((r) => r.value === v)
+  return o?.label || v
 }
 
+// 角色提示：能选什么
+const orgHint = computed(() => {
+  const r = role.value
+  if (r === 'system_admin') return '你可以选择任何街道/社区/支部'
+  if (r === 'street_lead') return '你只能在本街道下选择（街道/社区/支部）'
+  if (r === 'community_organizer') return '你只能在本社区下选择（社区/支部）'
+  if (r === 'branch_secretary') return '你只能在本支部添加人员'
+  return ''
+})
+
+// ===== 提交 =====
 async function onSubmit() {
-  errorMsg.value = validate()
-  if (errorMsg.value) {
-    showToast({ message: errorMsg.value, type: 'fail' })
-    return
+  if (submitting.value) return
+  errorMsg.value = ''
+  if (!form.value.name?.trim()) return void showToast('请填写姓名')
+  if (!form.value.phone) return void showToast('请填写手机号')
+  if (!form.value.gender) return void showToast('请选择性别')
+  if (!form.value.org_level) return void showToast('请选择所属组织')
+  if (form.value.is_mobile_member && !form.value.flow_in_date) return void showToast('流动党员必须填写流入日期')
+
+  const payload: any = {
+    name: form.value.name.trim(),
+    phone: form.value.phone.trim(),
+    id_card_no: form.value.id_card_no || null,
+    gender: form.value.gender,
+    join_date: form.value.join_date || null,
+    org_level: form.value.org_level,
+    is_mobile_member: form.value.is_mobile_member,
+    flow_in_date: form.value.is_mobile_member ? form.value.flow_in_date : null,
+    roles: form.value.roles.length ? form.value.roles : null,
+    identities: form.value.identities,
+    photo_urls: form.value.photo_urls,
   }
+  if (form.value.org_level === 'branch') payload.branch_id = form.value.branch_id
+  if (form.value.org_level === 'community') payload.community_id = form.value.community_id
+  if (form.value.org_level === 'street') payload.street_id = form.value.street_id
+
   submitting.value = true
   try {
-    const payload = {
-      name: form.value.name.trim(),
-      phone: form.value.phone,
-      id_card_no: form.value.id_card_no || undefined,
-      gender: form.value.gender,
-      join_date: form.value.join_date,
-      roles: form.value.roles,
-      identities: form.value.identities,
-      branch_id: form.value.branch_id,
-      photo_urls: form.value.photo_urls,
-      is_mobile_member: form.value.is_mobile_member,
-      flow_in_date: form.value.is_mobile_member ? form.value.flow_in_date : null,
-    }
     if (isEdit.value) {
       await membersApi.update(editingId.value!, payload)
-      showSuccessToast({ message: '保存成功' })
+      showSuccessToast('已保存')
     } else {
       await membersApi.create(payload)
-      showSuccessToast({ message: '新增成功' })
+      showSuccessToast('已创建')
     }
-    setTimeout(() => router.back(), 800)
+    setTimeout(() => router.replace('/pages/members/list'), 600)
   } catch (e: any) {
-    errorMsg.value = e?.message || (isEdit.value ? '保存失败' : '新增失败')
-    showToast({ message: errorMsg.value, type: 'fail' })
+    errorMsg.value = e?.message || '保存失败'
   } finally {
     submitting.value = false
   }
 }
+
+// ===== 编辑模式：加载现有数据 =====
 
 // ===== 风采照片上传 =====
 // 业务规则：只允许 1 张（覆盖原"主图"），大小不限制
@@ -468,189 +431,161 @@ function removeMemberPhoto(i: number) {
   form.value.photo_urls.splice(i, 1)
 }
 
-// 编辑模式：拉详情回显
 async function loadForEdit() {
-  if (!editingId.value) return
+  if (!isEdit.value) return
   try {
-    const m = await membersApi.get(editingId.value)
-    form.value.name = m.name
-    form.value.phone = m.phone
+    const m = await membersApi.get(editingId.value!) as any
+    form.value.name = m.name || ''
+    form.value.phone = m.phone || ''
     form.value.id_card_no = m.id_card_no || ''
-    form.value.gender = (m.gender as any) || ''
+    form.value.gender = m.gender || ''
     form.value.join_date = m.join_date || ''
-    form.value.branch_id = m.branch_id
-    form.value.roles = Array.isArray(m.roles) ? [...m.roles] : []
-    form.value.identities = Array.isArray(m.identities) ? [...m.identities] : []
+    form.value.org_level = m.org_level || 'branch'
+    form.value.street_id = m.street_id || 0
+    form.value.community_id = m.community_id || 0
+    form.value.branch_id = m.branch_id || 0
+    form.value.roles = Array.isArray(m.roles) ? m.roles : []
+    form.value.identities = Array.isArray(m.identities) ? m.identities : []
     form.value.photo_urls = Array.isArray(m.photo_urls) ? [...m.photo_urls] : []
     form.value.is_mobile_member = !!m.is_mobile_member
     form.value.flow_in_date = m.flow_in_date || ''
   } catch (e: any) {
-    showToast({ message: e?.message || '加载失败', type: 'fail' })
-    router.replace('/pages/members/list')
+    showToast(e?.message || '加载失败')
   }
 }
 
+// 编辑时回填组织选中状态（org_level + id 已经在 loadForEdit 设上）
+
 onMounted(async () => {
-  if (!canAccess.value) {
-    showToast({ message: '你没有编辑人员的权限', type: 'fail' })
-    setTimeout(() => router.replace('/pages/index/index'), 1000)
-    return
-  }
-  await loadOrgs()
-  if (isEdit.value) {
-    await loadForEdit()
-  }
+  await loadTree()
+  await loadForEdit()
 })
 </script>
 
 <template>
-  <div class="form-page">
-    <div class="page-header">
-      <div class="back" @click="router.back()">‹ 返回</div>
-      <div class="title">{{ isEdit ? '编辑人员' : '新增人员' }}</div>
-    </div>
+  <div class="page">
+    <van-nav-bar
+      :title="isEdit ? '编辑人员' : '新增人员'"
+      left-text="返回"
+      left-arrow
+      @click-left="$router.back()"
+    />
 
-    <div v-if="roleHint" class="role-hint">{{ roleHint }}</div>
+    <van-cell-group inset title="基本信息" class="cell-group-spaced">
+      <van-field
+        v-model="form.name"
+        label="姓名"
+        placeholder="请输入"
+        required
+        :rules="[{ required: true, message: '请填写姓名' }]"
+        maxlength="64"
+      />
+      <van-field
+        v-model="form.phone"
+        label="手机号"
+        placeholder="11 位手机号"
+        type="tel"
+        required
+        :rules="[{ required: true, message: '请填写手机号' }]"
+        maxlength="11"
+      />
+      <van-field
+        v-model="form.id_card_no"
+        label="身份证号"
+        placeholder="选填"
+        maxlength="32"
+      />
+    </van-cell-group>
 
-    <van-form v-if="canAccess" @submit="onSubmit" class="form">
-      <van-cell-group inset title="基本信息">
-        <van-field
-          v-model="form.name"
-          label="姓名"
-          placeholder="请输入姓名"
-          maxlength="64"
-          required
-          :rules="[{ required: true, message: '请填写姓名' }]"
-        />
-        <van-field
-          v-model="form.phone"
-          label="手机号"
-          type="tel"
-          placeholder="11位手机号"
-          maxlength="11"
-          required
-          :rules="[{ required: true, message: '请填写手机号' }]"
-        />
-        <van-field
-          v-model="form.id_card_no"
-          label="身份证号"
-          placeholder="可选，18位"
-          maxlength="18"
-        />
-      </van-cell-group>
+    <van-cell-group inset title="所属组织" class="cell-group-spaced">
+      <van-cell
+        :title="selectedOrgText || '点击选择'"
+        :value="orgHint"
+        :class="['field-required', !form.org_level ? 'field-missing' : '']"
+        is-link
+        @click="openOrgPicker"
+      />
+      <van-cell title="提示" :value="`可选项：${allowedLevels.map(levelLabel).join(' / ')}`" />
+    </van-cell-group>
 
-      <van-cell-group inset title="所属组织" class="cell-group-spaced">
-        <van-field
-          :model-value="selectedStreetName || '—'"
-          label="① 街道"
-          placeholder="加载中…"
-          readonly
-          :is-link="streetEditable"
-          :disabled="!streetEditable"
-          :class="['field-required', !form.street_id ? 'field-missing' : '']"
-          @click="streetEditable && (showStreetPicker = true)"
-        />
-        <van-field
-          :model-value="selectedCommunityName || '—'"
-          label="② 社区"
-          :placeholder="communityEditable ? '点击选择' : '已锁定'"
-          readonly
-          :is-link="communityEditable && !!form.street_id"
-          :disabled="!communityEditable || !form.street_id"
-          :class="['field-required', !form.community_id ? 'field-missing' : '']"
-          @click="communityEditable && form.street_id && (showCommunityPicker = true)"
-        />
-        <van-field
-          :model-value="selectedBranchName || '—'"
-          label="③ 支部"
-          :placeholder="branchEditable ? '点击选择' : '已锁定'"
-          readonly
-          :is-link="branchEditable && !!form.community_id"
-          required
-          :rules="[{ required: true, message: '请选择支部' }]"
-          :disabled="!branchEditable || !form.community_id"
-          :class="['field-required', !form.branch_id ? 'field-missing' : '']"
-          @click="branchEditable && form.community_id && (showBranchPicker = true)"
-        />
-      </van-cell-group>
+    <van-cell-group inset title="其他信息" class="cell-group-spaced">
+      <van-cell title="性别" required>
+        <template #value>
+          <van-radio-group v-model="form.gender" direction="horizontal">
+            <van-radio name="male">男</van-radio>
+            <van-radio name="female">女</van-radio>
+          </van-radio-group>
+        </template>
+      </van-cell>
 
-      <van-cell-group inset title="其他信息" class="cell-group-spaced">
-        <van-cell title="性别" required>
-          <template #value>
-            <van-radio-group v-model="form.gender" direction="horizontal">
-              <van-radio name="male">男</van-radio>
-              <van-radio name="female">女</van-radio>
-            </van-radio-group>
-          </template>
-        </van-cell>
+      <van-field label="入党时间" required>
+        <template #input>
+          <button type="button" class="date-btn" @click.prevent="openJoinDatePicker">
+            {{ displayDate || '点击选择日期' }}
+          </button>
+        </template>
+      </van-field>
 
-        <van-field label="入党时间" required>
-          <template #input>
-            <button type="button" class="date-btn" @click.prevent="openJoinDatePicker">
-              {{ displayDate || '点击选择日期' }}
-            </button>
-          </template>
-        </van-field>
+      <van-cell title="是否流动党员">
+        <template #value>
+          <van-switch v-model="form.is_mobile_member" />
+        </template>
+      </van-cell>
 
-        <van-cell title="角色（权限控制）">
-          <template #value>
-            <div class="check-group">
-              <template v-if="roleOptions.length">
-                <van-checkbox-group v-model="form.roles" direction="horizontal" :max="5">
-                  <van-checkbox
-                    v-for="r in roleOptions"
-                    :key="r.value"
-                    :name="r.value"
-                    shape="square"
-                  >{{ r.label }}</van-checkbox>
-                </van-checkbox-group>
-              </template>
-              <span v-else class="role-no-perm">当前角色无赋权资格</span>
-            </div>
-          </template>
-        </van-cell>
+      <van-field
+        v-if="form.is_mobile_member"
+        label="流入日期"
+        required
+        :rules="[{ required: true, message: '请填写流入日期' }]"
+      >
+        <template #input>
+          <button type="button" class="date-btn" @click.prevent="openFlowInDatePicker">
+            {{ displayFlowInDate || '点击选择日期' }}
+          </button>
+        </template>
+      </van-field>
+    </van-cell-group>
 
-        <van-cell title="身份">
-          <template #value>
-            <div class="check-group">
-              <van-checkbox-group v-model="form.identities" direction="horizontal" :max="5">
-                <van-checkbox
-                  v-for="id in identityOptions"
-                  :key="id.label"
-                  :name="id.label"
-                  shape="square"
-                >{{ id.label }}</van-checkbox>
-              </van-checkbox-group>
-            </div>
-          </template>
-        </van-cell>
+    <van-cell-group inset title="身份与角色" class="cell-group-spaced">
+      <van-cell title="身份标签（多选）">
+        <template #value>
+          <van-checkbox-group v-model="form.identities" direction="horizontal" style="display:flex;gap:8px;flex-wrap:wrap;">
+            <van-checkbox
+              v-for="o in IDENTITY_OPTIONS"
+              :key="o.value"
+              :name="o.value"
+              shape="square"
+            >{{ o.label }}</van-checkbox>
+          </van-checkbox-group>
+        </template>
+      </van-cell>
+      <van-cell title="登录角色（多选）">
+        <template #value>
+          <van-checkbox-group v-model="form.roles" direction="horizontal" style="display:flex;gap:8px;flex-wrap:wrap;">
+            <van-checkbox
+              v-for="o in ROLE_OPTIONS"
+              :key="o.value"
+              :name="o.value"
+              shape="square"
+            >{{ o.label }}</van-checkbox>
+          </van-checkbox-group>
+        </template>
+      </van-cell>
+      <van-cell v-if="form.identities.length" title="已选身份">
+        <template #value>
+          <span style="font-size:12px;color:#888">{{ form.identities.map(identityLabel).join('、') }}</span>
+        </template>
+      </van-cell>
+      <van-cell v-if="form.roles.length" title="已选角色">
+        <template #value>
+          <span style="font-size:12px;color:#888">{{ form.roles.map(roleLabel).join('、') }}</span>
+        </template>
+      </van-cell>
+    </van-cell-group>
 
-        <van-cell title-class="req" required>
-          <template #title>
-            <span class="req">是否流动党员</span>
-          </template>
-          <template #value>
-            <van-radio-group v-model="form.is_mobile_member" direction="horizontal">
-              <van-radio :name="true">是</van-radio>
-              <van-radio :name="false">否</van-radio>
-            </van-radio-group>
-          </template>
-        </van-cell>
+    <div v-if="errorMsg" class="error-msg">{{ errorMsg }}</div>
 
-        <van-field
-          v-if="form.is_mobile_member"
-          label="流入日期"
-          required
-          :rules="[{ required: true, message: '请选择流入日期' }]"
-        >
-          <template #input>
-            <button type="button" class="date-btn" @click.prevent="openFlowInDatePicker">
-              {{ flowInDisplayDate || '点击选择日期' }}
-            </button>
-          </template>
-        </van-field>
-      </van-cell-group>
-
+    
       <van-cell-group inset title="风采照片" class="cell-group-spaced">
         <van-cell :title="form.photo_urls.length ? '已上传 1 张（主图）' : '未上传（建议尺寸 800×800，大小不限）'">
           <template #value>
@@ -668,313 +603,225 @@ onMounted(async () => {
         </div>
       </van-cell-group>
 
-      <div class="actions">
-        <van-button
-          block
-          type="primary"
-          native-type="submit"
-          :loading="submitting"
-          :disabled="submitting"
-        >
-          {{ isEdit ? '保存修改' : '保存' }}
-        </van-button>
-      </div>
-    </van-form>
+<div class="submit-bar">
+      <van-button
+        type="primary"
+        block
+        :loading="submitting"
+        :disabled="submitting"
+        @click="onSubmit"
+      >{{ isEdit ? '保存' : '提交审核' }}</van-button>
+    </div>
 
-    <!-- 街道选择（action-sheet） -->
-    <van-action-sheet
-      v-model:show="showStreetPicker"
-      :actions="streetActions"
-      cancel-text="取消"
-      close-on-click-action
-      @select="onStreetSelect"
-    />
-
-    <!-- 社区选择（action-sheet） -->
-    <van-action-sheet
-      v-model:show="showCommunityPicker"
-      :actions="communityActions"
-      cancel-text="取消"
-      close-on-click-action
-      @select="onCommunitySelect"
-    />
-
-    <!-- 支部选择（action-sheet） -->
-    <van-action-sheet
-      v-model:show="showBranchPicker"
-      :actions="branchActions"
-      cancel-text="取消"
-      close-on-click-action
-      @select="onBranchSelect"
-    />
-
-    <!-- 入党时间 picker（Vant van-date-picker） -->
-    <van-popup v-model:show="showJoinDatePicker" position="bottom" round>
-      <van-date-picker
+    <!-- 入党时间选择 -->
+    <van-popup
+      v-model:show="showJoinDatePicker"
+      position="bottom"
+      round
+      teleport="body"
+      :style="{ zIndex: 9999 }"
+    >
+      <van-picker
         v-model="joinDatePickerValue"
-        :columns-type="['year', 'month', 'day']"
-        :min-date="new Date(1950, 0, 1)"
-        :max-date="new Date(new Date().getFullYear() + 5, 11, 31)"
+        :columns="joinDatePickerColumns"
         title="选择入党时间"
         @confirm="onJoinDateConfirm"
         @cancel="showJoinDatePicker = false"
       />
     </van-popup>
 
-    <!-- 流入日期 picker（Vant van-date-picker） -->
-    <van-popup v-model:show="showFlowInDatePicker" position="bottom" round>
-      <van-date-picker
+    <!-- 流入日期选择 -->
+    <van-popup
+      v-model:show="showFlowInDatePicker"
+      position="bottom"
+      round
+      teleport="body"
+      :style="{ zIndex: 9999 }"
+    >
+      <van-picker
         v-model="flowInDatePickerValue"
-        :columns-type="['year', 'month', 'day']"
-        :min-date="new Date(1950, 0, 1)"
-        :max-date="new Date(new Date().getFullYear() + 5, 11, 31)"
+        :columns="flowInDatePickerColumns"
         title="选择流入日期"
         @confirm="onFlowInDateConfirm"
         @cancel="showFlowInDatePicker = false"
       />
     </van-popup>
+
+    <!-- 所属组织选择（街道/社区/支部任选一级） -->
+    <van-popup v-model:show="showOrgPicker" position="bottom" round>
+      <div class="org-picker">
+        <div class="org-picker-header">
+          <span class="org-picker-back" @click="goBackOrgStep">
+            {{ pickerStep === 'street' ? '取消' : '‹ 返回上一级' }}
+          </span>
+          <span class="org-picker-title">{{ pickerTitle }}</span>
+          <span v-if="canPickThisLevel" class="org-picker-pick" @click="pickCurrentLevel">
+            选到{{ levelLabel(pickerStep) }}
+          </span>
+          <span v-else></span>
+        </div>
+        <div class="org-picker-list">
+          <div
+            v-for="action in pickerActions"
+            :key="`${action.level}-${action.value}`"
+            class="org-picker-item"
+            :class="{ 'is-current': action.value === (pickerStep === 'street' ? form.street_id : pickerStep === 'community' ? form.community_id : form.branch_id) }"
+            @click="onOrgActionSelect(action)"
+          >
+            <div class="org-picker-item-name">
+              {{ action.name }}
+              <span v-if="action.subname" class="org-picker-item-sub-inline">{{ action.subname }}</span>
+            </div>
+            <div
+              v-if="(action.level === 'street' && (allowedLevels.includes('community') || allowedLevels.includes('branch'))) ||
+                   (action.level === 'community' && allowedLevels.includes('branch'))"
+              class="org-picker-item-arrow"
+              @click.stop="onOrgItemGotoChildren(action)"
+            >›</div>
+          </div>
+          <div v-if="!pickerActions.length" class="org-picker-empty">无数据</div>
+        </div>
+      </div>
+    </van-popup>
   </div>
 </template>
 
 <style scoped>
-.form-page {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 16px 0 32px;
+.page {
+  min-height: 100vh;
+  background: #F7F8FA;
+  padding-bottom: 140px;  /* H5：submit-bar + tab-bar */
 }
-
-.page-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 4px 16px 16px;
+@media (min-width: 768px) {
+  .page { padding-bottom: 80px; }  /* PC：只有 submit-bar */
 }
-.back {
-  color: var(--primary);
-  font-size: 15px;
-  cursor: pointer;
-  user-select: none;
-}
-.back:hover { color: var(--primary-dark); }
-.title {
-  font-size: 18px;
-  font-weight: 700;
-  color: #222;
-}
-
-.role-hint {
-  margin: 0 16px 12px;
-  padding: 8px 12px;
-  background: #FFF8E1;
-  border: 1px solid #FFE0B2;
-  border-radius: 6px;
-  font-size: 12px;
-  color: #E65100;
-}
-
-.form { background: transparent; }
 .cell-group-spaced { margin-top: 12px; }
-
-.actions {
-  padding: 20px 16px 0;
+.field-required :deep(.van-field__label::before) {
+  content: '*';
+  color: #ee0a24;
+  margin-right: 2px;
 }
-
-/* 日期按钮：原生 button 确保 click 可靠 */
+.field-missing :deep(.van-cell__title),
+.field-missing :deep(.van-field__control) {
+  color: #ee0a24 !important;
+}
+.error-msg {
+  margin: 12px 16px;
+  padding: 8px 12px;
+  background: #FFF1F0;
+  color: #B22222;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.submit-bar {
+  position: fixed;
+  left: 0; right: 0;
+  bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  background: #fff;
+  padding: 8px 16px 16px;
+  border-top: 1px solid #eee;
+  z-index: 15;
+}
+/* PC：没有底部 tab 栏，直接贴合底部 */
+@media (min-width: 768px) {
+  .submit-bar { bottom: 0; }
+}
 .date-btn {
-  width: 100%;
   border: none;
-  background: none;
-  font: inherit;
-  font-size: 14px;
+  background: transparent;
   color: #333;
-  text-align: left;
+  font-size: 14px;
   padding: 0;
   cursor: pointer;
-  outline: none;
-}
-.date-btn:empty::after {
-  content: '点击选择日期';
-  color: #c8c9cc;
-}
-
-:deep(.van-cell-group--inset) {
-  margin-left: 0;
-  margin-right: 0;
-  overflow: hidden;
-}
-:deep(.van-field__label),
-:deep(.van-cell__title) {
-  color: #666;
-  min-width: 5.5em;
-}
-:deep(.van-field--disabled .van-field__label) {
-  color: #999;
-}
-:deep(.van-radio__label) {
-  font-size: 14px;
-}
-
-/* 必填红星（在 field label 前面） */
-:deep(.field-required .van-field__label::before) {
-  content: '*';
-  color: #B22222;
-  font-weight: 700;
-  margin-right: 3px;
-  font-size: 14px;
-}
-/* 缺值时 label 红色（更醒目） */
-:deep(.field-missing .van-field__label) {
-  color: #B22222 !important;
-}
-
-/* 日历遮罩 + 弹窗 */
-.calendar-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 2000;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  animation: calFadeIn 0.2s ease;
-}
-@keyframes calFadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-.calendar {
+  text-align: left;
   width: 100%;
-  max-width: 500px;
+  font-family: inherit;
+}
+
+/* 自建组织选择器 */
+.org-picker {
   background: #fff;
-  border-radius: 16px 16px 0 0;
-  padding: 20px 16px 16px;
-  user-select: none;
-  animation: calSlideUp 0.25s ease;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
 }
-@keyframes calSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-.cal-header {
+.org-picker-header {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 24px;
-  margin-bottom: 12px;
-}
-.cal-nav {
-  border: none;
-  background: #f5f5f5;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  font-size: 18px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #333;
-  transition: background 0.15s;
-}
-.cal-nav:hover { background: #e8e8e8; }
-.cal-nav:active { background: #ddd; }
-.cal-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #222;
-  min-width: 100px;
-  text-align: center;
-}
-.cal-weekdays {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  text-align: center;
-  color: #999;
-  font-size: 12px;
-  margin-bottom: 4px;
-  padding: 4px 0;
-}
-.cal-weekdays span {
-  padding: 4px 0;
-}
-.cal-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
-}
-.cal-day {
-  border: none;
-  background: none;
-  aspect-ratio: 1;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid #eee;
   font-size: 14px;
-  border-radius: 8px;
-  cursor: pointer;
-  color: #333;
-  transition: all 0.12s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
-.cal-day:hover:not(:disabled) { background: #f0f5ff; }
-.cal-day:active:not(:disabled) { background: #d6e4ff; }
-.cal-day--muted {
-  color: #ccc;
-  cursor: default;
-}
-.cal-day--today {
-  font-weight: 700;
-  color: var(--primary, #165dff);
-}
-.cal-day--selected {
-  background: var(--primary, #165dff);
-  color: #fff;
-  font-weight: 600;
-}
-.cal-day--selected:hover {
-  background: var(--primary-dark, #0e42c7);
-}
-.cal-footer {
-  display: flex;
-  gap: 12px;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid #f0f0f0;
-}
-.cal-today, .cal-close {
-  flex: 1;
-  height: 36px;
-  border-radius: 8px;
-  font-size: 14px;
-  cursor: pointer;
-  border: none;
-  transition: all 0.12s;
-}
-.cal-today {
-  background: var(--primary, #165dff);
-  color: #fff;
-  font-weight: 500;
-}
-.cal-today:hover { background: var(--primary-dark, #0e42c7); }
-.cal-close {
-  background: #f5f5f5;
+.org-picker-back {
   color: #666;
+  cursor: pointer;
+  min-width: 90px;
+  text-align: left;
 }
-.cal-close:hover { background: #e8e8e8; }
-
-/* 多选 checkbox 组 */
-.check-group {
-  width: 100%;
-}
-.role-no-perm {
-  color: #999;
-  font-size: 13px;
-}
-.check-group :deep(.van-checkbox-group--horizontal) {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-}
-.check-group :deep(.van-checkbox) {
-  margin-bottom: 2px;
-}
-.check-group :deep(.van-checkbox__label) {
-  font-size: 13px;
+.org-picker-title {
+  color: #222;
+  font-weight: 600;
+  flex: 1;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+}
+.org-picker-pick {
+  color: #B22222;
+  cursor: pointer;
+  min-width: 90px;
+  text-align: right;
+  font-weight: 600;
+}
+.org-picker-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+  max-height: 60vh;
+}
+.org-picker-item {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid #f5f5f5;
+  cursor: pointer;
+  transition: background .15s;
+}
+.org-picker-item:active { background: #f5f5f5; }
+.org-picker-item.is-current { background: #FFF0F0; }
+.org-picker-item-name {
+  flex: 1;
+  font-size: 15px;
+  color: #222;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.org-picker-item-sub {
+  display: none; /* 旧的 subname 独立 div 弃用 */
+}
+.org-picker-item-sub-inline {
+  font-size: 11px;
+  color: #B22222;
+  font-weight: normal;
+}
+.org-picker-item-arrow {
+  color: #c8c9cc;
+  font-size: 22px;
+  font-weight: 600;
+  flex-shrink: 0;
+  padding: 0 4px;
+  user-select: none;
+}
+.org-picker-empty {
+  text-align: center;
+  color: #999;
+  padding: 40px 16px;
+  font-size: 14px;
 }
 
 /* 风采照片网格（最多 1 张，但留 3 列布局兼容历史） */
@@ -992,7 +839,6 @@ onMounted(async () => {
   position: relative;
   width: 100%;
   aspect-ratio: 1;
-  border-radius: 6px;
   overflow: hidden;
   background: #f5f5f5;
 }

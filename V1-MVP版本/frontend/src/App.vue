@@ -28,11 +28,18 @@ onMounted(async () => {
 </script>
 
 <template>
+  <!--
+    v2026-07-29: 列表页 keep-alive 缓存
+    Layout 在外层 + keep-alive 包 router-view，确保 slot 里的 router-view 能被 keep-alive 拦截
+  -->
   <Layout v-if="useLayout">
-    <!-- :key 强制路由变化时重新挂载，避免 router-view 在 slot 里不更新 -->
-    <router-view :key="route.fullPath" />
+    <router-view v-slot="{ Component }">
+      <keep-alive :include="['MembersList', 'ActivitiesList', 'AuditPending']">
+        <component :is="Component" />
+      </keep-alive>
+    </router-view>
   </Layout>
-  <router-view v-else :key="route.fullPath" />
+  <router-view v-else />
 </template>
 
 <style>

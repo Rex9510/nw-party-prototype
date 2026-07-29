@@ -35,6 +35,9 @@ openpyxl==3.1.5
 minio==7.2.8
 oss2==2.18.5  # 阿里云 OSS（生产用）
 
+# 缩略图（活动照片/签到表压缩）
+Pillow==10.4.0
+
 # 测试
 pytest==8.3.3
 pytest-asyncio==0.24.0

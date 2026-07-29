@@ -106,7 +106,7 @@ const roleLabel = (r: string) => ({
   system_admin: '系统管理员',
   street_lead: '街道负责人',
   community_organizer: '社区组织委员',
-  branch_secretary: '支部书记',
+  branch_secretary: '社区组织员',
   party_member: '党员',
   member: '党员',
   admin: '管理员',

@@ -1,0 +1,1 @@
+import{I as r}from"./index-Ds6rhNGn.js";const s={list(e={}){return r.get("/members",e)},get(e){return r.get(`/members/${e}`)},getByPhone(e){return r.get(`/members/by-phone/${e}`)},create(e){return r.post("/members",e)},update(e,t){return r.patch(`/members/${e}`,t)},remove(e){return r.delete(`/members/${e}`)}};export{s as m};

@@ -1,7 +1,7 @@
 """党员 + 批量导入记录。"""
 from datetime import datetime, date
 from typing import TYPE_CHECKING
-from sqlalchemy import String, BigInteger, Integer, DateTime, Date, ForeignKey, JSON, func, UniqueConstraint
+from sqlalchemy import String, BigInteger, Integer, DateTime, Date, ForeignKey, JSON, func, Index, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -15,12 +15,30 @@ BigIntPK = BigInteger().with_variant(Integer(), "sqlite")
 
 class Member(Base):
     __tablename__ = "members"
+    # 只在 active 状态约束手机号唯一（partial unique index）
+    # dimission/transferred 状态不约束 → 软删除不再冲突
+    # SQL 层加 Index("ix_members_phone_active", "phone", unique=True, sqlite_where=text("status='active'"))
+    # 不用 UniqueConstraint 是因为它不支持 WHERE 子句
     __table_args__ = (
-        UniqueConstraint("phone", "status", name="uq_members_phone_active"),
+        Index(
+            "ix_members_phone_active",
+            "phone",
+            unique=True,
+            sqlite_where=text("status = 'active'"),
+            postgresql_where=text("status = 'active'"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigIntPK, primary_key=True, autoincrement=True)
-    branch_id: Mapped[int] = mapped_column(BigIntPK, ForeignKey("branches.id"), nullable=False, index=True)
+    # 所属组织（v3：支持街道/社区/支部任一级）
+    # - org_level=branch 时，branch_id 必填，指向具体支部
+    # - org_level=community 时，branch_id 可空；通过 m.community_id 关联到社区
+    # - org_level=street 时，branch_id 可空；通过 m.street_id 关联到街道
+    branch_id: Mapped[int | None] = mapped_column(BigIntPK, ForeignKey("branches.id"), nullable=True, index=True)
+    community_id: Mapped[int | None] = mapped_column(BigIntPK, ForeignKey("communities.id"), nullable=True, index=True)
+    street_id: Mapped[int | None] = mapped_column(BigIntPK, ForeignKey("streets.id"), nullable=True, index=True)
+    org_level: Mapped[str] = mapped_column(String(16), default="branch", nullable=False)
+    # 兼容老数据：老接口用 branch_id 必填；新接口按 org_level 决定取哪个
     name: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     phone: Mapped[str] = mapped_column(String(20), nullable=False)
     id_card_no: Mapped[str | None] = mapped_column(String(32), nullable=True)

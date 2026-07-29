@@ -61,7 +61,14 @@ class MemberBase(BaseModel):
 
 
 class MemberCreate(MemberBase):
-    branch_id: int = Field(..., description="所属支部 ID")
+    # 所属组织（v3：街道/社区/支部任选一级）
+    # - org_level=branch 时 branch_id 必填
+    # - org_level=community 时 community_id 必填
+    # - org_level=street 时 street_id 必填
+    org_level: str = Field("branch", pattern="^(street|community|branch)$")
+    branch_id: int | None = Field(None, description="所属支部 ID（org_level=branch 时必填）")
+    community_id: int | None = Field(None, description="所属社区 ID（org_level=community 时必填）")
+    street_id: int | None = Field(None, description="所属街道 ID（org_level=street 时必填）")
     roles: list[str] | None = Field(
         default=None,
         description="登录权限角色（system_admin/street_lead/community_organizer/branch_secretary/party_member），多选时按权限高低取最高",
@@ -81,6 +88,17 @@ class MemberCreate(MemberBase):
     def _json_in(cls, v):
         return v  # 保持 list，create 接口里再 dump
 
+    @model_validator(mode="after")
+    def _check_org(self):
+        """按 org_level 校验对应组织字段必填。"""
+        if self.org_level == "branch" and self.branch_id is None:
+            raise ValueError("org_level=branch 时必须填写 branch_id")
+        if self.org_level == "community" and self.community_id is None:
+            raise ValueError("org_level=community 时必须填写 community_id")
+        if self.org_level == "street" and self.street_id is None:
+            raise ValueError("org_level=street 时必须填写 street_id")
+        return self
+
 
 class MemberUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=64)
@@ -89,7 +107,10 @@ class MemberUpdate(BaseModel):
     gender: str | None = None
     join_date: date | None = None
     status: str | None = None
+    org_level: str | None = Field(None, pattern="^(street|community|branch)$")
     branch_id: int | None = None
+    community_id: int | None = None
+    street_id: int | None = None
     roles: list[str] | None = None
     identities: list[str] | None = None
     photo_urls: list[str] | None = Field(
@@ -105,7 +126,10 @@ class MemberOut(MemberBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    branch_id: int
+    org_level: str = "branch"
+    branch_id: int | None = None
+    community_id: int | None = None
+    street_id: int | None = None
     # 兼容：数据库里存的是 JSON 字符串，应用层转 list
     roles: list[str] | None = None
     identities: list[str] | None = None
@@ -120,8 +144,10 @@ class MemberOut(MemberBase):
 
 
 class MemberListItem(MemberOut):
-    """列表项：多带一个支部名。"""
+    """列表项：多带一个支部名 + 社区/街道名（按 org_level 选填展示层级）。"""
     branch_name: str | None = None
+    community_name: str | None = None
+    street_name: str | None = None
 
 
 class MemberListResponse(BaseModel):

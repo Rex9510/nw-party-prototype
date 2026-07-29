@@ -58,13 +58,55 @@ async def _assert_branch_in_user_street(user: User, branch: Branch) -> None:
     raise HTTPException(status_code=403, detail="无权操作该支部（不在你的街道范围内）")
 
 
+async def _next_sort(model, db: AsyncSession, where_clause=None) -> int:
+    """计算下一条 sort：当前最大值 + 10（同字典的命名规则）。"""
+    stmt = select(func.coalesce(func.max(model.sort), 0))
+    if where_clause is not None:
+        stmt = stmt.where(where_clause)
+    cur_max = (await db.execute(stmt)).scalar() or 0
+    return int(cur_max) + 10
+
+
+async def _swap_sort(model, db: AsyncSession, item_id: int, where_clause, item_fk_field=None) -> None:
+    """把 item_id 这条跟同组 (where_clause) 内 sort 最近的邻居交换 sort。
+
+    - 默认向上交换（↑ 按钮）
+    - 找不到邻居 / 已经在最上 / 最下 → 静默 no-op（前端按 disable 状态保护）
+    """
+    # 1) 取当前条
+    r = await db.execute(select(model).where(model.id == item_id))
+    cur = r.scalar_one_or_none()
+    if not cur:
+        raise HTTPException(status_code=404, detail="记录不存在")
+
+    # 2) 取同组所有，按 sort 升序
+    stmt = select(model).order_by(model.sort, model.id)
+    if where_clause is not None:
+        stmt = stmt.where(where_clause)
+    rows = (await db.execute(stmt)).scalars().all()
+    ids = [x.id for x in rows]
+    if item_id not in ids:
+        return
+    idx = ids.index(item_id)
+    if idx == 0:
+        return  # 已在最上
+
+    # 3) 跟上一条交换 sort
+    prev = rows[idx - 1]
+    cur.sort, prev.sort = prev.sort, cur.sort
+    await db.commit()
+    await db.refresh(cur)
+    await db.refresh(prev)
+
+
+# =================== 街道 ===================
 @router.get("/streets", response_model=list[StreetOut])
 async def list_streets(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(get_current_user),
 ) -> list[Street]:
     """所有街道。"""
-    result = await db.execute(select(Street).order_by(Street.id))
+    result = await db.execute(select(Street).order_by(Street.sort, Street.id))
     return list(result.scalars().all())
 
 
@@ -74,7 +116,7 @@ async def create_street(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_roles(*ADMIN_ONLY)),
 ) -> Street:
-    s = Street(**body.model_dump())
+    s = Street(**body.model_dump(), sort=await _next_sort(Street, db))
     db.add(s)
     await db.commit()
     await db.refresh(s)
@@ -99,6 +141,42 @@ async def update_street(
     return s
 
 
+@router.post("/streets/{street_id}/move-up", response_model=StreetOut)
+async def move_street_up(
+    street_id: int,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_roles(*ADMIN_ONLY)),
+) -> Street:
+    await _swap_sort(Street, db, street_id, where_clause=None)
+    r = await db.execute(select(Street).where(Street.id == street_id))
+    return r.scalar_one()
+
+
+@router.post("/streets/{street_id}/move-down", response_model=StreetOut)
+async def move_street_down(
+    street_id: int,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_roles(*ADMIN_ONLY)),
+) -> Street:
+    # move-down = 先把列表倒序，swap 后再回正（复用 _swap_sort 逻辑）
+    r = await db.execute(select(Street).where(Street.id == street_id))
+    cur = r.scalar_one_or_none()
+    if not cur:
+        raise HTTPException(status_code=404, detail="街道不存在")
+    rows = (await db.execute(select(Street).order_by(Street.sort, Street.id))).scalars().all()
+    ids = [x.id for x in rows]
+    if street_id not in ids:
+        return cur
+    idx = ids.index(street_id)
+    if idx == len(ids) - 1:
+        return cur  # 已在最下
+    nxt = rows[idx + 1]
+    cur.sort, nxt.sort = nxt.sort, cur.sort
+    await db.commit()
+    await db.refresh(cur)
+    return cur
+
+
 @router.delete("/streets/{street_id}", status_code=204)
 async def delete_street(
     street_id: int,
@@ -119,6 +197,7 @@ async def delete_street(
     await db.commit()
 
 
+# =================== 社区 ===================
 @router.get("/communities", response_model=list[CommunityOut])
 async def list_communities(
     street_id: int | None = None,
@@ -126,7 +205,7 @@ async def list_communities(
     _user: User = Depends(get_current_user),
 ) -> list[Community]:
     """社区列表。可选按 street_id 过滤。"""
-    stmt = select(Community).order_by(Community.id)
+    stmt = select(Community).order_by(Community.sort, Community.id)
     if street_id is not None:
         stmt = stmt.where(Community.street_id == street_id)
     result = await db.execute(stmt)
@@ -146,7 +225,10 @@ async def create_community(
     # 权限：街道负责人只能在自家街道下新增
     if not can_manage_in_street(user, body.street_id):
         raise HTTPException(status_code=403, detail="无权在该街道下新增社区")
-    c = Community(**body.model_dump())
+    c = Community(
+        **body.model_dump(),
+        sort=await _next_sort(Community, db, where_clause=Community.street_id == body.street_id),
+    )
     db.add(c)
     await db.commit()
     await db.refresh(c)
@@ -169,6 +251,60 @@ async def update_community(
     await _assert_community_in_user_street(user, c)
     for k, v in body.model_dump(exclude_unset=True).items():
         setattr(c, k, v)
+    await db.commit()
+    await db.refresh(c)
+    return c
+
+
+@router.post("/communities/{community_id}/move-up", response_model=CommunityOut)
+async def move_community_up(
+    community_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_roles(*ADMIN_OR_STREET_LEAD)),
+) -> Community:
+    r = await db.execute(
+        select(Community).options(selectinload(Community.street)).where(Community.id == community_id)
+    )
+    c = r.scalar_one_or_none()
+    if not c:
+        raise HTTPException(status_code=404, detail="社区不存在")
+    await _assert_community_in_user_street(user, c)
+    await _swap_sort(
+        Community, db, community_id,
+        where_clause=Community.street_id == c.street_id,
+    )
+    r = await db.execute(select(Community).where(Community.id == community_id))
+    return r.scalar_one()
+
+
+@router.post("/communities/{community_id}/move-down", response_model=CommunityOut)
+async def move_community_down(
+    community_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_roles(*ADMIN_OR_STREET_LEAD)),
+) -> Community:
+    r = await db.execute(
+        select(Community).options(selectinload(Community.street)).where(Community.id == community_id)
+    )
+    c = r.scalar_one_or_none()
+    if not c:
+        raise HTTPException(status_code=404, detail="社区不存在")
+    await _assert_community_in_user_street(user, c)
+    rows = (
+        await db.execute(
+            select(Community)
+            .where(Community.street_id == c.street_id)
+            .order_by(Community.sort, Community.id)
+        )
+    ).scalars().all()
+    ids = [x.id for x in rows]
+    if community_id not in ids:
+        return c
+    idx = ids.index(community_id)
+    if idx == len(ids) - 1:
+        return c
+    nxt = rows[idx + 1]
+    c.sort, nxt.sort = nxt.sort, c.sort
     await db.commit()
     await db.refresh(c)
     return c
@@ -219,6 +355,7 @@ async def delete_community(
     await db.commit()
 
 
+# =================== 支部 ===================
 @router.get("/branches", response_model=list[BranchOut])
 async def list_branches(
     community_id: int | None = None,
@@ -226,7 +363,7 @@ async def list_branches(
     _user: User = Depends(get_current_user),
 ) -> list[Branch]:
     """支部列表。可选按 community_id 过滤。"""
-    stmt = select(Branch).order_by(Branch.id)
+    stmt = select(Branch).order_by(Branch.sort, Branch.id)
     if community_id is not None:
         stmt = stmt.where(Branch.community_id == community_id)
     result = await db.execute(stmt)
@@ -248,7 +385,10 @@ async def create_branch(
     # 校验：街道负责人只能在自己街道的社区下新建支部
     if not can_manage_in_street(user, c.street_id):
         raise HTTPException(status_code=403, detail="无权在该社区下新增支部")
-    b = Branch(**body.model_dump())
+    b = Branch(
+        **body.model_dump(),
+        sort=await _next_sort(Branch, db, where_clause=Branch.community_id == body.community_id),
+    )
     db.add(b)
     await db.commit()
     await db.refresh(b)
@@ -272,6 +412,62 @@ async def update_branch(
     await _assert_branch_in_user_street(user, b)
     for k, v in body.model_dump(exclude_unset=True).items():
         setattr(b, k, v)
+    await db.commit()
+    await db.refresh(b)
+    return b
+
+
+@router.post("/branches/{branch_id}/move-up", response_model=BranchOut)
+async def move_branch_up(
+    branch_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_roles(*ADMIN_OR_STREET_LEAD)),
+) -> Branch:
+    r = await db.execute(
+        select(Branch).options(selectinload(Branch.community).selectinload(Community.street))
+        .where(Branch.id == branch_id)
+    )
+    b = r.scalar_one_or_none()
+    if not b:
+        raise HTTPException(status_code=404, detail="支部不存在")
+    await _assert_branch_in_user_street(user, b)
+    await _swap_sort(
+        Branch, db, branch_id,
+        where_clause=Branch.community_id == b.community_id,
+    )
+    r = await db.execute(select(Branch).where(Branch.id == branch_id))
+    return r.scalar_one()
+
+
+@router.post("/branches/{branch_id}/move-down", response_model=BranchOut)
+async def move_branch_down(
+    branch_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_roles(*ADMIN_OR_STREET_LEAD)),
+) -> Branch:
+    r = await db.execute(
+        select(Branch).options(selectinload(Branch.community).selectinload(Community.street))
+        .where(Branch.id == branch_id)
+    )
+    b = r.scalar_one_or_none()
+    if not b:
+        raise HTTPException(status_code=404, detail="支部不存在")
+    await _assert_branch_in_user_street(user, b)
+    rows = (
+        await db.execute(
+            select(Branch)
+            .where(Branch.community_id == b.community_id)
+            .order_by(Branch.sort, Branch.id)
+        )
+    ).scalars().all()
+    ids = [x.id for x in rows]
+    if branch_id not in ids:
+        return b
+    idx = ids.index(branch_id)
+    if idx == len(ids) - 1:
+        return b
+    nxt = rows[idx + 1]
+    b.sort, nxt.sort = nxt.sort, b.sort
     await db.commit()
     await db.refresh(b)
     return b
@@ -372,6 +568,7 @@ async def delete_branch(
     await db.commit()
 
 
+# =================== 组织树 ===================
 @router.get("/tree", response_model=list[StreetTree])
 async def get_org_tree(
     db: AsyncSession = Depends(get_db),
@@ -383,11 +580,12 @@ async def get_org_tree(
         .options(
             selectinload(Street.communities).selectinload(Community.branches)
         )
-        .order_by(Street.id)
+        .order_by(Street.sort, Street.id)
     )
     return list(result.scalars().unique().all())
 
 
+# =================== 我的数据范围 ===================
 @router.get("/my-scope")
 async def get_my_scope(
     user: User = Depends(get_current_user),

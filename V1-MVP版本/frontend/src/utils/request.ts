@@ -105,7 +105,12 @@ export async function request<T = any>(
     try {
       const data = await res.json()
       const detail = data?.detail
-      if (typeof detail === 'string') {
+      // FastAPI 422: detail = [{loc, msg, type}, ...]
+      if (Array.isArray(detail)) {
+        const first = detail[0]
+        if (first?.msg) msg = first.msg
+        else if (first?.message) msg = first.message
+      } else if (typeof detail === 'string') {
         msg = detail
       } else if (detail?.msg) {
         msg = detail.msg
@@ -131,6 +136,29 @@ export const api = {
   put: <T = any>(url: string, data?: any) => request<T>(url, { method: 'PUT', data }),
   patch: <T = any>(url: string, data?: any) => request<T>(url, { method: 'PATCH', data }),
   delete: <T = any>(url: string) => request<T>(url, { method: 'DELETE' }),
+  /**
+   * 拉 Blob（二进制）。用于下载/预览文件（图片/PDF/word/excel）。
+   * 返 Blob 自身（用 URL.createObjectURL 展示/下载）。
+   */
+  getBlob: async (url: string): Promise<Blob> => {
+    const fullUrl = url.startsWith('http') ? url : `${BASE_URL}${url}`
+    const token = getToken()
+    const skipAuth = SKIP_AUTH_PATHS.some((p) => p.endsWith('/') ? url.includes(p) : url.endsWith(p))
+    const headers: Record<string, string> = {
+      ...(token && !skipAuth ? { Authorization: `Bearer ${token}` } : {}),
+    }
+    const res = await fetch(fullUrl, { method: 'GET', headers })
+    if (!res.ok) {
+      let msg = `请求失败 (${res.status})`
+      try {
+        const data = await res.json()
+        const d = data?.detail
+        if (typeof d === 'string') msg = d
+      } catch { /* ignore */ }
+      throw new ApiError(msg, res.status)
+    }
+    return await res.blob()
+  },
 }
 
 /**

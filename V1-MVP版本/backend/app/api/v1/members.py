@@ -11,7 +11,7 @@ from app.core.deps import get_current_user
 from app.core.security import hash_password
 from app.db.session import get_db
 from app.models.member import Member
-from app.models.party import Branch, Community
+from app.models.party import Branch, Community, Street
 from app.models.user import User
 from app.schemas.member import (
     MemberCreate,
@@ -25,7 +25,9 @@ from app.services.member_import import (
     parse_and_import,
 )
 from app.services.permissions import (
+    can_create_member_at,
     can_create_member_in,
+    can_manage_member_at,
     can_manage_member_in,
     can_manage_members,
     get_member_scope_filter,
@@ -102,32 +104,28 @@ async def list_members(
     user: User = Depends(get_current_user),
 ) -> MemberListResponse:
     """党员列表（分页 + 按角色过滤）。"""
-    # 基础过滤
-    stmt = select(Member).options(selectinload(Member.branch))
+    from app.models.party import Community, Street
+    # 基础过滤：v3 字段全用
+    stmt = select(Member).options(
+        selectinload(Member.branch).selectinload(Branch.community),
+    )
 
-    # 角色权限隔离
+    # 角色权限隔离（v3：直接用 member 的 community_id / street_id 过滤）
     scope = get_member_scope_filter(user)
     if "branch_id" in scope and scope["branch_id"]:
         if branch_id and branch_id != scope["branch_id"]:
             raise HTTPException(status_code=403, detail="无权访问该支部数据")
         stmt = stmt.where(Member.branch_id == scope["branch_id"])
     elif "community_id" in scope and scope["community_id"]:
-        # 通过 join branch 过滤
-        stmt = stmt.join(Branch, Member.branch_id == Branch.id).where(
-            Branch.community_id == scope["community_id"]
-        )
+        # 用 member.community_id 直接过滤（含 org_level=community 和 org_level=branch 的）
+        stmt = stmt.where(Member.community_id == scope["community_id"])
         if branch_id:
             stmt = stmt.where(Member.branch_id == branch_id)
     elif "street_id" in scope and scope["street_id"]:
-        stmt = stmt.join(Branch, Member.branch_id == Branch.id).join(
-            __import__("app.models.party", fromlist=["Community"]).Community,
-            Branch.community_id == __import__("app.models.party", fromlist=["Community"]).Community.id,
-        ).where(
-            __import__("app.models.party", fromlist=["Community"]).Community.street_id
-            == scope["street_id"]
-        )
+        # 用 member.street_id 直接过滤
+        stmt = stmt.where(Member.street_id == scope["street_id"])
         if community_id:
-            stmt = stmt.where(Branch.community_id == community_id)
+            stmt = stmt.where(Member.community_id == community_id)
         if branch_id:
             stmt = stmt.where(Member.branch_id == branch_id)
 
@@ -149,9 +147,22 @@ async def list_members(
     result = await db.execute(stmt)
     members = result.scalars().all()
 
+    # 拉 community/street 名字（一次性 IN）
+    community_ids = {m.community_id for m in members if m.community_id}
+    street_ids = {m.street_id for m in members if m.street_id}
+    community_map: dict[int, str] = {}
+    street_map: dict[int, str] = {}
+    if community_ids:
+        cr = await db.execute(select(Community.id, Community.name).where(Community.id.in_(community_ids)))
+        community_map = {r[0]: r[1] for r in cr.all()}
+    if street_ids:
+        sr = await db.execute(select(Street.id, Street.name).where(Street.id.in_(street_ids)))
+        street_map = {r[0]: r[1] for r in sr.all()}
+
     items = [
         MemberListItem(
             id=m.id,
+            org_level=m.org_level,
             name=m.name,
             phone=m.phone,
             id_card_no=m.id_card_no,
@@ -159,10 +170,14 @@ async def list_members(
             join_date=m.join_date,
             status=m.status,
             branch_id=m.branch_id,
+            community_id=m.community_id,
+            street_id=m.street_id,
             branch_name=m.branch.name if m.branch else None,
-            roles=m.roles,        # MemberOut 自动转 list
+            community_name=community_map.get(m.community_id) if m.community_id else None,
+            street_name=street_map.get(m.street_id) if m.street_id else None,
+            roles=m.roles,
             identities=m.identities,
-            photo_urls=m.photo_urls,  # 加回：让 list 头像能展示
+            photo_urls=m.photo_urls,
             is_mobile_member=m.is_mobile_member,
             flow_in_date=m.flow_in_date,
             created_at=m.created_at,
@@ -195,14 +210,11 @@ async def get_member_by_phone(
     if not m:
         raise HTTPException(status_code=404, detail="党员档案不存在，请联系管理员")
 
-    # 权限校验
+    # 权限校验（v2026-07-28：社区组织员 = 社区组织委员 = 本社区权限）
     if user.role in (User.ROLE_ADMIN, User.ROLE_STREET_LEAD):
         pass  # 全权限
-    elif user.role == User.ROLE_COMMUNITY_ORG:
+    elif user.role in (User.ROLE_COMMUNITY_ORG, User.ROLE_BRANCH_SEC):
         if not (m.branch and m.branch.community_id == user.community_id):
-            raise HTTPException(status_code=403, detail="无权查询该党员信息")
-    elif user.role == User.ROLE_BRANCH_SEC:
-        if m.branch_id != user.branch_id:
             raise HTTPException(status_code=403, detail="无权查询该党员信息")
     else:  # 普通党员
         if user.phone != phone:
@@ -233,18 +245,21 @@ async def get_member(
     if not m:
         raise HTTPException(status_code=404, detail="党员不存在")
 
-    # 权限校验：是否在用户可见范围
-    if user.role == User.ROLE_COMMUNITY_ORG:
+    # 权限校验：是否在用户可见范围（v2026-07-28：社区组织员 = 本社区）
+    if user.role in (User.ROLE_COMMUNITY_ORG, User.ROLE_BRANCH_SEC):
         if m.branch and m.branch.community_id != user.community_id:
             raise HTTPException(status_code=403, detail="无权访问")
-    elif user.role in (User.ROLE_BRANCH_SEC, User.ROLE_MEMBER):
+    elif user.role == User.ROLE_MEMBER:
         if m.branch_id != user.branch_id:
             raise HTTPException(status_code=403, detail="无权访问")
 
     return MemberListItem(
         id=m.id, name=m.name, phone=m.phone, id_card_no=m.id_card_no,
         gender=m.gender, join_date=m.join_date, status=m.status,
+        org_level=m.org_level,
         branch_id=m.branch_id, branch_name=m.branch.name if m.branch else None,
+        community_id=m.community_id,
+        street_id=m.street_id,
         roles=m.roles, identities=m.identities, photo_urls=m.photo_urls,
         is_mobile_member=m.is_mobile_member,
         flow_in_date=m.flow_in_date,
@@ -261,17 +276,53 @@ async def create_member(
     if not can_manage_members(user):
         raise HTTPException(status_code=403, detail="无权新增党员")
 
-    # 校验支部存在
-    branch_r = await db.execute(
-        select(Branch).options(selectinload(Branch.community)).where(Branch.id == body.branch_id)
-    )
-    branch = branch_r.scalar_one_or_none()
-    if not branch:
-        raise HTTPException(status_code=400, detail="支部不存在")
+    # 按 org_level 校验组织存在 + 拉取其上层 ID
+    target_street_id: int | None = None
+    target_community_id: int | None = None
+    target_branch_community_id: int | None = None  # for can_create_member_at
 
-    # 权限：社区委员只能在本社区
-    if not can_create_member_in(user, branch.community_id):
-        raise HTTPException(status_code=403, detail="无权在该支部新增党员")
+    if body.org_level == "branch":
+        if not body.branch_id:
+            raise HTTPException(status_code=400, detail="org_level=branch 时必须填写 branch_id")
+        br_r = await db.execute(
+            select(Branch).options(selectinload(Branch.community)).where(Branch.id == body.branch_id)
+        )
+        branch = br_r.scalar_one_or_none()
+        if not branch:
+            raise HTTPException(status_code=400, detail="支部不存在")
+        target_street_id = branch.community.street_id
+        target_community_id = branch.community_id
+        target_branch_community_id = branch.community_id
+    elif body.org_level == "community":
+        if not body.community_id:
+            raise HTTPException(status_code=400, detail="org_level=community 时必须填写 community_id")
+        co_r = await db.execute(
+            select(Community).where(Community.id == body.community_id)
+        )
+        comm = co_r.scalar_one_or_none()
+        if not comm:
+            raise HTTPException(status_code=400, detail="社区不存在")
+        target_street_id = comm.street_id
+        target_community_id = comm.id
+    elif body.org_level == "street":
+        if not body.street_id:
+            raise HTTPException(status_code=400, detail="org_level=street 时必须填写 street_id")
+        st_r = await db.execute(
+            select(Street).where(Street.id == body.street_id)
+        )
+        street = st_r.scalar_one_or_none()
+        if not street:
+            raise HTTPException(status_code=400, detail="街道不存在")
+        target_street_id = street.id
+
+    # 权限校验（按 org_level + 选中的组织 ID）
+    if not can_create_member_at(
+        user, body.org_level,
+        branch_community_id=target_branch_community_id,
+        target_street_id=target_street_id,
+        target_community_id=target_community_id,
+    ):
+        raise HTTPException(status_code=403, detail="无权在该组织下新增党员")
 
     # 手机号唯一（active 状态）
     dup_r = await db.execute(
@@ -314,6 +365,14 @@ async def create_member(
 
     # 创建党员（含 roles/identities/photo_urls 展示字段）
     member_data = body.model_dump(exclude={"roles", "identities", "photo_urls"})
+    # 自动回填 community_id / street_id（前端只传一个，剩下反查）
+    if member_data.get("org_level") == "branch" and member_data.get("branch_id") and not member_data.get("community_id"):
+        member_data["community_id"] = target_community_id
+        member_data["street_id"] = target_street_id
+    elif member_data.get("org_level") == "community" and member_data.get("community_id") and not member_data.get("street_id"):
+        member_data["street_id"] = target_street_id
+    # street 级别：street_id 已有
+
     m = Member(
         **member_data,
         roles=_dump_json(normalized_roles),
@@ -330,18 +389,18 @@ async def create_member(
         select(User).where(User.phone == body.phone)
     )
     if user_dup.scalar_one_or_none():
-        # 已有同手机号用户（极少见，可能是 admin/lead 等），跳过建账号
         return MemberOut.model_validate(m)
 
     default_pwd = body.phone[-6:]
+    # v3：按 org_level 决定 user 的组织 ID（street/community/branch 都填，缺字段留 None）
     new_user = User(
         phone=body.phone,
         password_hash=hash_password(default_pwd),
         name=body.name,
-        role=chosen_role,  # 按优先级自动派发
-        street_id=branch.community.street_id,
-        community_id=branch.community_id,
-        branch_id=branch.id,
+        role=chosen_role,
+        street_id=target_street_id,
+        community_id=target_community_id,
+        branch_id=body.branch_id if body.org_level == "branch" else None,
         status='active',
     )
     db.add(new_user)
@@ -368,20 +427,50 @@ async def update_member(
         raise HTTPException(status_code=404, detail="党员不存在")
 
     # 权限：必须在可见范围（按角色严格判断）
-    target_community_id = m.branch.community_id if m.branch else None
-    if not can_manage_member_in(user, m.branch_id, target_community_id):
+    if not can_manage_member_at(user, m):
         raise HTTPException(status_code=403, detail="无权修改该党员")
 
-    # 如果 PATCH 修改了 branch_id，校验目标支部也在权限范围
-    if body.branch_id is not None and body.branch_id != m.branch_id:
-        new_br_r = await db.execute(
-            select(Branch).options(selectinload(Branch.community)).where(Branch.id == body.branch_id)
-        )
-        new_br = new_br_r.scalar_one_or_none()
-        if not new_br:
-            raise HTTPException(status_code=400, detail="目标支部不存在")
-        if not can_manage_member_in(user, new_br.id, new_br.community_id):
-            raise HTTPException(status_code=403, detail="无权将党员调整到该支部")
+    # 如果 PATCH 修改了 org_level 或组织 ID，校验目标组织
+    new_org_level = body.org_level if body.org_level is not None else m.org_level
+    new_branch_id = body.branch_id if body.branch_id is not None else m.branch_id
+    new_community_id = body.community_id if body.community_id is not None else m.community_id
+    new_street_id = body.street_id if body.street_id is not None else m.street_id
+    if (body.org_level is not None and body.org_level != m.org_level) or \
+       (body.branch_id is not None and body.branch_id != m.branch_id) or \
+       (body.community_id is not None and body.community_id != m.community_id) or \
+       (body.street_id is not None and body.street_id != m.street_id):
+        # 校验目标组织在权限范围
+        target_street_id: int | None = None
+        target_community_id: int | None = None
+        target_branch_community_id: int | None = None
+        if new_org_level == "branch":
+            if not new_branch_id:
+                raise HTTPException(status_code=400, detail="org_level=branch 时必须填写 branch_id")
+            new_br_r = await db.execute(
+                select(Branch).options(selectinload(Branch.community)).where(Branch.id == new_branch_id)
+            )
+            new_br = new_br_r.scalar_one_or_none()
+            if not new_br:
+                raise HTTPException(status_code=400, detail="目标支部不存在")
+            target_street_id = new_br.community.street_id
+            target_community_id = new_br.community_id
+            target_branch_community_id = new_br.community_id
+        elif new_org_level == "community":
+            if not new_community_id:
+                raise HTTPException(status_code=400, detail="org_level=community 时必须填写 community_id")
+            target_street_id = (await db.execute(select(Community).where(Community.id == new_community_id))).scalar_one_or_none().street_id
+            target_community_id = new_community_id
+        elif new_org_level == "street":
+            if not new_street_id:
+                raise HTTPException(status_code=400, detail="org_level=street 时必须填写 street_id")
+            target_street_id = new_street_id
+        if not can_create_member_at(
+            user, new_org_level,
+            branch_community_id=target_branch_community_id,
+            target_street_id=target_street_id,
+            target_community_id=target_community_id,
+        ):
+            raise HTTPException(status_code=403, detail="无权将该党员调整到该组织")
 
     # 角色权限自动派发：编辑时按最新的 roles 重新算 user.role
     if body.photo_urls is not None and len(body.photo_urls) > 1:
@@ -431,6 +520,25 @@ async def update_member(
         data["identities"] = _dump_json(data["identities"])
     if "photo_urls" in data and data["photo_urls"] is not None:
         data["photo_urls"] = _dump_json(data["photo_urls"])
+
+    # 自动反查 community_id / street_id
+    new_level = data.get("org_level", m.org_level)
+    if new_level == "branch":
+        new_branch_id = data.get("branch_id", m.branch_id)
+        if new_branch_id and (data.get("community_id") is None or data.get("street_id") is None):
+            br = (await db.execute(select(Branch).options(selectinload(Branch.community)).where(Branch.id == new_branch_id))).scalar_one_or_none()
+            if br:
+                if data.get("community_id") is None:
+                    data["community_id"] = br.community_id
+                if data.get("street_id") is None:
+                    data["street_id"] = br.community.street_id
+    elif new_level == "community":
+        new_community_id = data.get("community_id", m.community_id)
+        if new_community_id and data.get("street_id") is None:
+            co = (await db.execute(select(Community).where(Community.id == new_community_id))).scalar_one_or_none()
+            if co:
+                data["street_id"] = co.street_id
+
     for k, v in data.items():
         setattr(m, k, v)
     await db.commit()
@@ -455,8 +563,7 @@ async def delete_member(
         raise HTTPException(status_code=404, detail="党员不存在")
 
     # 权限：必须在可见范围（按角色严格判断）
-    target_community_id = m.branch.community_id if m.branch else None
-    if not can_manage_member_in(user, m.branch_id, target_community_id):
+    if not can_manage_member_at(user, m):
         raise HTTPException(status_code=403, detail="无权删除该党员")
 
     # 软删除：把 status 改为 dimission

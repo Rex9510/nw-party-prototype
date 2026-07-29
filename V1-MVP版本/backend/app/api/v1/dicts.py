@@ -138,6 +138,52 @@ async def delete_training_category(
     await db.commit()
 
 
+@router.post("/training-categories/{item_id}/move-up", response_model=DictItemOut)
+async def move_training_category_up(
+    item_id: int,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_roles(*ADMIN_ONLY)),
+):
+    rows = (await db.execute(
+        select(TrainingCategory).order_by(TrainingCategory.sort, TrainingCategory.id)
+    )).scalars().all()
+    ids = [x.id for x in rows]
+    if item_id not in ids:
+        raise HTTPException(status_code=404, detail="类别不存在")
+    idx = ids.index(item_id)
+    if idx == 0:
+        r = await db.execute(select(TrainingCategory).where(TrainingCategory.id == item_id))
+        return r.scalar_one()
+    cur, prev = rows[idx], rows[idx - 1]
+    cur.sort, prev.sort = prev.sort, cur.sort
+    await db.commit()
+    await db.refresh(cur)
+    return cur
+
+
+@router.post("/training-categories/{item_id}/move-down", response_model=DictItemOut)
+async def move_training_category_down(
+    item_id: int,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_roles(*ADMIN_ONLY)),
+):
+    rows = (await db.execute(
+        select(TrainingCategory).order_by(TrainingCategory.sort, TrainingCategory.id)
+    )).scalars().all()
+    ids = [x.id for x in rows]
+    if item_id not in ids:
+        raise HTTPException(status_code=404, detail="类别不存在")
+    idx = ids.index(item_id)
+    if idx == len(ids) - 1:
+        r = await db.execute(select(TrainingCategory).where(TrainingCategory.id == item_id))
+        return r.scalar_one()
+    cur, nxt = rows[idx], rows[idx + 1]
+    cur.sort, nxt.sort = nxt.sort, cur.sort
+    await db.commit()
+    await db.refresh(cur)
+    return cur
+
+
 # 培训来源
 @router.get("/training-sources", response_model=list[DictItemOut])
 async def list_training_sources(
@@ -196,3 +242,49 @@ async def delete_training_source(
         raise HTTPException(status_code=404, detail="来源不存在")
     await db.delete(item)
     await db.commit()
+
+
+@router.post("/training-sources/{item_id}/move-up", response_model=DictItemOut)
+async def move_training_source_up(
+    item_id: int,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_roles(*ADMIN_ONLY)),
+):
+    rows = (await db.execute(
+        select(TrainingSource).order_by(TrainingSource.sort, TrainingSource.id)
+    )).scalars().all()
+    ids = [x.id for x in rows]
+    if item_id not in ids:
+        raise HTTPException(status_code=404, detail="来源不存在")
+    idx = ids.index(item_id)
+    if idx == 0:
+        r = await db.execute(select(TrainingSource).where(TrainingSource.id == item_id))
+        return r.scalar_one()
+    cur, prev = rows[idx], rows[idx - 1]
+    cur.sort, prev.sort = prev.sort, cur.sort
+    await db.commit()
+    await db.refresh(cur)
+    return cur
+
+
+@router.post("/training-sources/{item_id}/move-down", response_model=DictItemOut)
+async def move_training_source_down(
+    item_id: int,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_roles(*ADMIN_ONLY)),
+):
+    rows = (await db.execute(
+        select(TrainingSource).order_by(TrainingSource.sort, TrainingSource.id)
+    )).scalars().all()
+    ids = [x.id for x in rows]
+    if item_id not in ids:
+        raise HTTPException(status_code=404, detail="来源不存在")
+    idx = ids.index(item_id)
+    if idx == len(ids) - 1:
+        r = await db.execute(select(TrainingSource).where(TrainingSource.id == item_id))
+        return r.scalar_one()
+    cur, nxt = rows[idx], rows[idx + 1]
+    cur.sort, nxt.sort = nxt.sort, cur.sort
+    await db.commit()
+    await db.refresh(cur)
+    return cur

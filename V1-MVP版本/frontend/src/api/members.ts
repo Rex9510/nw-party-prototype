@@ -11,8 +11,13 @@ export interface MemberItem {
   gender: string | null
   join_date: string | null
   status: string
-  branch_id: number
+  org_level: 'street' | 'community' | 'branch'
+  branch_id: number | null
   branch_name: string | null
+  community_id: number | null
+  community_name: string | null
+  street_id: number | null
+  street_name: string | null
   roles: string[]
   identities: string[]
   photo_urls: string[]

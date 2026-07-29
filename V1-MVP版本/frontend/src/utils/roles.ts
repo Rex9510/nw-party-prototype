@@ -26,14 +26,14 @@ export const ROLES = {
     ],
   },
   branch_secretary: {
-    label: '支部书记',
+    label: '社区组织员',
     color: '#15803D',
-    scope: '本支部',
+    scope: '本社区',
     cards: [
-      { key: 'members', icon: '👥', label: '人员管理库', desc: '本支部人员', path: '/pages/members/list', enabled: true },
+      { key: 'members', icon: '👥', label: '人员管理库', desc: '本社区人员', path: '/pages/members/list', enabled: true },
       { key: 'activities', icon: '📋', label: '培训活动', desc: '录入/提交', path: '/pages/activities/list', enabled: true },
-      { key: 'study', icon: '🎓', label: '学时档案', desc: '本支部汇总', path: '/pages/study-hours/index', enabled: true },
-      { key: 'stats', icon: '📊', label: '年度统计', desc: '本支部数据', path: '/pages/stats/yearly', enabled: true },
+      { key: 'study', icon: '🎓', label: '学时档案', desc: '本社区汇总', path: '/pages/study-hours/index', enabled: true },
+      { key: 'stats', icon: '📊', label: '年度统计', desc: '本社区数据', path: '/pages/stats/yearly', enabled: true },
     ],
   },
   member: {

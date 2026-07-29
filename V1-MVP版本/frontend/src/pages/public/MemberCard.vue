@@ -7,6 +7,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showToast } from 'vant'
+import { ROLES } from '@/utils/roles'
 import { api } from '@/utils/request'
 
 const route = useRoute()
@@ -28,6 +29,13 @@ function onBack() {
   router.push('/pages/login/index')
 }
 
+interface Attachment {
+  id: number
+  kind: string  // photo / signin
+  thumbnail_url: string | null
+  is_image: boolean
+}
+
 interface Training {
   activity_id: number
   theme: string
@@ -38,8 +46,7 @@ interface Training {
   study_hours: number
   source_type: string
   attendance_status: string
-  photos: string[]
-  attachments: string[]
+  attachments: Attachment[]
 }
 
 interface MemberInfo {
@@ -116,11 +123,12 @@ const partyAgeText = computed(() => {
 const isImage = (url: string) =>
   url.startsWith('data:image') || /\.(png|jpg|jpeg|gif|webp|bmp)$/i.test(url)
 
-const fileTypeIcon = (url: string) => {
-  if (url.startsWith('data:application/pdf')) return '📄'
-  if (url.includes('spreadsheet') || url.includes('ms-excel')) return '📊'
-  if (url.includes('wordprocessingml') || url.includes('msword')) return '📝'
-  if (url.startsWith('data:text/plain')) return '📃'
+// 按 attachment id 拉全图（缩略图点开时调 /public/attachments/{id}/full）
+const loadingFullId = ref<number | null>(null)
+
+const fileTypeIcon = (att: Attachment) => {
+  // 非图片（pdf/word/excel/txt）按 kind 给固定 icon
+  if (att.is_image) return ''
   return '📎'
 }
 
@@ -133,35 +141,36 @@ const MIME_EXT: Record<string, string> = {
   'text/plain': 'txt',
 }
 
-const downloadAttachment = (url: string) => {
+const downloadAttachment = async (att: Attachment) => {
   try {
-    if (!url.startsWith('data:')) {
-      window.open(url, '_blank')
-      return
-    }
-    const [meta, b64] = url.split(',')
-    const mime = meta.match(/data:([^;]+)/)?.[1] || 'application/octet-stream'
+    const blob: Blob = await api.getBlob(`/public/attachments/${att.id}/full`)
+    // 从 mime 推扩展名
+    const mime = blob.type || 'application/octet-stream'
     const ext = MIME_EXT[mime] || mime.split('/')[1]?.split('+').pop()?.split('.').pop() || 'bin'
-    const bin = atob(b64)
-    const bytes = new Uint8Array(bin.length)
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-    const blob = new Blob([bytes], { type: mime })
     const objUrl = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = objUrl
-    a.download = `附件.${ext}`
+    a.download = `附件-${att.id}.${ext}`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(objUrl)
-  } catch (e) {
-    showToast('下载失败')
+  } catch (e: any) {
+    showToast(e?.message || '下载失败')
   }
 }
 
-const onPhotoClick = (url: string) => {
-  previewImage.value = url
-  showPreview.value = true
+const onPhotoClick = async (att: Attachment) => {
+  try {
+    loadingFullId.value = att.id
+    const blob: Blob = await api.getBlob(`/public/attachments/${att.id}/full`)
+    previewImage.value = URL.createObjectURL(blob)
+    showPreview.value = true
+  } catch (e: any) {
+    showToast(e?.message || '加载图片失败')
+  } finally {
+    loadingFullId.value = null
+  }
 }
 
 async function load() {
@@ -234,7 +243,10 @@ onMounted(() => {
           <span class="join-time-dur">（党龄 {{ partyAgeText }}）</span>
         </div>
         <div v-if="member.roles && member.roles.length" class="tag-row">
-          <span v-for="r in member.roles" :key="r" class="tag">{{ r }}</span>
+          <span v-for="r in member.roles" :key="r" class="tag">{{ (ROLES as any)[r]?.label || r }}</span>
+        </div>
+        <div v-if="member.identities && member.identities.length" class="tag-row">
+          <span v-for="idn in member.identities" :key="idn" class="tag identity-tag">{{ idn }}</span>
         </div>
         <div v-if="member.phone" class="contact">
           <span class="contact-label">📞 电话：</span>
@@ -286,25 +298,23 @@ onMounted(() => {
           <div v-if="t.lecturer_bio" class="t-bio">
             {{ t.lecturer_bio }}
           </div>
-          <div v-if="t.photos && t.photos.length" class="t-photos">
+          <div v-if="t.attachments && t.attachments.length" class="t-photos">
             <div
-              v-for="(p, i) in t.photos"
-              :key="i"
+              v-for="att in t.attachments"
+              :key="att.id"
               class="t-photo"
-              @click="onPhotoClick(p)"
+              @click="onPhotoClick(att)"
             >
-              <img v-if="isImage(p)" :src="p" />
-            </div>
-          </div>
-          <div v-if="t.attachments && t.attachments.length" class="t-attachments">
-            <div
-              v-for="(a, i) in t.attachments"
-              :key="i"
-              class="t-attach"
-              @click="downloadAttachment(a)"
-            >
-              <span class="t-attach-icon">{{ fileTypeIcon(a) }}</span>
-              <span>附件 {{ i + 1 }}</span>
+              <img
+                v-if="att.is_image && att.thumbnail_url"
+                :src="att.thumbnail_url"
+                :class="{ 'is-loading': loadingFullId === att.id }"
+              />
+              <div v-else-if="!att.is_image" class="t-attach-tile" @click.stop="downloadAttachment(att)">
+                <span class="t-attach-icon">{{ fileTypeIcon(att) }}</span>
+                <span class="t-attach-label">附件</span>
+              </div>
+              <div v-else class="t-photo-empty">无图</div>
             </div>
           </div>
         </div>
@@ -495,6 +505,10 @@ onMounted(() => {
   padding: 2px 8px;
   border-radius: 4px;
 }
+.identity-tag {
+  background: #F0F5FF;
+  color: #1E40AF;
+}
 .contact {
   margin-top: 10px;
   font-size: 14px;
@@ -630,6 +644,33 @@ onMounted(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+.t-photo img.is-loading {
+  opacity: 0.5;
+}
+.t-photo-empty {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  font-size: 12px;
+  background: #f5f5f5;
+}
+.t-attach-tile {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #FFF7E6;
+  color: #B22222;
+  gap: 2px;
+}
+.t-attach-label {
+  font-size: 11px;
 }
 .t-attachments {
   display: flex;

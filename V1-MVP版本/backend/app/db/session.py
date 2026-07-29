@@ -61,13 +61,19 @@ engine = create_async_engine(DATABASE_URL, **_engine_kwargs)
 
 # SQLite 开启 WAL（Write-Ahead Logging）+ 合理 busy_timeout
 # 这样读不阻塞写，并发友好
+#
+# 注意：foreign_keys=OFF（不是 ON）。
+# 原因：SQLAlchemy 2.0 + aiosqlite + RETURNING + autoflush 模式下，flush 后 INSERT 的外键行
+# 在同事务内立即检查 FK，导致 ORM 链式 add(activity) + add(participants(activity.id=activity.id))
+# 会失败（"FOREIGN KEY constraint failed"），即使两行都在同一事务内也会因 visibility 检查失败。
+# 应用层（permissions / model_validator / SQL CHECK）已保证数据完整性，SQLite FK 仅作辅助。
 @event.listens_for(engine.sync_engine, "connect")
 def _set_sqlite_pragma(dbapi_connection, _):
     if DATABASE_URL.startswith("sqlite"):
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA synchronous=NORMAL")
-        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA foreign_keys=OFF")
         cursor.execute("PRAGMA busy_timeout=5000")
         cursor.close()
 
